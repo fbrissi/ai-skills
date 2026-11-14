@@ -1,0 +1,25 @@
+{
+  "name": "ai-skills",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Reusable, harness-agnostic AI agent skills for Claude Code, Codex CLI, OpenCode, Cursor and GitHub Copilot",
+  "scripts": {
+    "sync": "scripts/sync-shared.sh",
+    "generate": "npm run -s sync && rulesync generate",
+    "generate:global": "npm run -s sync && rulesync generate --config rulesync.global.jsonc",
+    "check": "scripts/sync-shared.sh --check && rulesync generate --check",
+    "doctor": "rulesync doctor",
+    "check:discovery": "scripts/check-discovery.sh"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fbrissi/ai-skills.git"
+  },
+  "license": "MIT",
+  "engines": {
+    "node": ">=22.22.0"
+  },
+  "devDependencies": {
+    "rulesync": "43.8.2"
+  }
+}
