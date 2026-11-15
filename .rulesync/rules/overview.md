@@ -12,7 +12,8 @@ Public library of reusable, harness-agnostic AI agent skills. Users install them
 ## Source of truth
 
 - Edit only `.rulesync/**`, `shared/**`, `docs/**`, `scripts/**`, `.github/workflows/**`, and the root files (`README.md`, `CHANGELOG.md`, `package.json`, configs).
-- Generated and gitignored, never edit or commit: `.claude/`, `.agents/`, `.cursor/`, `.github/skills/`, `.github/copilot-instructions.md`, `AGENTS.md`, `CLAUDE.md`. Committed copies would make the `skills` CLI list each skill twice.
+- Generated and committed, never edit by hand: `AGENTS.md`, `CLAUDE.md`. Edit `.rulesync/rules/overview.md`, then run `npm run generate` and commit both.
+- Generated and gitignored, never edit or commit: `.claude/`, `.agents/`, `.cursor/`, `.github/skills/`, `.github/copilot-instructions.md`. Committed skill folders would make the `skills` CLI list each skill twice.
 - Skills live in `.rulesync/skills/<skill-name>/SKILL.md`.
 - Files under a skill's `references/` or `scripts/` that are listed in `shared/manifest.txt` are copies: edit `shared/`, then run `npm run sync`.
 - To add a skill, follow the `skill-authoring` skill, then add `docs/skills/<name>.md`, a row in the `docs/README.md` catalog, and an entry in the root `README.md` skills table.
