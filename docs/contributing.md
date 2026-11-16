@@ -64,14 +64,27 @@ Why the copies: the `skills` CLI and `rulesync install` fetch one skill director
 
 | Workflow | Trigger | What it does |
 | --- | --- | --- |
-| `quality-checks.yml` | PRs, pushes to `main` | `npm run check`, `npm run doctor`, `bash -n` on scripts, `check:discovery`, `npm audit`; on PRs to `main`, the release-note check; then dispatches Code Review |
-| `code-review.yml` | dispatched by Quality Checks | Runs OpenCode with this repo's `review-changes` skill (taken from the base branch) and publishes a PR review |
+| `quality-checks.yml` | PRs, pushes to `main` | `npm run check`, `npm run doctor`, `bash -n` and `ruby -c` on scripts, `check:discovery`, `npm audit`; on PRs to `main`, the release-note check; then dispatches Code Review |
+| `code-review.yml` | dispatched by Quality Checks | Runs OpenCode or Claude Code (`AI_HARNESS`) with this repo's `review-changes` skill (taken from the base branch) and publishes a PR review |
 | `release-orchestrator.yml` | PR merged into `main` | Reads the top `## vX.Y.Z` from `CHANGELOG.md` and calls `release.yml` |
 | `release.yml` | called, or run manually | Validates the version, creates the tag and the GitHub release with the CHANGELOG notes |
 
 **Release notes**: every PR into `main` must add exactly one new heading `## vMAJOR.MINOR.PATCH` at the top of `CHANGELOG.md`, with notes, for a version that has no tag yet. `package.json`'s `version` must match. Merging the PR tags and releases that version. Users then get it with `npx skills update`, or pin it with `npx skills add fbrissi/ai-skills@vX.Y.Z`.
 
-**Code Review setup** (repository settings): environment `opencode-review`; variables `AGENT_APP_ID`, `OPENCODE_MODEL`, `OPENCODE_VARIANT`; secrets `AGENT_APP_PRIVATE_KEY` (GitHub App that posts the review) and `OPEN_AI_TOKEN`. Set the variable `CODE_REVIEW_ENABLED` to `false` to skip it. Optional: `CI_RUNNER` to change the runner.
+**Code Review setup** (repository settings):
+
+| Name | Kind | Purpose |
+| --- | --- | --- |
+| `AI_HARNESS` | variable | `opencode` (default when empty) or `claude` |
+| `AGENT_APP_ID`, `AGENT_APP_PRIVATE_KEY` | variable, secret | GitHub App that publishes the review |
+| `OPENCODE_MODEL`, `OPENCODE_VARIANT` | variables | OpenCode model (`provider/model`) and variant; `OPENCODE_MODEL` is required for `opencode` |
+| `OPEN_AI_TOKEN` | secret | Provider key used by OpenCode |
+| `CLAUDE_MODEL`, `CLAUDE_EFFORT` | variables | Optional Claude Code model and effort |
+| `CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_API_KEY` | secret | Claude Code authentication; one is required for `claude` |
+| `CODE_REVIEW_ENABLED` | variable | `false` skips the review |
+| `CI_RUNNER` | variable | Optional runner label |
+
+The review job runs in the `code-review` environment, which GitHub creates on the first run; add protection rules there if you want them. A review that ends with `Published: skipped (...)` passes without publishing.
 
 ## Commands
 
