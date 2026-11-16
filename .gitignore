@@ -48,3 +48,7 @@ rulesync.local.jsonc
 **/.cursorignore
 !.rulesync/.aiignore
 # End of Rulesync
+
+# Root guidance files are generated but tracked
+!/AGENTS.md
+!/CLAUDE.md

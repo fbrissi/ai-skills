@@ -1,0 +1,7 @@
+# Shared files copied into skills by scripts/sync-shared.sh.
+# `rulesync install` skips symlinks, so each skill carries a real copy.
+# Format: <path under shared/> <skill> [<skill> ...]
+scripts/pr-context.sh      pr-fix review-changes
+references/tickets.md      ticket-plan ticket-ask ticket-create dev pr-create review-changes
+references/body-format.md  pr-create ticket-create ship
+references/commits.md      ship todo pr-fix

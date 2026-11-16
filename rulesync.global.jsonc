@@ -1,0 +1,17 @@
+{
+  "$schema": "https://github.com/dyoshikawa/rulesync/releases/latest/download/config-schema.json",
+  // Used by `npm run generate:global`: a development preview of the skills in your user folders.
+  // Do not mix with `npx skills add -g`, which manages the same folders. Targets are limited to
+  // Claude Code and Codex; Cursor also reads ~/.agents/skills, so adding `cursor` would duplicate skills.
+  // `delete` must stay false: user-scope skill folders (~/.claude/skills, ~/.agents/skills, ...)
+  // are shared with other installers, and delete would remove every skill not generated here.
+  "targets": [
+    "claudecode",
+    "codexcli"
+  ],
+  "features": ["skills"],
+  "delete": false,
+  "verbose": false,
+  "silent": false,
+  "global": true
+}

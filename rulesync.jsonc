@@ -1,0 +1,21 @@
+{
+  "$schema": "https://github.com/dyoshikawa/rulesync/releases/latest/download/config-schema.json",
+  // Harnesses to generate for. Run `npx rulesync generate --help` for all target ids.
+  // No `opencode` target: OpenCode already reads .claude/skills and .agents/skills.
+  "targets": [
+    "claudecode",
+    "codexcli",
+    "cursor",
+    "copilot"
+  ],
+  "features": ["rules", "skills"],
+  "outputRoots": ["."],
+  "delete": true,
+  "verbose": false,
+  "silent": false,
+  "global": false,
+  "simulateCommands": false,
+  "simulateSubagents": false,
+  "simulateSkills": false,
+  "gitignoreTargetsOnly": true
+}

@@ -150,8 +150,25 @@ jobs:
       contents: read
     timeout-minutes: 30
     environment:
-      name: opencode-review
+      name: code-review
     steps:
+      - name: Resolve AI harness
+        id: harness
+        env:
+          AI_HARNESS: ${{ vars.AI_HARNESS }}
+        run: |
+          set -euo pipefail
+          harness="${AI_HARNESS:-opencode}"
+          case "$harness" in
+            opencode | claude) ;;
+            *)
+              echo "::error::Unsupported AI_HARNESS '${harness}'. Use opencode or claude."
+              exit 1
+              ;;
+          esac
+          echo "Code Review harness: $harness"
+          echo "name=$harness" >> "$GITHUB_OUTPUT"
+
       - name: Generate GitHub App token
         id: app-token
         uses: actions/create-github-app-token@v3
@@ -204,6 +221,7 @@ jobs:
         run: npm ci
 
       - name: Install OpenCode
+        if: ${{ steps.harness.outputs.name == 'opencode' }}
         env:
           OPENCODE_VERSION: 1.19.5
           OPENCODE_SHA256: 588310a336fa3b9df36b3f0225b26f679d453efaad0cf3d66c3651ef3ec1647a
@@ -219,9 +237,19 @@ jobs:
           rm -rf "$archive" "$RUNNER_TEMP/opencode"
           echo "$HOME/.opencode/bin" >> "$GITHUB_PATH"
 
+      - name: Install Claude Code
+        if: ${{ steps.harness.outputs.name == 'claude' }}
+        env:
+          CLAUDE_CODE_VERSION: 2.1.319
+        run: |
+          set -euo pipefail
+          npm install --global --no-fund --no-audit "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}"
+          claude --version
+
       - name: Install review-changes skill from the base branch
         env:
           BASE_SHA: ${{ needs.start-review.outputs.base_sha }}
+          HARNESS: ${{ steps.harness.outputs.name }}
         run: |
           set -euo pipefail
           # Use the base branch's skill so a pull request cannot rewrite its own reviewer.
@@ -231,29 +259,78 @@ jobs:
             echo "::warning::review-changes is not on the base branch yet; using the pull request's version."
             source_ref='HEAD'
           fi
-          skills_dir="$HOME/.config/opencode/skills"
+          case "$HARNESS" in
+            opencode) skills_dir="$HOME/.config/opencode/skills" ;;
+            claude) skills_dir="$HOME/.claude/skills" ;;
+          esac
           mkdir -p "$skills_dir"
           git archive "$source_ref" "$skill_path" | tar -x -C "$RUNNER_TEMP"
           rm -rf "$skills_dir/review-changes"
           cp -R "$RUNNER_TEMP/$skill_path" "$skills_dir/review-changes"
 
-      - name: Run OpenCode review
+      - name: Run AI review
         env:
+          HARNESS: ${{ steps.harness.outputs.name }}
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           OPENAI_API_KEY: ${{ secrets.OPEN_AI_TOKEN }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          OPENCODE_MODEL: ${{ vars.OPENCODE_MODEL }}
+          OPENCODE_VARIANT: ${{ vars.OPENCODE_VARIANT }}
+          CLAUDE_MODEL: ${{ vars.CLAUDE_MODEL }}
+          CLAUDE_EFFORT: ${{ vars.CLAUDE_EFFORT }}
           GH_REPO: ${{ github.repository }}
           PR_NUMBER: ${{ needs.start-review.outputs.pr_number }}
           HEAD_SHA: ${{ needs.start-review.outputs.head_sha }}
         run: |
           set -euo pipefail
+
+          # Empty credentials must not shadow another authentication method.
+          for name in OPENAI_API_KEY ANTHROPIC_API_KEY CLAUDE_CODE_OAUTH_TOKEN; do
+            if [ -z "${!name:-}" ]; then
+              unset "$name"
+            fi
+          done
+
+          prompt="Use the review-changes skill to review pull request #${PR_NUMBER} in ${GITHUB_REPOSITORY} and publish the review on GitHub. Do not modify, commit, or push any files."
+          output_file="$RUNNER_TEMP/code-review-output.txt"
           review_started_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          timeout --foreground --kill-after=30s 25m opencode run \
-            --model="${{ vars.OPENCODE_MODEL }}" \
-            --variant="${{ vars.OPENCODE_VARIANT }}" \
-            --thinking \
-            --dangerously-skip-permissions \
-            "Use the review-changes skill to review pull request #${PR_NUMBER} in ${GITHUB_REPOSITORY} and publish the review on GitHub. Do not modify, commit, or push any files."
+
+          case "$HARNESS" in
+            opencode)
+              if [ -z "${OPENCODE_MODEL:-}" ]; then
+                echo '::error::The opencode harness requires the OPENCODE_MODEL variable.'
+                exit 1
+              fi
+              command=(opencode run "--model=${OPENCODE_MODEL}" --thinking --dangerously-skip-permissions)
+              if [ -n "${OPENCODE_VARIANT:-}" ]; then
+                command+=("--variant=${OPENCODE_VARIANT}")
+              fi
+              timeout --foreground --kill-after=30s 25m "${command[@]}" "$prompt" 2>&1 | tee "$output_file"
+              ;;
+            claude)
+              if [ -z "${ANTHROPIC_API_KEY:-}" ] && [ -z "${CLAUDE_CODE_OAUTH_TOKEN:-}" ]; then
+                echo '::error::The claude harness requires the ANTHROPIC_API_KEY or CLAUDE_CODE_OAUTH_TOKEN secret.'
+                exit 1
+              fi
+              command=(claude --print --output-format text --dangerously-skip-permissions)
+              if [ -n "${CLAUDE_MODEL:-}" ]; then
+                command+=(--model "$CLAUDE_MODEL")
+              fi
+              if [ -n "${CLAUDE_EFFORT:-}" ]; then
+                command+=(--effort "$CLAUDE_EFFORT")
+              fi
+              printf '%s' "$prompt" \
+                | timeout --foreground --kill-after=30s 25m "${command[@]}" 2>&1 \
+                | tee "$output_file"
+              ;;
+          esac
+
+          if grep -qE '^Published: skipped' "$output_file"; then
+            echo 'The review was skipped on purpose (already approved or no new findings).'
+            exit 0
+          fi
 
           review_count=0
           for attempt in 1 2 3 4 5 6; do
@@ -267,12 +344,12 @@ jobs:
           done
 
           if [ "$review_count" -eq 0 ]; then
-            echo 'OpenCode did not publish a GitHub review for the current commit.' >&2
+            echo "The ${HARNESS} harness did not publish a GitHub review for the current commit." >&2
             exit 1
           fi
 
       - name: Export OpenCode session
-        if: ${{ always() && !cancelled() }}
+        if: ${{ always() && !cancelled() && steps.harness.outputs.name == 'opencode' }}
         run: |
           session_id="$(opencode session list | awk 'NR > 2 && $1 ~ /^ses_/ { print $1; exit }')"
 
@@ -309,7 +386,7 @@ jobs:
               output: {
                 title: conclusion === 'success' ? 'Code Review completed' : 'Code Review failed',
                 summary: conclusion === 'success'
-                  ? 'OpenCode completed the pull request review.'
-                  : 'OpenCode failed before completing the pull request review.',
+                  ? 'The AI harness completed the pull request review.'
+                  : 'The AI harness failed before completing the pull request review.',
               },
             });

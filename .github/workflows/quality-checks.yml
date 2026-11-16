@@ -1,0 +1,139 @@
+name: Quality Checks
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: quality-checks-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  quality:
+    name: Quality / ${{ matrix.name }}
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: generated-outputs
+            command: npm run check
+          - name: rulesync-doctor
+            command: npm run doctor
+          - name: shell-syntax
+            command: for f in scripts/*.sh shared/scripts/*.sh .rulesync/skills/*/scripts/*.sh; do bash -n "$f"; done; for f in .rulesync/skills/*/scripts/*.rb; do ruby -c "$f"; done
+          - name: skills-discovery
+            command: scripts/check-discovery.sh
+          - name: dependency-audit
+            command: npm audit --audit-level=high
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Run ${{ matrix.name }}
+        env:
+          DISABLE_TELEMETRY: '1'
+          DO_NOT_TRACK: '1'
+        run: ${{ matrix.command }}
+
+  release-note:
+    name: Quality / release-note
+    if: ${{ github.event_name == 'pull_request' && github.base_ref == 'main' }}
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Validate new release note
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+
+          mapfile -t versions < <(
+            git diff --unified=0 "$BASE_SHA" "$HEAD_SHA" -- CHANGELOG.md \
+              | sed -nE 's/^\+## (v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?)$/\1/p'
+          )
+
+          if [ "${#versions[@]}" -ne 1 ]; then
+            echo 'CHANGELOG.md must add exactly one release heading in the form ## vMAJOR.MINOR.PATCH.'
+            exit 1
+          fi
+
+          version="${versions[0]}"
+          notes=$(awk -v heading="## $version" '
+            $0 == heading { found = 1; next }
+            found && /^## / { exit }
+            found { print }
+          ' CHANGELOG.md)
+
+          if [ -z "$(printf '%s' "$notes" | tr -d '[:space:]')" ]; then
+            echo "Release $version must include release notes."
+            exit 1
+          fi
+
+          if git rev-parse -q --verify "refs/tags/$version" >/dev/null; then
+            echo "Release tag already exists: $version"
+            exit 1
+          fi
+
+          package_version="v$(jq -r .version package.json)"
+          if [ "$package_version" != "$version" ]; then
+            echo "package.json version ($package_version) must match the new CHANGELOG.md release ($version)."
+            exit 1
+          fi
+
+  quality-jobs:
+    name: Quality Checks
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    needs: [quality, release-note]
+    if: ${{ always() && !cancelled() && (github.event_name != 'pull_request' || github.event.pull_request.draft == false) }}
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      - name: Validate quality results
+        env:
+          QUALITY_RESULT: ${{ needs.quality.result }}
+          RELEASE_NOTE_RESULT: ${{ needs.release-note.result }}
+        run: |
+          set -euo pipefail
+
+          if [ "$QUALITY_RESULT" != 'success' ]; then
+            echo "Quality result: $QUALITY_RESULT"
+            exit 1
+          fi
+
+          if [ "$RELEASE_NOTE_RESULT" != 'success' ] && [ "$RELEASE_NOTE_RESULT" != 'skipped' ]; then
+            echo "Release note result: $RELEASE_NOTE_RESULT"
+            exit 1
+          fi
+
+      - name: Dispatch Code Review
+        if: ${{ success() && github.event_name == 'pull_request' && vars.CODE_REVIEW_ENABLED != 'false' }}
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const pullRequest = context.payload.pull_request;
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'code-review.yml',
+              ref: pullRequest.head.ref,
+              inputs: {
+                pr_number: String(pullRequest.number),
+              },
+            });
