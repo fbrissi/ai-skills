@@ -21,7 +21,7 @@ Stop with `Unable to answer ticket: missing ticket or question` if either one ca
 
 ## Steps
 
-1. Load the ticket body and comments following `references/tickets.md`.
+1. Load the ticket body and comments following `references/tickets.md`. If no access can load it, stop and say which tool, MCP server, or CLI is needed.
 2. Answer from the ticket discussion, plus repository context when the question is technical (cite `path:line` for code claims). Do not invent facts. If something is unknown, say so and state what would settle it.
 3. Keep it short: lead with the direct answer, then supporting detail. Match the tone of the thread.
 4. When posting is requested or approved, post it as a comment using the provider's comment command (body via temp file).

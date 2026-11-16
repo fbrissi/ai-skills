@@ -22,7 +22,7 @@ High-signal code review with a 1-5 star grade and severity-ranked findings. Work
 
 ## What it does
 
-1. Loads the scope: git diff, or `scripts/pr-context.sh` plus a linked ticket for PRs.
+1. Loads the scope: git diff, or `scripts/pr-context.sh` plus a referenced ticket for PRs. If the ticket cannot be loaded (for example a Jira key in CI with no Jira access), it reviews the diff alone and adds a `Ticket: <ref> not loaded` line instead of stopping.
 2. Reads the nearest `AGENTS.md`/`CLAUDE.md` (binding criteria) and every changed file in full.
 3. Reports only material defects that have a concrete failure mode: correctness, security, contracts, migrations, concurrency, partial updates, stale references.
 4. On PRs it skips concerns that are already settled (resolved threads, author-declined items, its own earlier reviews) unless new code reopens them.
