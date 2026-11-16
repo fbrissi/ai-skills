@@ -39,6 +39,7 @@ Why the copies: the `skills` CLI and `rulesync install` fetch one skill director
 - Frontmatter has only `name` (equal to the folder) and `description` (what it does plus "Use when…"). Do not add Rulesync's `targets` key: it is optional and would ship to every user.
 - No harness tool names in the body. Skills that hand off to another skill include a fallback for when it is not installed.
 - Scripts are run by absolute path from the user's repository root, never from the skill folder.
+- Keep project-specific values out of skills: read them from a [project profile](README.md#project-profiles) and ship `references/profile-template.md`.
 
 ## Workflow
 

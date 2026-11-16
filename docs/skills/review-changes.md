@@ -30,6 +30,8 @@ High-signal code review with a 1-5 star grade and severity-ranked findings. Work
 
 It never checks out or switches branches.
 
+The last line is always `Published: <review URL | approved | skipped (head already approved) | skipped (no new findings) | not requested>`, so a CI job can tell a deliberate skip from a failure (for example, `grep -q '^Published: skipped'`).
+
 ## Side effects
 
 None unless publishing was requested.

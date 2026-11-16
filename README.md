@@ -10,6 +10,8 @@ Personal library of reusable AI agent skills. Plain [Agent Skills](https://agent
 | Ticket | [`ticket-plan`](docs/skills/ticket-plan.md), [`ticket-ask`](docs/skills/ticket-ask.md), [`ticket-create`](docs/skills/ticket-create.md) |
 | PR | [`pr-create`](docs/skills/pr-create.md), [`pr-fix`](docs/skills/pr-fix.md), [`review-changes`](docs/skills/review-changes.md) |
 | Orchestration | [`dev`](docs/skills/dev.md), [`ship`](docs/skills/ship.md), [`todo`](docs/skills/todo.md) |
+| Brazil | [`inpi-trademark-watch`](docs/skills/inpi-trademark-watch.md), [`nfse-technical-note-analysis`](docs/skills/nfse-technical-note-analysis.md) |
+| Media | [`flow-video-ad`](docs/skills/flow-video-ad.md) |
 
 Full catalog and per-harness usage: [docs/](docs/README.md).
 

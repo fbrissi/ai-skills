@@ -15,6 +15,9 @@
 | Orchestration | [`dev`](skills/dev.md) | Implements a request or ticket and validates it; optionally ships | Code edits (+ ship) |
 | Orchestration | [`ship`](skills/ship.md) | Branch → commit → push → PR | Branch, commit, push, PR |
 | Orchestration | [`todo`](skills/todo.md) | Works through a checklist file item by item with approval and commits | Code edits, commits |
+| Brazil | [`inpi-trademark-watch`](skills/inpi-trademark-watch.md) | Analyzes an INPI RPI issue for a watched trademark: actions and deadlines | Writes an issue body file |
+| Brazil | [`nfse-technical-note-analysis`](skills/nfse-technical-note-analysis.md) | Maps an NFS-e Nacional technical note to code changes and a rollout plan | Writes an issue body file |
+| Media | [`flow-video-ad`](skills/flow-video-ad.md) | Plans a Google Flow ad with real screen footage and assembles the video | Writes files in the ads folder |
 
 How they fit together:
 
@@ -23,6 +26,18 @@ ticket-plan ──► dev ──► ship ──► pr-create ──► pr-fix (l
                  ▲                                   
 ticket-ask   ticket-create   todo   learn   skill-authoring
 ```
+
+The Brazil and Media skills stand alone and read a project profile.
+
+## Project profiles
+
+Domain skills keep the method in the skill and the project's specifics in a profile: a Markdown file in your repository, by default `docs/ai/<skill>.md`. Pass another path in the request ("profile docs/x.md") to override it. Each of these skills ships `references/profile-template.md` to start from; without a profile, the skill asks for the missing values (or fails clearly in automation).
+
+| Skill | Profile holds |
+| --- | --- |
+| `inpi-trademark-watch` | the mark, classes, specification, own processes, watch pattern and variants, language, owner |
+| `nfse-technical-note-analysis` | scope, documents to read, code map, implementation rules, release facts, language |
+| `flow-video-ad` | product name and pronunciation, folders, claim sources, forbidden claims, character, voice, setting, crop, end card, privacy rules |
 
 ## Using the skills per harness
 
@@ -49,6 +64,7 @@ Every harness also picks a skill **automatically** when your request matches its
 
 - `git`. Also `gh` (authenticated) for GitHub PR/issue skills, `glab` for GitLab, and `bash` + `jq` for `scripts/pr-context.sh` (`pr-fix`, `review-changes`). On Windows, run the harness from Git Bash or WSL for those two skills.
 - Jira/Linear tickets need that tracker's MCP server/connector configured in the harness.
+- `inpi-trademark-watch` needs Ruby and `unzip` to download RPI issues; `flow-video-ad` needs `ffmpeg` and `whisper-cli` to assemble the video.
 
 ## Background
 

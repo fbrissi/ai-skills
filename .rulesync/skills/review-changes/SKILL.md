@@ -58,6 +58,7 @@ Severity: `critical` (data loss, security, broken deploy) · `high` (likely bug 
 ## 6. Publish (PR + explicit request only)
 
 - **5 stars**: `gh pr review <n> --approve` (skip if `viewer` already approved `pr.headSha`). If approving fails (for example on your own PR), fall back to `gh pr review <n> --comment --body "★★★★★"`.
+- **Nothing new**: when the grade is below 5 and every finding was already raised by `viewer` on the same effective diff, publish nothing.
 - **Below 5**: submit **one** review with every inline comment in a single API call:
 
 ```bash
@@ -77,5 +78,7 @@ Findings: <n> (<c> critical, <h> high, <m> medium, <l> low)
 
 1. [high] path:line - failure mode. Smallest fix: ...
 ...
-Published: <review URL | approved | not published>
+Published: <review URL | approved | skipped (head already approved) | skipped (no new findings) | not requested>
 ```
+
+Keep the `Published:` line exactly in one of these forms: automation parses it.

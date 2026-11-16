@@ -31,4 +31,5 @@ Require Node.js 22.22+ and bash.
 - Keep skills harness-agnostic: no harness tool names in the body.
 - Skills that hand off to other skills must include a fallback for when the other skill is not installed.
 - Skill scripts are run by absolute path from the user's repository root.
+- Project-specific values go in a profile file in the user's repository (default `docs/ai/<skill>.md`), never in the skill. Ship `references/profile-template.md` and ask for missing values when there is no profile.
 - Write skill content in English.
