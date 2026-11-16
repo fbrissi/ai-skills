@@ -11,6 +11,7 @@
 | Ticket | [`ticket-create`](skills/ticket-create.md) | Creates a ticket summarizing current work | Creates a ticket |
 | PR | [`pr-create`](skills/pr-create.md) | Pushes the branch and opens a PR with a linked ticket | Push, PR, optional ticket |
 | PR | [`pr-fix`](skills/pr-fix.md) | Triages review feedback and CI, fixes, pushes, replies; optional watch loop | Commits, push, PR replies |
+| PR | [`pr-checks`](skills/pr-checks.md) | Diagnoses failing PR checks: failing step, real error, cause class, and fix | Fixes only when asked |
 | PR | [`review-changes`](skills/review-changes.md) | Graded review of local changes, a branch, or a PR; optional publish | Review only when asked |
 | Orchestration | [`dev`](skills/dev.md) | Implements a request or ticket and validates it; optionally ships | Code edits (+ ship) |
 | Orchestration | [`ship`](skills/ship.md) | Branch → commit → push → PR | Branch, commit, push, PR |
@@ -23,6 +24,8 @@ How they fit together:
 
 ```text
 ticket-plan ──► dev ──► ship ──► pr-create ──► pr-fix (loop) ◄── review-changes (publish)
+                                                   ▲
+                                                pr-checks
                  ▲                                   
 ticket-ask   ticket-create   todo   learn   skill-authoring
 ```
@@ -62,7 +65,7 @@ Every harness also picks a skill **automatically** when your request matches its
 
 ## Requirements
 
-- `git`. Also `gh` (authenticated) for GitHub PR/issue skills, `glab` for GitLab, and `bash` + `jq` for `scripts/pr-context.sh` (`pr-fix`, `review-changes`). On Windows, run the harness from Git Bash or WSL for those two skills.
+- `git`. Also `gh` (authenticated) for GitHub PR/issue skills, `glab` for GitLab, and `bash` + `jq` for `scripts/pr-context.sh` (`pr-fix`, `review-changes`) and `scripts/failed-checks.sh` (`pr-checks`). On Windows, run the harness from Git Bash or WSL for those skills.
 - Jira/Linear tickets need that tracker's MCP server/connector configured in the harness.
 - `inpi-trademark-watch` needs Ruby and `unzip` to download RPI issues; `flow-video-ad` needs `ffmpeg` and `whisper-cli` to assemble the video.
 
