@@ -9,14 +9,15 @@ Requires Node.js 22.22+ (Rulesync), plus `bash`, `git` and `jq`.
 ├── rules/overview.md              # repo guidance → AGENTS.md, CLAUDE.md, ...
 └── skills/<name>/
     ├── SKILL.md                   # source of truth for the skill
-    ├── references/*.md            # COPIED from shared/ (do not edit here)
-    └── scripts/*.sh               # COPIED from shared/ (do not edit here)
+    ├── references/*.md            # skill's own, or COPIED from shared/ when listed in manifest.txt
+    └── scripts/*                  # skill's own, or COPIED from shared/ when listed in manifest.txt
 shared/
 ├── manifest.txt                   # which shared file goes into which skills
 ├── references/                    # tickets.md, body-format.md, commits.md
 └── scripts/pr-context.sh
 scripts/
 ├── sync-shared.sh                 # copies shared/ into skills; --check detects drift and orphans
+├── check-generated.sh             # fails if rulesync would change tracked outputs (works without gitignored folders)
 └── check-discovery.sh             # asserts the skills CLI finds every skill
 .github/workflows/                 # CI, code review, releases (tracked, not generated)
 rulesync.jsonc                     # project generation (delete: true)

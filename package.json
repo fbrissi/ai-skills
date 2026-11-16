@@ -7,7 +7,7 @@
     "sync": "scripts/sync-shared.sh",
     "generate": "npm run -s sync && rulesync generate",
     "generate:global": "npm run -s sync && rulesync generate --config rulesync.global.jsonc",
-    "check": "scripts/sync-shared.sh --check && rulesync generate --check",
+    "check": "scripts/sync-shared.sh --check && scripts/check-generated.sh",
     "doctor": "rulesync doctor",
     "check:discovery": "scripts/check-discovery.sh"
   },
