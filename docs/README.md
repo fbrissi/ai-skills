@@ -66,7 +66,7 @@ Every harness also picks a skill **automatically** when your request matches its
 ## Requirements
 
 - `git`. Also `gh` (authenticated) for GitHub PR/issue skills, `glab` for GitLab, and `bash` + `jq` for `scripts/pr-context.sh` (`pr-fix`, `review-changes`) and `scripts/failed-checks.sh` (`pr-checks`). On Windows, run the harness from Git Bash or WSL for those skills.
-- Jira/Linear tickets need that tracker's MCP server/connector configured in the harness.
+- Jira/Linear/other tickets need some access to that tracker: an MCP server or connector, a project or harness tool (for example an OpenCode tool in `.opencode/tools/`), an authenticated CLI, or a public URL. Ticket skills stop without it; `review-changes` continues and notes the missing ticket. See [tickets](../shared/references/tickets.md).
 - `inpi-trademark-watch` needs Ruby and `unzip` to download RPI issues; `flow-video-ad` needs `ffmpeg` and `whisper-cli` to assemble the video.
 
 ## Background

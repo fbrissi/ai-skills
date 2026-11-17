@@ -27,7 +27,7 @@ Never switch branches or move `HEAD` during a review. If the content you need is
 | branch | base = the given branch or `git symbolic-ref --short refs/remotes/origin/HEAD`; `git log --oneline <base>..HEAD`; `git diff --stat <base>...HEAD` |
 | PR | `<skill-dir>/scripts/pr-context.sh <pr> --all-threads` (absolute path, run from the repo root; needs `bash`, `gh`, `jq`); then `git fetch origin <pr.base> pull/<n>/head` (works for forks too) and diff `origin/<pr.base>...FETCH_HEAD`, reading PR files with `git show FETCH_HEAD:<path>` (or use `gh pr diff <n>`). If the PR head is already checked out, diff against `HEAD` instead |
 
-For a PR whose body links exactly one ticket, load it with `references/tickets.md` and judge whether the PR meets the ticket's intent.
+For a PR that clearly references exactly one ticket (body, title, or branch name; see `references/tickets.md`), load it and judge whether the PR meets the ticket's intent. If no access can load it, continue: review the diff on its own merits, skip the intent judgement, and add the `Ticket:` line below to the output and to any published review body. Never wait for input about ticket access, and never let it block publishing.
 
 ## 2. Read before judging
 
@@ -57,7 +57,7 @@ Severity: `critical` (data loss, security, broken deploy) · `high` (likely bug 
 
 ## 6. Publish (PR + explicit request only)
 
-- **5 stars**: `gh pr review <n> --approve` (skip if `viewer` already approved `pr.headSha`). If approving fails (for example on your own PR), fall back to `gh pr review <n> --comment --body "★★★★★"`.
+- **5 stars**: `gh pr review <n> --approve`, adding `--body "<Ticket: line>"` when the ticket could not be loaded (skip if `viewer` already approved `pr.headSha`). If approving fails (for example on your own PR), fall back to `gh pr review <n> --comment --body "★★★★★"` (plus the `Ticket:` line, if any).
 - **Nothing new**: when the grade is below 5 and every finding was already raised by `viewer` on the same effective diff, publish nothing.
 - **Below 5**: submit **one** review with every inline comment in a single API call:
 
@@ -75,10 +75,11 @@ Inline comments only work on lines inside the diff hunks. Put anything else in t
 Review: <scope>
 Grade: <★★★☆☆>   Verdict: <one line>
 Findings: <n> (<c> critical, <h> high, <m> medium, <l> low)
+Ticket: <ref> not loaded (needs <MCP server, tool, or CLI for the tracker>)
 
 1. [high] path:line - failure mode. Smallest fix: ...
 ...
 Published: <review URL | approved | skipped (head already approved) | skipped (no new findings) | not requested>
 ```
 
-Keep the `Published:` line exactly in one of these forms: automation parses it.
+Include the `Ticket:` line only when a referenced ticket could not be loaded. Keep the `Published:` line exactly in one of these forms: automation parses it.

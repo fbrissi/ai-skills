@@ -21,7 +21,7 @@ Stop with `Unable to plan: missing request or ticket context` if there is no sou
 
 ## 1. Load
 
-For a ticket, load the body **and comments** following `references/tickets.md`. Extract:
+For a ticket, load the body **and comments** following `references/tickets.md`. If no access can load it, stop and say which tool, MCP server, or CLI is needed. Extract:
 
 - **Objective**: what the latest request asks for.
 - **Constraints still in force**: earlier comments that set business rules, decisions, renames, ordering, migrations, or scope cuts.

@@ -2,7 +2,7 @@
 
 Turns a ticket or request into a scoped, repo-grounded plan with implementation and validation checklists. Can optionally save it to the ticket. Replaces Kompass `/ticket/plan` and `/ticket/plan-and-sync`.
 
-**Requires:** for tickets, `gh`, `glab`, or a tracker MCP (Jira, Linear).
+**Requires:** for tickets, access to the tracker: `gh`, `glab`, an MCP server, a project tool, or a tracker CLI (see [tickets](../../shared/references/tickets.md)).
 
 ## Inputs
 

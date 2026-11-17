@@ -37,9 +37,9 @@ Scope is **the commits ahead of base**. Read commit messages first, then diffs o
 
 ## 2. Resolve ticket
 
-In order of precedence: a reference given → use it. `skip` → `SKIPPED`. `auto` → create one. Otherwise, check the commits and branch for an obvious reference (`#123`, `ABC-123`). If none is found, ask the user once: provide a ticket, create one automatically, or skip. If you cannot ask, default to `SKIPPED`.
+In order of precedence: a reference given → use it. `skip` → `SKIPPED`. `auto` → create one. Otherwise, check the commits and branch name for a clear reference (`#123`, `Closes ABC-123`, `feature/abc-123-x`), as described in `references/tickets.md`. If none is found, ask the user once: provide a ticket, create one automatically, or skip. If you cannot ask, default to `SKIPPED`.
 
-To create one: use the change themes with `references/body-format.md` (no `## Ticket` section) and the create command from `references/tickets.md`, assigned to `@me`.
+To create one: use the change themes with `references/body-format.md` (no `## Ticket` section) and the create command from `references/tickets.md`, assigned to `@me`. If no access can create it, stop and say which tool, MCP server, or CLI is needed.
 
 ## 3. Push and create
 
