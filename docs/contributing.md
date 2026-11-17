@@ -66,9 +66,9 @@ Why the copies: the `skills` CLI and `rulesync install` fetch one skill director
 | Workflow | Trigger | What it does |
 | --- | --- | --- |
 | `quality-checks.yml` | PRs, pushes to `main` | `npm run check`, `npm run doctor`, `bash -n` and `ruby -c` on scripts, `check:discovery`, `npm audit`; on PRs to `main`, the release-note check; then dispatches Code Review |
-| `code-review.yml` | dispatched by Quality Checks | Runs OpenCode or Claude Code (`AI_HARNESS`) with this repo's `review-changes` skill (taken from the base branch) and publishes a PR review |
-| `release-orchestrator.yml` | PR merged into `main` | Reads the top `## vX.Y.Z` from `CHANGELOG.md` and calls `release.yml` |
-| `release.yml` | called, or run manually | Validates the version, creates the tag and the GitHub release with the CHANGELOG notes |
+| `code-review.yml` | dispatched by Quality Checks on `main` | Calls the shared [Code Review](https://github.com/fbrissi/github-actions#code-review) workflow: OpenCode or Claude Code (`AI_HARNESS`) with this repo's `review-changes` skill (taken from the base commit) publishes a PR review |
+| `release-orchestrator.yml` | PR merged into `main` | Calls the shared [release](https://github.com/fbrissi/github-actions#release) workflow, which tags the top `## vX.Y.Z` of `CHANGELOG.md` and creates the GitHub release |
+| `release.yml` | run manually | Runs the same shared release workflow for a given version |
 
 **Release notes**: every PR into `main` must add exactly one new heading `## vMAJOR.MINOR.PATCH` at the top of `CHANGELOG.md`, with notes, for a version that has no tag yet. `package.json`'s `version` must match. Merging the PR tags and releases that version. Users then get it with `npx skills update`, or pin it with `npx skills add fbrissi/ai-skills@vX.Y.Z`.
 
