@@ -3,6 +3,12 @@
 All notable changes to this project are documented here. Release versions follow
 [Semantic Versioning](https://semver.org/).
 
+## v0.3.2
+
+### Changed
+
+- `review-changes` supports cumulative coverage for PRs too large for one pass: partial reviews publish `Covered:` / `Not covered:` lines and never approve, later passes read only the uncovered areas, and the PR is approved once the passes together cover every changed file with no unresolved finding. Output gains a `Coverage:` line.
+
 ## v0.3.1
 
 ### Changed

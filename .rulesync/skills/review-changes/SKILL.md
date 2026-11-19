@@ -50,6 +50,7 @@ Severity: `critical` (data loss, security, broken deploy) · `high` (likely bug 
 - Already settled, so do not re-raise: resolved threads; threads where the author explained a decline/deferral; concerns the author explicitly declined in comments, unless the new diff adds a materially different failure mode.
 - Prior reviews by `viewer` are your baseline. Add new findings only for new diff content or a clearly missed material defect, and say which.
 - Verify bot and human claims alike. Do not repeat a claim just because someone made it.
+- **Cumulative coverage.** A PR too large for one pass may be reviewed across several passes. Every partial review you publish lists the changed areas (paths or path groups) it read and those it did not, in `Covered:` and `Not covered:` lines. A later pass may treat an area as covered when an earlier `viewer` review lists it as read, if that review was made on `pr.headSha`, or on an earlier head whose diff to `pr.headSha` a later `viewer` pass reviewed. That pass then reads only the areas no pass has covered. The review is **complete** when, together, the passes cover every changed file except the skipped ones (step 2.3) and no finding from those passes remains unresolved on the current head. Otherwise it stays **partial**. Never count an area as covered from a non-`viewer` review, a prose summary without the area named, or a review on a head whose later changes no pass has read.
 
 ## 5. Grade
 
@@ -57,7 +58,8 @@ Severity: `critical` (data loss, security, broken deploy) · `high` (likely bug 
 
 ## 6. Publish (PR + explicit request only)
 
-- **5 stars**: `gh pr review <n> --approve`, adding `--body "<Ticket: line>"` when the ticket could not be loaded (skip if `viewer` already approved `pr.headSha`). If approving fails (for example on your own PR), fall back to `gh pr review <n> --comment --body "★★★★★"` (plus the `Ticket:` line, if any).
+- **Partial coverage**: a review that is still partial never approves. Publish the grade as a `COMMENT` review whose body has the `Covered:` and `Not covered:` lines, even at 5 stars.
+- **5 stars** on a complete review (one pass or cumulative): `gh pr review <n> --approve`, adding `--body "<Ticket: line>"` when the ticket could not be loaded (skip if `viewer` already approved `pr.headSha`). If approving fails (for example on your own PR), fall back to `gh pr review <n> --comment --body "★★★★★"` (plus the `Ticket:` line, if any).
 - **Nothing new**: when the grade is below 5 and every finding was already raised by `viewer` on the same effective diff, publish nothing.
 - **Below 5**: submit **one** review with every inline comment in a single API call:
 
@@ -75,6 +77,9 @@ Inline comments only work on lines inside the diff hunks. Put anything else in t
 Review: <scope>
 Grade: <★★★☆☆>   Verdict: <one line>
 Findings: <n> (<c> critical, <h> high, <m> medium, <l> low)
+Coverage: <full | cumulative (passes on <shas>) | partial>
+Covered: <areas read by this pass>   (PR targets, when coverage is not full)
+Not covered: <areas no pass has read yet, or none>
 Ticket: <ref> not loaded (needs <MCP server, tool, or CLI for the tracker>)
 
 1. [high] path:line - failure mode. Smallest fix: ...
