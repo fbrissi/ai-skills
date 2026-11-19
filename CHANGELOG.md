@@ -3,6 +3,13 @@
 All notable changes to this project are documented here. Release versions follow
 [Semantic Versioning](https://semver.org/).
 
+## v0.3.1
+
+### Changed
+
+- `quality-cycle` keeps scenarios that QA marks `blocked` for lack of user input (credentials, certificates, devices) open until a fresh, delegated QA run executes them after the user provides what is missing; the orchestrator only performs the step that needs the user. The cycle no longer finishes with blocked scenarios in scope unless the user accepts it.
+- `quality-cycle` requires scheduled jobs, queue consumers, and their e-mails to be triggered on purpose, and the profile template gains a `Scheduled job triggers` field.
+
 ## v0.3.0
 
 ### Added

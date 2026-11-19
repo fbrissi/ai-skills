@@ -14,6 +14,7 @@ Copy this template to `docs/ai/quality-cycle.md` in your repository and fill it 
 ## Checks
 - Full checks before push: <commands: tests, lint, typecheck, build>
 - Narrow checks per area: <how to run tests for one area>
+- Scheduled job triggers: <commands that fire crons, scheduled tasks, and queue consumers locally>
 
 ## Triage
 - Fix in cycle: <blocker, critical, high, medium; cheap lows in touched code>
