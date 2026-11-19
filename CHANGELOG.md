@@ -3,6 +3,12 @@
 All notable changes to this project are documented here. Release versions follow
 [Semantic Versioning](https://semver.org/).
 
+## v0.3.3
+
+### Added
+
+- `review-changes` loads a security and privacy reference when a change touches authentication, tokens, permissions, tenancy, personal data, secrets, storage, or retention. It covers access policy, account enumeration through status or timing, tenant filters on every query, secrets and personal data in logs and responses, LGPD purpose and retention for new data, deletion reach, and injection.
+
 ## v0.3.2
 
 ### Changed
