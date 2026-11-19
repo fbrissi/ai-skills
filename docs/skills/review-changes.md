@@ -27,7 +27,8 @@ High-signal code review with a 1-5 star grade and severity-ranked findings. Work
 3. Reports only material defects that have a concrete failure mode: correctness, security, contracts, migrations, concurrency, partial updates, stale references.
 4. On PRs it skips concerns that are already settled (resolved threads, author-declined items, its own earlier reviews) unless new code reopens them.
 5. Publishing: a 5-star result approves the PR (falling back to a ★★★★★ comment if approval fails). Anything lower is submitted as **one** review with every inline comment anchored to the head SHA.
-6. Large PRs: a pass that cannot read everything publishes a partial `COMMENT` review with `Covered:` / `Not covered:` lines and never approves. Later passes read only what is still uncovered and count earlier own passes on the same head (or on an earlier head whose diff to the current one was reviewed). When the passes together cover every changed file and no finding remains unresolved, the 5-star result approves.
+6. Security and privacy: when the change touches authentication, tokens, permissions, tenancy, personal data, secrets, storage, or retention, the review also answers the questions in `references/security-privacy.md` (access policy, account enumeration, tenant filters, secrets and PII in logs, LGPD purpose and retention, injection).
+7. Large PRs: a pass that cannot read everything publishes a partial `COMMENT` review with `Covered:` / `Not covered:` lines and never approves. Later passes read only what is still uncovered and count earlier own passes on the same head (or on an earlier head whose diff to the current one was reviewed). When the passes together cover every changed file and no finding remains unresolved, the 5-star result approves.
 
 It never checks out or switches branches.
 

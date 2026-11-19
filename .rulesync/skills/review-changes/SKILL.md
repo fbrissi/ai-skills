@@ -35,7 +35,8 @@ For a PR that clearly references exactly one ticket (body, title, or branch name
 2. Read each changed file in full (or the full changed functions in very large files). Hunks alone are not enough. For deleted files use `git show <base>:<path>`.
 3. Skip lockfiles, generated output, and bulk formatting unless they hide real changes.
 4. Look beyond the changed files only to confirm a suspected issue, such as a caller that breaks.
-5. If the change set is too big for one pass, split it by area and use subagents if the harness has them, after the file list is known.
+5. If the change set touches authentication, sessions, tokens, permissions, tenancy, personal data, secrets, storage, or retention, load `references/security-privacy.md` and answer its questions for the touched areas.
+6. If the change set is too big for one pass, split it by area and use subagents if the harness has them, after the file list is known.
 
 ## 3. What counts
 
