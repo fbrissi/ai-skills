@@ -20,7 +20,7 @@ Three independent roles, one loop: **Reviewer** (code), **QA** (running app), **
 - **Push**: whether to push (and open a PR) after approval. Default: ask once both approve.
 - **Profile**: default `docs/ai/quality-cycle.md`; [references/profile-template.md](references/profile-template.md) lists its fields. Without one, use the defaults here and the `review-changes`, `qa-e2e`, and `bdd-scenarios` profiles.
 
-Stop if the working tree has uncommitted changes that are not part of the target; ask the user to commit or stash them first.
+Stop if the working tree has uncommitted changes that are not part of the target; ask the user to commit or stash them first. The cycle's own artifacts (the cycle log, QA reports and their screenshots) do not count as such changes, so a cycle can resume.
 
 ## Roles and independence
 
@@ -45,6 +45,7 @@ Decisions that belong to the user (scope changes, product rules, accepting a kno
 1. Record the base, the head sha, and the scope (`git log --oneline <base>..HEAD`, `git diff --stat <base>...HEAD`).
 2. Make sure scenarios exist for the changed capabilities (run `bdd-scenarios` on the diff if they are missing or stale).
 3. Start the cycle log from [references/cycle-log-format.md](references/cycle-log-format.md) at the profile's path (default `docs/qa/cycles/<YYYY-MM-DD>-<branch-slug>.md`).
+4. If step 2 created or updated scenario files, commit them locally in their own commit (`test: add bdd scenarios for <scope>`) before round 1. They ship with the branch, so the push and the PR include them.
 
 ## 1. Review and QA (each round)
 
@@ -74,7 +75,7 @@ Merge both finding lists, drop duplicates, and classify each:
 
 ## 4. Record and repeat
 
-Append the round to the cycle log: findings with IDs, triage class, fix commit, verdicts of both roles. Then start the next round at step 1.
+Append the round to the cycle log: findings with IDs, triage class, fix commit, verdicts of both roles. If the profile sets `Commit cycle logs and QA reports: yes`, commit the log and the round's QA report locally (`docs: record quality cycle round <n>`); screenshots follow the same setting unless the profile excludes them. With `no` (the default), leave them uncommitted and suggest adding their folders to `.gitignore`. Then start the next round at step 1.
 
 Finish when both roles return APPROVED in the same round. If the round limit is reached first, stop and escalate: summarize what is still open, why it did not converge (disagreement, flaky environment, scope too large), and ask the user how to proceed. Also stop early when a round makes no progress (same findings, no new commits).
 
