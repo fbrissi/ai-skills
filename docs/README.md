@@ -16,6 +16,9 @@
 | Orchestration | [`dev`](skills/dev.md) | Implements a request or ticket and validates it; optionally ships | Code edits (+ ship) |
 | Orchestration | [`ship`](skills/ship.md) | Branch → commit → push → PR | Branch, commit, push, PR |
 | Orchestration | [`todo`](skills/todo.md) | Works through a checklist file item by item with approval and commits | Code edits, commits |
+| Quality | [`bdd-scenarios`](skills/bdd-scenarios.md) | Maps features and writes Gherkin scenarios with roles, tags, and a coverage matrix | Writes feature files |
+| Quality | [`qa-e2e`](skills/qa-e2e.md) | Runs BDD scenarios in a real browser at desktop and mobile viewports; APPROVED or CHANGES REQUIRED | Writes a QA report |
+| Quality | [`quality-cycle`](skills/quality-cycle.md) | Review + QA → fixes → re-review and re-test until both approve or a round limit | Local commits, cycle log; push once |
 | Brazil | [`inpi-trademark-watch`](skills/inpi-trademark-watch.md) | Analyzes an INPI RPI issue for a watched trademark: actions and deadlines | Writes an issue body file |
 | Brazil | [`nfse-technical-note-analysis`](skills/nfse-technical-note-analysis.md) | Maps an NFS-e Nacional technical note to code changes and a rollout plan | Writes an issue body file |
 | Media | [`flow-video-ad`](skills/flow-video-ad.md) | Plans a Google Flow ad with real screen footage and assembles the video | Writes files in the ads folder |
@@ -28,6 +31,10 @@ ticket-plan ──► dev ──► ship ──► pr-create ──► pr-fix (l
                                                 pr-checks
                  ▲                                   
 ticket-ask   ticket-create   todo   learn   skill-authoring
+
+bdd-scenarios ──► qa-e2e ──┐
+                           ├──► quality-cycle ──► dev (fixes) ──► loop until both approve ──► ship / pr-create
+review-changes ────────────┘
 ```
 
 The Brazil and Media skills stand alone and read a project profile.
@@ -40,6 +47,9 @@ Domain skills keep the method in the skill and the project's specifics in a prof
 | --- | --- |
 | `inpi-trademark-watch` | the mark, classes, specification, own processes, watch pattern and variants, language, owner |
 | `nfse-technical-note-analysis` | scope, documents to read, code map, implementation rules, release facts, language |
+| `bdd-scenarios` | features folder, step language, source paths, roles and tags, test data sources, mail catcher, sandboxes |
+| `qa-e2e` | URLs, start and reset commands, scenarios folder, test account source, mail catcher, test modes, viewports, report folder |
+| `quality-cycle` | round limit, base branch, cycle log folder, checks, triage policy, follow-up tracker, shipping preference |
 | `flow-video-ad` | product name and pronunciation, folders, claim sources, forbidden claims, character, voice, setting, crop, end card, privacy rules |
 
 ## Using the skills per harness
@@ -67,6 +77,7 @@ Every harness also picks a skill **automatically** when your request matches its
 
 - `git`. Also `gh` (authenticated) for GitHub PR/issue skills, `glab` for GitLab, and `bash` + `jq` for `scripts/pr-context.sh` (`pr-fix`, `review-changes`) and `scripts/failed-checks.sh` (`pr-checks`). On Windows, run the harness from Git Bash or WSL for those skills.
 - Jira/Linear/other tickets need some access to that tracker: an MCP server or connector, a project or harness tool (for example an OpenCode tool in `.opencode/tools/`), an authenticated CLI, or a public URL. Ticket skills stop without it; `review-changes` continues and notes the missing ticket. See [tickets](../shared/references/tickets.md).
+- `qa-e2e` (and the QA step of `quality-cycle`) needs a browser automation capability in the harness and a running local or staging stack.
 - `inpi-trademark-watch` needs Ruby and `unzip` to download RPI issues; `flow-video-ad` needs `ffmpeg` and `whisper-cli` to assemble the video.
 
 ## Background

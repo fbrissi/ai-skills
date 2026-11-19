@@ -3,6 +3,14 @@
 All notable changes to this project are documented here. Release versions follow
 [Semantic Versioning](https://semver.org/).
 
+## v0.3.0
+
+### Added
+
+- Add `bdd-scenarios`, which maps an application's features from its routes, views, API, docs, and tests and writes Gherkin feature files with priority, role, viewport, e-mail, and sandbox tags, a coverage matrix (feature × scenario × role), and an unmapped list for owner input.
+- Add `qa-e2e`, which runs BDD scenarios in a real browser against a local or named staging environment, reviews UX/UI at desktop and mobile viewports, follows e-mail links through a local mail catcher, and writes a report with screenshots and an APPROVED or CHANGES REQUIRED verdict. Test environments and test credentials only.
+- Add `quality-cycle`, which loops review (`review-changes`) and QA (`qa-e2e`) with developer fixes (`dev`) until both approve or a round limit escalates to the user, with full-diff reviews, sibling-path fixes, triage of lows into follow-ups, a cycle log, and a single push. Every referenced skill has a fallback.
+
 ## v0.2.0
 
 ### Changed
