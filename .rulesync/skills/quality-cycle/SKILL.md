@@ -54,6 +54,9 @@ Decisions that belong to the user (scope changes, product rules, accepting a kno
 
 Run Reviewer and QA in parallel when both are delegated; otherwise Reviewer first.
 
+- **Scheduled and background work**: scenarios for cron jobs, scheduled tasks, queue consumers, and the e-mails they send must be exercised by triggering them on purpose (the profile's trigger commands), because a local stack never fires them on its own. A job that nobody triggered is `blocked`, not `pass`.
+- **Blocked scenarios**: a scenario QA marks `blocked` because it needs the user (a real credential, a certificate, a device, an external account) stays open in the cycle log with what is needed. Ask the user for it; the cycle is not approved while such scenarios remain in scope unless the user explicitly accepts leaving them out. Once the user provides it, do only the step that needs the user yourself (for example, open the page where they type the secret), then **delegate the blocked scenarios to a fresh QA run** with the new state and the open findings; do not run them yourself in the orchestrating context. Their result is part of the current round.
+
 ## 2. Triage
 
 Merge both finding lists, drop duplicates, and classify each:
@@ -77,7 +80,7 @@ Merge both finding lists, drop duplicates, and classify each:
 
 Append the round to the cycle log: findings with IDs, triage class, fix commit, verdicts of both roles. If the profile sets `Commit cycle logs and QA reports: yes`, commit the log and the round's QA report locally (`docs: record quality cycle round <n>`); screenshots follow the same setting unless the profile excludes them. With `no` (the default), leave them uncommitted and suggest adding their folders to `.gitignore`. Then start the next round at step 1.
 
-Finish when both roles return APPROVED in the same round. If the round limit is reached first, stop and escalate: summarize what is still open, why it did not converge (disagreement, flaky environment, scope too large), and ask the user how to proceed. Also stop early when a round makes no progress (same findings, no new commits).
+Finish when both roles return APPROVED in the same round and no scenario in scope is still `blocked` (unless the user accepted it). If the round limit is reached first, stop and escalate: summarize what is still open, why it did not converge (disagreement, flaky environment, scope too large), and ask the user how to proceed. Also stop early when a round makes no progress (same findings, no new commits).
 
 ## 5. Ship (after both approve)
 
