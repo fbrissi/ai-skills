@@ -7,6 +7,7 @@ Requires Node.js 22.22+ (Rulesync), plus `bash`, `git` and `jq`.
 ```text
 .rulesync/
 ├── rules/overview.md              # repo guidance → AGENTS.md, CLAUDE.md, ...
+├── subagents/<name>.md            # Claude Code agents → .claude/agents/ and the plugin
 └── skills/<name>/
     ├── SKILL.md                   # source of truth for the skill
     ├── references/*.md            # skill's own, or COPIED from shared/ when listed in manifest.txt
@@ -20,6 +21,9 @@ scripts/
 ├── check-generated.sh             # fails if rulesync would change tracked outputs (works without gitignored folders)
 └── check-discovery.sh             # asserts the skills CLI finds every skill
 .github/workflows/                 # CI, code review, releases (tracked, not generated)
+plugins/ai-skills/                 # Claude Code plugin: agents/ and skills/ generated and committed
+└── .claude-plugin/plugin.json     # hand-written; version must match package.json
+.claude-plugin/marketplace.json    # marketplace that lists the plugin
 rulesync.jsonc                     # project generation (delete: true)
 rulesync.global.jsonc              # dev preview in user folders (delete: false, never change)
 CHANGELOG.md                       # drives releases
@@ -57,8 +61,8 @@ Why the copies: the `skills` CLI and `rulesync install` fetch one skill director
    ```bash
    npm run check:discovery
    ```
-5. For a new skill, add `docs/skills/<name>.md`, a row in the [catalog](README.md), and the skill in the root [README](../README.md) table.
-6. Add a release entry at the top of [CHANGELOG.md](../CHANGELOG.md) and bump `version` in `package.json` to match (see below).
+5. For a new skill, add `docs/skills/<name>.md`, a row in the [catalog](README.md), and the skill in the root [README](../README.md) table. For a new agent, add it to [claude-code-agents.md](claude-code-agents.md) and the root README agents table.
+6. Add a release entry at the top of [CHANGELOG.md](../CHANGELOG.md) and bump `version` in `package.json` and `plugins/ai-skills/.claude-plugin/plugin.json` to match (see below).
 7. Open a pull request against `main`.
 
 ## CI and releases
@@ -93,7 +97,7 @@ The review job runs in the `code-review` environment, which GitHub creates on th
 | --- | --- |
 | `npm run sync` | Copy `shared/` files into skills and remove orphaned copies |
 | `npm run generate` | Sync, then generate project outputs |
-| `npm run check` | Fail if shared copies (content, exec bit, orphans) or generated outputs are stale |
+| `npm run check` | Fail if shared copies (content, exec bit, orphans) or generated outputs (including the plugin) are stale, or the plugin version differs from `package.json` |
 | `npm run check:discovery` | Fail if the `skills` CLI does not find every skill |
 | `npm run doctor` | Diagnose the Rulesync config |
 | `npm run generate:global` | Dev preview: write the skills into `~/.claude/skills` and `~/.agents/skills` (never deletes other skills). Do not mix with `npx skills add -g`, which manages the same folders |

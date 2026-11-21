@@ -4,6 +4,13 @@
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
+
+package_version="$(node -p "require('$root/package.json').version")"
+plugin_version="$(node -p "require('$root/plugins/ai-skills/.claude-plugin/plugin.json').version")"
+if [ "$package_version" != "$plugin_version" ]; then
+  echo "Plugin version $plugin_version does not match package.json $package_version. Update plugins/ai-skills/.claude-plugin/plugin.json." >&2
+  exit 1
+fi
 rulesync="$root/node_modules/.bin/rulesync"
 [ -x "$rulesync" ] || { echo "rulesync not found; run npm ci" >&2; exit 1; }
 

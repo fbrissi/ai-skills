@@ -1,8 +1,8 @@
 {
   "name": "ai-skills",
-  "version": "0.3.3",
+  "version": "0.4.0",
   "private": true,
-  "description": "Reusable, harness-agnostic AI agent skills for Claude Code, Codex CLI, OpenCode, Cursor and GitHub Copilot",
+  "description": "Reusable, harness-agnostic AI agent skills for Claude Code, Codex CLI, OpenCode, Cursor and GitHub Copilot, plus Claude Code agents",
   "scripts": {
     "sync": "scripts/sync-shared.sh",
     "generate": "npm run -s sync && rulesync generate",

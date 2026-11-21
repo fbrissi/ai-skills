@@ -24,7 +24,7 @@ Stop if the working tree has uncommitted changes that are not part of the target
 
 ## Roles and independence
 
-Run Reviewer and QA as fresh, independent contexts when the harness can delegate (subagents or separate sessions), giving each only the target, the base branch, the previous round's findings, and its skill. Never let the Developer's reasoning leak into their prompts. Without delegation, run the roles sequentially yourself, announce each switch (`Role: Reviewer, round 2`), and judge only from the repository and the running app, not from what you remember writing.
+Run Reviewer and QA as fresh, independent contexts when the harness can delegate (subagents or separate sessions). When the harness has agents named `code-reviewer`, `qa-tester`, and `developer` (for example from the ai-skills plugin), delegate the roles to them; otherwise use generic subagents. Give each only the target, the base branch, the previous round's findings, and its skill. Never let the Developer's reasoning leak into their prompts. Without delegation, run the roles sequentially yourself, announce each switch (`Role: Reviewer, round 2`), and judge only from the repository and the running app, not from what you remember writing.
 
 Decisions that belong to the user (scope changes, product rules, accepting a known risk, pushing, opening a PR) are asked, never assumed. Ask with the harness's question capability if it has one; otherwise ask in chat and wait.
 

@@ -5,3 +5,4 @@ scripts/pr-context.sh      pr-fix review-changes
 references/tickets.md      ticket-plan ticket-ask ticket-create dev pr-create review-changes
 references/body-format.md  pr-create ticket-create ship
 references/commits.md      ship todo pr-fix
+references/triage.md       ticket-create ticket-plan
