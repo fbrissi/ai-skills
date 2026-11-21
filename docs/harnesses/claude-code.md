@@ -16,6 +16,17 @@ Folders the harness reads natively:
 | Project skills | `.claude/skills/<name>/SKILL.md` |
 | User skills | `~/.claude/skills/<name>/SKILL.md` |
 
+## Plugin (skills and agents)
+
+The `ai-skills` plugin bundles every skill plus the [agents](../claude-code-agents.md):
+
+```text
+/plugin marketplace add fbrissi/ai-skills
+/plugin install ai-skills@fbrissi
+```
+
+Use either the plugin or `npx skills add` for Claude Code, not both, or each skill is listed twice. Plugin skills are namespaced (`/ai-skills:pr-fix`).
+
 ## Invoke
 
 - **Slash command**: every skill is also a slash command. Text after the name is passed as arguments.

@@ -1,0 +1,16 @@
+{
+  "name": "fbrissi",
+  "owner": {
+    "name": "Filipe Bojikian Rissi"
+  },
+  "plugins": [
+    {
+      "name": "ai-skills",
+      "source": "./plugins/ai-skills",
+      "description": "Reusable skills and agents for delivery, review, QA, incidents, and Brazilian compliance (INPI, NFS-e)."
+    }
+  ],
+  "metadata": {
+    "description": "Skills and agents by fbrissi for Claude Code."
+  }
+}

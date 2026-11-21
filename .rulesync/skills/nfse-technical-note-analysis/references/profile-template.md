@@ -44,4 +44,18 @@ Copy this template to `docs/ai/nfse-technical-note-analysis.md` in your reposito
 
 ## Output
 - Language: <English>
+
+## Automation (read by the nfse-compliance agent; the skill ignores it)
+- Tracker: <GitHub issues in owner/repo | GitLab project | Jira project>
+- Labels: <nfse>; categories: <nfse:tributario, nfse:layout, nfse:api, nfse:eventos, nfse:danfse, nfse:validacao>
+- Estimate scale: <Fibonacci points | GitLab weight | Jira story points>
+- Due date field: <GitHub Project number and date field | milestone | tracker due date>
+- Split into one issue per change: <no | yes>
+- Implement optional changes: <no | yes>
+- Base branch: <main>
+- Auto-merge: <off | on>
+- Max risk to merge: <2>
+- Merge method: <squash>
+- Required human approvals: <1>
+- Risk floors: <paths or kinds of change and their minimum rating, e.g. fiscal formulas -> 4, migrations -> 4, production revision switch -> 4>
 ```

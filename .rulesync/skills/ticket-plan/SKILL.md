@@ -15,6 +15,7 @@ Plan only. Do not edit source files.
 
 - **Source**: a ticket reference/URL, a file path, or a free-text request. Default: the request from the conversation.
 - **Sync**: only when the user asks to save, sync, or update the ticket, or to create a ticket from the plan. Otherwise just present the plan.
+- **Triage**: only when the request or a calling agent asks for it: estimate, category, priority, and due date, decided with `references/triage.md` and written on sync.
 - **Focus**: any remaining text adds constraints or emphasis.
 
 Stop with `Unable to plan: missing request or ticket context` if there is no source.
@@ -49,6 +50,8 @@ Description:
 
 ## Validation
 - [ ] Verify that <observable result>
+
+Triage: <estimate, category, priority, due date: only when requested>
 
 Assumptions / Risks / Open questions: <only if they matter>
 ```
