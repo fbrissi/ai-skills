@@ -55,7 +55,7 @@ Start from the highest level whose description fits any part of the change, then
 | 5 | Critical | Irreversible data changes, security-sensitive code without tests, anything that switches production behavior before an official date, or a large diff the tests barely cover |
 
 - **Floors**: a changed file matching a profile path floor sets the minimum rating (for example `db/migrate/** -> 4`).
-- **Mitigations**: one documented mitigation may lower the rating by one: the new behavior is off by default behind a flag, the change only affects a homologation or sandbox path, or it was validated in staging with evidence linked in the PR. Never go below a floor.
+- **Mitigations**: one verified mitigation may lower the rating by one: the new behavior is off by default behind a flag (default read from the code or config in the diff), the change only affects a homologation or sandbox path (seen in the diff), or it passed in staging (a passing staging check or deployment status on the head commit). A claim that appears only in the PR body, comments, or commit messages is not a mitigation. Never go below a floor.
 - **Coverage**: a behavior change with no test that exercises it adds one level.
 
 Write one line of evidence per factor (`path:line` or check name). If you cannot tell what a change does in production, rate it at least 4.

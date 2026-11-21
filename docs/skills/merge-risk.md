@@ -34,7 +34,7 @@ Start the profile from [`references/profile-template.md`](../../.rulesync/skills
 | 4 | Migrations, money or fiscal calculations, auth, breaking contracts, integrations, infrastructure |
 | 5 | Irreversible data changes, untested security-sensitive code, production switches before an official date |
 
-Path floors from the profile set minimums. One documented mitigation (flag off by default, homologation-only path, staging evidence) lowers the rating by one, never below a floor. Untested behavior changes add one.
+Path floors from the profile set minimums. One mitigation verified from the diff or CI (flag off by default in the code, homologation-only path, a passing staging check or deployment on the head commit) lowers the rating by one, never below a floor; claims made only in the PR text do not count. Untested behavior changes add one.
 
 ## Side effects
 
