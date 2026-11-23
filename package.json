@@ -20,6 +20,6 @@
     "node": ">=22.22.0"
   },
   "devDependencies": {
-    "rulesync": "43.8.2"
+    "rulesync": "43.11.0"
   }
 }
