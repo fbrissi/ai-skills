@@ -8,7 +8,7 @@ All notable changes to this project are documented here. Release versions follow
 ### Changed
 
 - `nfse-compliance` reconciles an existing issue with the current profile and official sources before resuming it (decision, labels, estimate, due date, milestone), follows the profile's milestone policy (release milestone for deadline work, tracking milestone for watched work), and implements required changes from any source item the profile lists as implementable, not only technical notes.
-- `nfse-compliance` searches open PRs and issues for the same change before branching, so two items about one change never open two PRs, and may prepare a production switch before the official date as long as it merges only on or after it. Its report counts reconciled issues.
+- `nfse-compliance` searches open PRs and issues for the same change before branching, so two items about one change never open two PRs, and may prepare a production switch before the official date, which the merge decision holds until that date as a hard gate. A resumed issue is only reconciled, never re-created. Its report counts reconciled issues.
 - The `nfse-technical-note-analysis` profile template gains the `Milestone policy`, `Awaiting-answer label`, and `Implementable sources` Automation values.
 
 ## v0.4.0

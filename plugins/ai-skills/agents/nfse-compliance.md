@@ -38,6 +38,8 @@ Follow the `nfse-technical-note-analysis` skill to write the issue body. If it i
 
 ## 3. Track
 
+For an item that already has an issue, only Reconcile (3) and Milestone (4) apply; steps 1, 2, and 5 create new issues only.
+
 1. **Not applicable**: create the issue with the analysis, label it, and close it as not planned, so the note is recorded as reviewed. Stop for this note.
 2. **Required or optional**: triage each change with the `ticket-create` skill's triage rules:
    - **Category** labels: tax (`tributário`, IBS/CBS, calculations), layout (XML, XSD, domains), API, events, DANFSE, validation (rules, rejection codes), from the profile's label set.
@@ -49,7 +51,7 @@ Follow the `nfse-technical-note-analysis` skill to write the issue body. If it i
 
 ## 4. Implement
 
-1. Before branching, search the open PRs and issues for one that already covers the same change (same note, package, or production switch). If one does, link it from this issue, add a reference to this issue on the covering PR, or close this issue as a duplicate when another issue covers it, and stop for this item.
+1. When the issue has no linked PR yet, search the other open PRs and issues (excluding this issue and anything already linked to it) for one that already covers the same change (same note, package, or production switch). If one does, link it from this issue, add a reference to this issue on the covering PR, or close this issue as a duplicate when another issue covers it, and stop for this item.
 2. Implement the **required** changes from a technical note or from any other source item the profile lists as implementable. Optional changes only when the profile says so or the user agrees; otherwise leave them listed in the issue. When a required change still waits for answers, ask on the issue, add the profile's awaiting-answer label when it names one, and stop for that item. Remove that label once the answers are in.
 3. **Branch** from the base: `feat/nfse-nt-<number>-<slug>`, or the profile's branch name for other source items. When the milestone policy ties a release version to the milestone, the PR carries that version.
 4. **Developer**: one change at a time from the analysis, following the profile's implementation rules (homologation first; a production switch may be prepared earlier, but it merges and deploys only on or after the official production date, behind the mechanism the profile names). Tests for each change.
@@ -62,7 +64,7 @@ Run the `pr-shepherd` loop on the PR in `auto` mode (the `pr-fix` skill's loop i
 
 ## 6. Merge decision
 
-Follow the `merge-risk` skill in `decide` mode with the resolved Auto-merge, Max risk, and the profile's risk floors. Also weigh: whether production behavior changes now or only homologation, whether the production switch is gated by the official date, and data migrations. It rates the risk 1-5, comments on the PR, and merges only when every gate passes and the rating is within the limit. With Auto-merge `off` or a rating above the limit, it holds and says why. If the skill is not installed, do not merge.
+When the PR contains a production switch and its official production date has not arrived yet, hold and say so on the PR, whatever the rating. Otherwise follow the `merge-risk` skill in `decide` mode with the resolved Auto-merge, Max risk, and the profile's risk floors. Also weigh: whether production behavior changes now or only homologation, whether the production switch is gated by the official date, and data migrations. It rates the risk 1-5, comments on the PR, and merges only when every gate passes and the rating is within the limit. With Auto-merge `off` or a rating above the limit, it holds and says why. If the skill is not installed, do not merge.
 
 After a merge, comment on the issue with the merge commit, the risk rating, and the remaining rollout steps (production release date). Never deploy.
 
