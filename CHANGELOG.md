@@ -3,6 +3,13 @@
 All notable changes to this project are documented here. Release versions follow
 [Semantic Versioning](https://semver.org/).
 
+## v0.4.1
+
+### Changed
+
+- `nfse-compliance` reconciles an existing issue with the current profile and official sources before resuming it (decision, labels, estimate, due date, milestone), follows the profile's milestone policy (release milestone for deadline work, tracking milestone for watched work), and implements required changes from any source item the profile lists as implementable, not only technical notes.
+- The `nfse-technical-note-analysis` profile template gains the `Milestone policy` and `Implementable sources` Automation values.
+
 ## v0.4.0
 
 ### Added

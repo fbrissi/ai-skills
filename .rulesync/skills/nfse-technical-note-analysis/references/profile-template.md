@@ -50,6 +50,8 @@ Copy this template to `docs/ai/nfse-technical-note-analysis.md` in your reposito
 - Labels: <nfse>; categories: <nfse:tributario, nfse:layout, nfse:api, nfse:eventos, nfse:danfse, nfse:validacao>
 - Estimate scale: <Fibonacci points | GitLab weight | Jira story points>
 - Due date field: <GitHub Project number and date field | milestone | tracker due date>
+- Milestone policy: <work with an official deadline -> next patch release milestone after the latest tag, due on the deadline, and the PR carries that version | watched work -> one tracking milestone without a due date | none>
+- Implementable sources: <technical notes and XSD packages | also other official source items with a required change, such as deployment rows, annexes, or news>
 - Split into one issue per change: <no | yes>
 - Implement optional changes: <no | yes>
 - Base branch: <main>
