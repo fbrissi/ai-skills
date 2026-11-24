@@ -16,6 +16,7 @@
 | Orchestration | [`dev`](skills/dev.md) | Implements a request or ticket and validates it; optionally ships | Code edits (+ ship) |
 | Orchestration | [`ship`](skills/ship.md) | Branch → commit → push → PR | Branch, commit, push, PR |
 | Orchestration | [`todo`](skills/todo.md) | Works through a checklist file item by item with approval and commits | Code edits, commits |
+| Orchestration | [`work-cleanup`](skills/work-cleanup.md) | Removes leftover branches and worktrees of finished work after an itemized confirmation | Deletes confirmed branches and worktrees |
 | Quality | [`bdd-scenarios`](skills/bdd-scenarios.md) | Maps features and writes Gherkin scenarios with roles, tags, and a coverage matrix | Writes feature files |
 | Quality | [`qa-e2e`](skills/qa-e2e.md) | Runs BDD scenarios in a real browser at desktop and mobile viewports; APPROVED or CHANGES REQUIRED | Writes a QA report |
 | Quality | [`quality-cycle`](skills/quality-cycle.md) | Review + QA → fixes → re-review and re-test until both approve or a round limit | Local commits, cycle log; push once |
@@ -32,7 +33,7 @@ ticket-plan ──► dev ──► ship ──► pr-create ──► pr-fix (l
                                                    ▲
                                                 pr-checks
                  ▲                                   
-ticket-ask   ticket-create   todo   learn   skill-authoring
+ticket-ask   ticket-create   todo   learn   skill-authoring   work-cleanup
 
 bdd-scenarios ──► qa-e2e ──┐
                            ├──► quality-cycle ──► dev (fixes) ──► loop until both approve ──► ship / pr-create
