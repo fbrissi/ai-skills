@@ -10,6 +10,7 @@ Personal library of reusable AI agent skills. Plain [Agent Skills](https://agent
 | Ticket | [`ticket-plan`](docs/skills/ticket-plan.md), [`ticket-ask`](docs/skills/ticket-ask.md), [`ticket-create`](docs/skills/ticket-create.md) |
 | PR | [`pr-create`](docs/skills/pr-create.md), [`pr-fix`](docs/skills/pr-fix.md), [`pr-checks`](docs/skills/pr-checks.md), [`review-changes`](docs/skills/review-changes.md) |
 | Orchestration | [`dev`](docs/skills/dev.md), [`ship`](docs/skills/ship.md), [`todo`](docs/skills/todo.md), [`work-cleanup`](docs/skills/work-cleanup.md) |
+| Delivery | [`business-refinement`](docs/skills/business-refinement.md), [`technical-refinement`](docs/skills/technical-refinement.md), [`readiness-review`](docs/skills/readiness-review.md), [`delivery-orchestration`](docs/skills/delivery-orchestration.md) |
 | Quality | [`bdd-scenarios`](docs/skills/bdd-scenarios.md), [`qa-e2e`](docs/skills/qa-e2e.md), [`quality-cycle`](docs/skills/quality-cycle.md) |
 | Operations | [`observability-triage`](docs/skills/observability-triage.md), [`merge-risk`](docs/skills/merge-risk.md) |
 | Brazil | [`inpi-trademark-watch`](docs/skills/inpi-trademark-watch.md), [`nfse-technical-note-analysis`](docs/skills/nfse-technical-note-analysis.md) |
@@ -23,6 +24,7 @@ Full catalog and per-harness usage: [docs/](docs/README.md).
 | --- | --- |
 | Workers | `code-reviewer`, `qa-tester`, `developer`, `ci-investigator` |
 | Orchestrators | `milestone-delivery`, `pr-shepherd`, `incident-responder`, `inpi-watch`, `nfse-compliance` |
+| Delivery flow | `business-analyst`, `tech-lead`, `readiness-reviewer`, `delivery-orchestrator`, `task-implementer` ([flow](docs/delivery-flow.md)) |
 
 They ship with every skill as the `ai-skills` Claude Code plugin:
 

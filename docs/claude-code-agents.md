@@ -26,13 +26,21 @@ The plugin contains every skill too, so you do not need `npx skills add` for Cla
 | `incident-responder` | Orchestrator | Observability error to root cause, then questions or a fix PR, auto-fix, risk rating, optional merge | Tickets, branches, PRs, merge when allowed |
 | `inpi-watch` | Orchestrator | RPI analysis to tracked issues with labels, owner, and due dates | Issues, labels, comments |
 | `nfse-compliance` | Orchestrator | NFS-e technical note to estimated issues, implementation, PR, auto-fix, risk rating, optional merge | Issues, branches, PRs, merge when allowed |
+| `business-analyst` | Delivery | Source ticket to a milestone with business issues, or questions on the source, with `business-refinement` | Milestone, issues, labels, source comment |
+| `tech-lead` | Delivery | Technical plan per issue and safe parallel order, with `technical-refinement` | Issue plans, labels |
+| `readiness-reviewer` | Delivery | Ready or back to refinement, with `readiness-review`; never edits bodies | Labels, comments |
+| `delivery-orchestrator` | Orchestrator | Starts a milestone's unblocked issues up to a limit, with `delivery-orchestration`; opens the milestone PR | Branches, labels, workflow dispatches, PR |
+| `task-implementer` | Orchestrator | One issue on its task branch: `dev`, `quality-cycle`, `pr-create` into the milestone branch | Commits, push, PR, labels |
 
 ```text
 milestone-delivery ─┐
 pr-shepherd        ─┤                  ┌─► developer
 incident-responder ─┼─ delegate to ────┼─► code-reviewer
 inpi-watch         ─┤                  ├─► qa-tester
-nfse-compliance    ─┘                  └─► ci-investigator
+nfse-compliance    ─┤                  └─► ci-investigator
+task-implementer   ─┘
+
+delivery-orchestrator ─► task-implementer (local) | implement workflow (CI)
 ```
 
 **Workers** run as subagents. Claude Code picks them by description, or you ask for them by name ("use the code-reviewer agent on this branch"). `quality-cycle` delegates its Reviewer, QA, and Developer roles to them when they are installed.
@@ -73,6 +81,18 @@ Runs `inpi-trademark-watch` for each RPI, then creates or updates `INPI: RPI <n>
 
 In `scan` mode it finds notes with no issue yet. For each note: `nfse-technical-note-analysis`, then an issue with category labels (tax, layout, API, events, DANFSE, validation), estimates, priority, and due dates from the official dates and rollout plan. Not-applicable notes are recorded and closed. Issues go to the milestone the profile's milestone policy names (a release milestone for deadline work, a tracking milestone for watched work). On resume it reconciles an existing issue with the current profile and sources first, so a policy change fixes old issues instead of duplicating them. Required changes are implemented homologation first on `feat/nfse-nt-<n>-<slug>`, go through `quality-cycle` and `pr-create`, then the `pr-shepherd` loop in `auto` mode until a person approves, then `merge-risk` in `decide` mode. With the profile's `PR follow-up: events`, it handles the feedback already on the PR in one pass and stops with `awaiting review`; a CI workflow that reacts to review events runs it again, and a run on an approved PR goes on to the merge decision. It never deploys.
 
+### Delivery flow
+
+`business-analyst`, `tech-lead`, `readiness-reviewer`, `delivery-orchestrator`, and `task-implementer` run one step each of the [delivery flow](delivery-flow.md): business refinement, technical refinement, readiness review, orchestration, and implementation. Each step is its own non-interactive run, usually started by a workflow, and moves issues through the `status:*` labels. The first three only change issues; they follow their skill and stop if it is not installed.
+
+`delivery-orchestrator` never codes. In CI it dispatches the implement workflow for each unblocked issue, up to `max-parallel`, and exits; it is re-run when a task PR merges into the milestone branch. Locally it delegates each task to `task-implementer`, or plays that role itself one task at a time when it cannot start subagents. When every issue is done it opens the milestone PR.
+
+`task-implementer` checks out the task branch, implements the issue with `developer`, runs `quality-cycle` with `code-reviewer` and `qa-tester` until both approve, opens a PR into the milestone branch with `pr-create`, and marks the issue `in-review`. The PR follow-up (`pr-shepherd` or `pr-fix`, then the repository's merge process) is a separate run. None of these agents merges.
+
+```bash
+claude -p --agent ai-skills:delivery-orchestrator "milestone JIRA:ABC-123 max-parallel 2"
+```
+
 ## Auto-merge
 
 `incident-responder` and `nfse-compliance` can merge their own PRs. Both stop before merging unless every condition holds:
@@ -93,3 +113,5 @@ The agents read the profiles of the skills they use:
 | `incident-responder` | `observability-triage` (Automation section), `merge-risk`, plus the cycle profiles |
 | `inpi-watch` | `inpi-trademark-watch` (Automation section) |
 | `nfse-compliance` | `nfse-technical-note-analysis` (Automation section), `merge-risk`, plus the cycle profiles |
+| `business-analyst`, `tech-lead`, `readiness-reviewer`, `delivery-orchestrator` | `delivery` (`docs/ai/delivery.md`) |
+| `task-implementer` | `delivery`, plus the cycle profiles |

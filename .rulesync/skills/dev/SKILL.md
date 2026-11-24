@@ -14,6 +14,7 @@ description: >-
 - **Source**: a ticket reference/URL/file, or a direct request. Default: the request from the conversation.
 - **Ship**: when the user says "ship", "open a PR", or "end to end", continue into shipping after validation. Otherwise stop at a validated, uncommitted change.
 - **Guidance**: any remaining text sets scope, priorities, or tradeoffs.
+- **Status**: only when the request or a calling agent asks to track status on the issue (for example the delivery flow's `status-labels` or `project`): move it to `in-progress` when you start and to `in-review` once its PR is open (here when shipping, or when the caller reports it), following `references/work-status.md`.
 
 Stop with `Missing implementation request` if there is no source.
 

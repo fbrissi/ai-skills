@@ -3,6 +3,23 @@
 All notable changes to this project are documented here. Release versions follow
 [Semantic Versioning](https://semver.org/).
 
+## v0.6.0
+
+### Added
+
+- Delivery flow: four skills that take a source ticket to reviewed PRs, each a separate non-interactive run. `business-refinement` turns a Jira ticket, GitHub issue, or GitHub milestone into a milestone with business-level issues, or comments the open questions on the source in its language. `technical-refinement` writes a technical plan per issue with `ticket-plan` and makes the milestone safe to build in parallel (disjoint areas or explicit dependencies, splits and merges). `readiness-review` moves each issue to ready or back to refinement with a reason. `delivery-orchestration` creates the milestone and task branches, starts unblocked issues up to `max-parallel` (dispatching the implement workflow in CI), and opens the milestone PR when every issue is done. See `docs/delivery-flow.md`.
+- Delivery agents: `business-analyst`, `tech-lead`, `readiness-reviewer`, `delivery-orchestrator`, and `task-implementer` (`dev`, `quality-cycle`, and `pr-create` into the milestone branch). None of them merges.
+- Shared `work-status` reference: one `status:<state>` label per issue, configurable labels, and the matching GitHub Project single-select field with configurable option names (`project-status-options`).
+- One shared delivery profile, `docs/ai/delivery.md`, with the flow's inputs and defaults, including a `## Triage` section.
+- Every issue the delivery flow creates or refines carries triage: `business-refinement` sets category labels, Priority, Start and Target date, and an initial Size, Estimate, and Effort; `technical-refinement` revises them after the plan and splits anything above the largest size; `readiness-review` sends an issue with missing triage back to technical refinement; `delivery-orchestration` starts issues by Priority and Target date.
+
+### Changed
+
+- Ticket access gains the tracker's REST API with credentials already in the environment (for Jira `JIRA_BASE_URL`, `JIRA_EMAIL`, `JIRA_API_TOKEN`) before the public URL option: read, comment, labels, and attachments, never printing the credentials.
+- Triage reference covers Size, Effort, and Start and Target dates, a Size to Estimate scale, estimates from the history of similar closed work, GitHub Project fields and organization issue fields (the issue field wins when a project field mirrors it), and never overwrites values people set unless the scope changed, with a comment.
+- `dev` can track the issue's status (`in-progress`, `in-review`) when a caller asks for it.
+- Ticket skills (`ticket-ask`, `ticket-plan`, `ticket-create`, `dev`, `pr-create`, `review-changes`) download and read ticket attachments and inline images instead of skipping them: through the tracker's download action, including one an MCP server exposes only through discovery (such as the Atlassian server's Jira attachment download), then a tracker CLI or the REST API with credentials from the environment. Files go to a temp directory, are never executed, and are deleted afterwards.
+
 ## v0.5.1
 
 ### Changed
