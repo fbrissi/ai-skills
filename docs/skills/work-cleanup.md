@@ -24,7 +24,7 @@ Cleans up the local branches, worktrees, and optionally remote branches left ove
 ## What it does
 
 1. Fetches with prune and loads worktrees, local branches, upstream tracking, and each candidate's PR state.
-2. Keeps protected branches, the current branch or worktree, open PRs, uncommitted changes, and unpushed or unmerged commits, each with its reason.
+2. Keeps protected branches, the current branch or worktree, open PRs, uncommitted changes, and unpushed or unmerged commits, each with its reason. If the finished branch is checked out in the main worktree and otherwise safe, it offers to switch to the default branch first.
 3. Shows a numbered plan: what will be removed (path, branch, last commit, PR state) and what is kept and why.
 4. Asks for confirmation: local items, each `git branch -D` item by name (squash-merged branches), and remote branches separately.
 5. Runs `git worktree remove` and `git worktree prune`, `git branch -d`, and `git push origin --delete` for confirmed items only, then reports removed, kept, and skipped items.

@@ -51,8 +51,13 @@ Check each candidate against these keep rules, in order. The first match keeps i
 | Current branch or worktree | it is the branch checked out here, or the worktree you are running in, or the main worktree |
 | Open PR | PR state `OPEN` or `unknown` with commits not in `origin/<default>` |
 | Uncommitted changes | `git -C <worktree> status --porcelain` is not empty, or the worktree is locked |
-| Unpushed commits | `git rev-list --count <upstream>..<branch>` > 0, or no upstream and no merged PR |
+| Unpushed commits | `git rev-list --count <upstream>..<branch>` > 0. With no upstream, or one shown as `[gone]` (do not run `rev-list` against it), keep unless the PR is `MERGED` and `<branch>` equals the PR head (or is its ancestor) |
 | Unmerged commits | `git rev-list --count origin/<default>..<branch>` > 0, unless the PR is `MERGED` and `<branch>` equals the PR head (or is its ancestor) |
+
+If the target matches `Current branch or worktree` and none of the later rules, offer a way out in the plan instead of dropping it:
+
+- In the main worktree: offer `git switch <default>` (only with no uncommitted changes), confirmed as its own plan item; after the switch, the branch is classified again.
+- In a linked worktree: it cannot remove itself. Keep it and tell the user to re-run from the main worktree or another one.
 
 Everything else is safe. Mark how each safe branch is deleted:
 
@@ -76,6 +81,9 @@ Remove (local):
 Remove (remote, confirm separately):
   4. origin/<branch>  last <sha>  PR <#n STATE>
 
+Switch first (confirm):
+  5. git switch <default>  releases current branch <branch>
+
 Keep:
   - branch <branch>  worktree <path>: <keep rule> (<detail, e.g. 2 unpushed commits>)
 ```
@@ -86,6 +94,7 @@ Ask the user, and wait for an explicit answer:
 
 - which local items to remove (`all local`, item numbers, or none);
 - each `-D` item, by name;
+- the switch to `<default>`, if offered;
 - the remote items, as a separate question.
 
 Remove only what was confirmed. Silence, an unclear answer, or a general "go ahead" that does not cover remote or `-D` items confirms none of them.
@@ -94,9 +103,10 @@ Remove only what was confirmed. Silence, an unclear answer, or a general "go ahe
 
 Run in this order, from a worktree that is not being removed. Re-check each item right before deleting it; if its state changed (new commits, changes, an open PR), skip it and report why.
 
-1. Worktrees: `git worktree remove <path>`, then `git worktree prune`.
-2. Branches: `git branch -d <branch>`; `git branch -D <branch>` only for items confirmed by name.
-3. Remote branches: `git push origin --delete <branch>`.
+1. If confirmed, `git switch <default>` to release the current branch.
+2. Worktrees: `git worktree remove <path>`, then `git worktree prune`.
+3. Branches: `git branch -d <branch>`; `git branch -D <branch>` only for items confirmed by name.
+4. Remote branches: `git push origin --delete <branch>`.
 
 If a command fails, do not retry with force: record the error, skip the item, and continue.
 
