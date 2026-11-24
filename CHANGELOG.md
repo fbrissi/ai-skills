@@ -3,6 +3,12 @@
 All notable changes to this project are documented here. Release versions follow
 [Semantic Versioning](https://semver.org/).
 
+## v0.5.0
+
+### Added
+
+- `work-cleanup` skill: after work is finished, lists the branches, worktrees, and optionally remote branches it left behind, classifies each as safe to remove or keep with a reason (protected, current, open PR, uncommitted changes, unpushed or unmerged commits), and deletes only the items the user confirms, never by force. Remote branches and `git branch -D` items are confirmed separately.
+
 ## v0.4.1
 
 ### Changed
