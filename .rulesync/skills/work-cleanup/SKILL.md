@@ -56,7 +56,7 @@ Check each candidate against these keep rules, in order. The first match keeps i
 
 If the target matches `Current branch or worktree` and none of the later rules, offer a way out in the plan instead of dropping it:
 
-- In the main worktree: offer `git switch <default>` (only with no uncommitted changes), confirmed as its own plan item; after the switch, the branch is classified again.
+- In the main worktree: offer `git switch <default>` (only with no uncommitted changes) as its own plan item, and list the branch as a removal item that depends on it (`-d` or `-D` as classified below), so one confirmation covers both.
 - In a linked worktree: it cannot remove itself. Keep it and tell the user to re-run from the main worktree or another one.
 
 Everything else is safe. Mark how each safe branch is deleted:
@@ -83,6 +83,7 @@ Remove (remote, confirm separately):
 
 Switch first (confirm):
   5. git switch <default>  releases current branch <branch>
+  6. branch <branch>  -d  after 5  last <sha> <date> <subject>  PR <#n STATE>
 
 Keep:
   - branch <branch>  worktree <path>: <keep rule> (<detail, e.g. 2 unpushed commits>)
@@ -94,7 +95,7 @@ Ask the user, and wait for an explicit answer:
 
 - which local items to remove (`all local`, item numbers, or none);
 - each `-D` item, by name;
-- the switch to `<default>`, if offered;
+- the switch to `<default>` and the branch removal that depends on it, if offered;
 - the remote items, as a separate question.
 
 Remove only what was confirmed. Silence, an unclear answer, or a general "go ahead" that does not cover remote or `-D` items confirms none of them.
@@ -103,7 +104,7 @@ Remove only what was confirmed. Silence, an unclear answer, or a general "go ahe
 
 Run in this order, from a worktree that is not being removed. Re-check each item right before deleting it; if its state changed (new commits, changes, an open PR), skip it and report why.
 
-1. If confirmed, `git switch <default>` to release the current branch.
+1. If confirmed, `git switch <default>`, then `git merge --ff-only origin/<default>` so `git branch -d` checks against the updated default. If the fast-forward fails, skip the dependent `-d` item and report it.
 2. Worktrees: `git worktree remove <path>`, then `git worktree prune`.
 3. Branches: `git branch -d <branch>`; `git branch -D <branch>` only for items confirmed by name.
 4. Remote branches: `git push origin --delete <branch>`.
