@@ -17,7 +17,7 @@ You take an NFS-e technical note from publication to a merged, homologation-firs
 ## Inputs
 
 - **Note**: an NT number, URL, or PDF, or `scan` (default) to look for notes without an issue.
-- **Profile**: `docs/ai/nfse-technical-note-analysis.md`, including its Automation section (tracker, labels, estimate scale, due date field, milestone policy, awaiting-answer label, implementable sources, issue split, optional changes, base branch, Auto-merge default `off`, Max risk default 2, merge method, required human approvals, risk floors). Missing merge values fall back to `docs/ai/merge-risk.md`.
+- **Profile**: `docs/ai/nfse-technical-note-analysis.md`, including its Automation section (tracker, labels, estimate scale, due date field, milestone policy, awaiting-answer label, implementable sources, issue split, optional changes, base branch, PR follow-up default `agent`, Auto-merge default `off`, Max risk default 2, merge method, required human approvals, risk floors). Missing merge values fall back to `docs/ai/merge-risk.md`.
 - **Overrides**: the user's request wins over the profile ("no merge", "auto-merge on", "analysis only").
 - **Run**: interactive or non-interactive. Non-interactive runs never wait for input: questions go to the issue or PR and that note stops there.
 
@@ -60,7 +60,10 @@ For an item that already has an issue, only Reconcile (3) and Milestone (4) appl
 
 ## 5. Until approved
 
-Run the `pr-shepherd` loop on the PR in `auto` mode (the `pr-fix` skill's loop is the auto-fix). The PR is approved when the review decision is approved with the required human approvals on the current head. If it is not approved when CI is green and no new item arrives, stop with `awaiting approval`; the next run resumes here.
+The PR is approved when the review decision is approved with the required human approvals on the current head. When it already is, go to section 6. Otherwise, by the profile's PR follow-up:
+
+- `agent` (default): run the `pr-shepherd` loop on the PR in `auto` mode (the `pr-fix` skill's loop is the auto-fix). If it is not approved when CI is green and no new item arrives, stop with `awaiting approval`; the next run resumes here.
+- `events`: handle the feedback already on the PR once with `pr-shepherd` in `auto` mode and Settle `none`, then stop with `awaiting review`. Workflows outside the agent react to later reviews and approvals; a later run that resumes the PR goes on to section 6 when it is approved.
 
 ## 6. Merge decision
 
@@ -74,5 +77,5 @@ After a merge, comment on the issue with the merge commit, the risk rating, and 
 NFS-e: <n> notes checked, <m> new, <k> issues reconciled
 | Note or item | Verdict | Issue | Estimate | Due | PR | Risk | Outcome |
 |---|---|---|---|---|---|---|---|
-Outcome values: recorded (n/a) | reconciled: <what changed or no change> | watched | awaiting approval | merged | held: reason | questions asked | covered by: <issue or PR>
+Outcome values: recorded (n/a) | reconciled: <what changed or no change> | watched | awaiting approval | awaiting review | merged | held: reason | questions asked | covered by: <issue or PR>
 ```

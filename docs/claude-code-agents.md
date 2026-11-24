@@ -59,7 +59,7 @@ Loads the milestone's open issues, skips the ones assigned to others or already 
 
 ### pr-shepherd
 
-Each round: `pr-fix` on the review comments and CI (in `review` mode it asks before the first push and before replying), then `quality-cycle` on the PR branch, then the `pr-fix` watch loop until CI settles. Repeats while new feedback arrives, up to the round limit. Never merges.
+Each round: `pr-fix` on the review comments and CI (in `review` mode it asks before the first push and before replying), then `quality-cycle` on the PR branch, then the `pr-fix` watch loop until CI settles. Repeats while new feedback arrives, up to the round limit. Never merges. With Settle `none` it does one round and finishes with `awaiting events` instead of watching, for a CI workflow that reacts to review events and starts the next run.
 
 ### incident-responder
 
@@ -71,7 +71,7 @@ Runs `inpi-trademark-watch` for each RPI, then creates or updates `INPI: RPI <n>
 
 ### nfse-compliance
 
-In `scan` mode it finds notes with no issue yet. For each note: `nfse-technical-note-analysis`, then an issue with category labels (tax, layout, API, events, DANFSE, validation), estimates, priority, and due dates from the official dates and rollout plan. Not-applicable notes are recorded and closed. Issues go to the milestone the profile's milestone policy names (a release milestone for deadline work, a tracking milestone for watched work). On resume it reconciles an existing issue with the current profile and sources first, so a policy change fixes old issues instead of duplicating them. Required changes are implemented homologation first on `feat/nfse-nt-<n>-<slug>`, go through `quality-cycle` and `pr-create`, then the `pr-shepherd` loop in `auto` mode until a person approves, then `merge-risk` in `decide` mode. It never deploys.
+In `scan` mode it finds notes with no issue yet. For each note: `nfse-technical-note-analysis`, then an issue with category labels (tax, layout, API, events, DANFSE, validation), estimates, priority, and due dates from the official dates and rollout plan. Not-applicable notes are recorded and closed. Issues go to the milestone the profile's milestone policy names (a release milestone for deadline work, a tracking milestone for watched work). On resume it reconciles an existing issue with the current profile and sources first, so a policy change fixes old issues instead of duplicating them. Required changes are implemented homologation first on `feat/nfse-nt-<n>-<slug>`, go through `quality-cycle` and `pr-create`, then the `pr-shepherd` loop in `auto` mode until a person approves, then `merge-risk` in `decide` mode. With the profile's `PR follow-up: events`, it handles the feedback already on the PR in one pass and stops with `awaiting review`; a CI workflow that reacts to review events runs it again, and a run on an approved PR goes on to the merge decision. It never deploys.
 
 ## Auto-merge
 

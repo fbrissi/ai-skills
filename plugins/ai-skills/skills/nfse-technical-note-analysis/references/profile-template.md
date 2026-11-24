@@ -56,6 +56,7 @@ Copy this template to `docs/ai/nfse-technical-note-analysis.md` in your reposito
 - Split into one issue per change: <no | yes>
 - Implement optional changes: <no | yes>
 - Base branch: <main>
+- PR follow-up: <agent (the agent watches the PR until approved) | events (one pass, then a workflow that reacts to review events starts the next run)>
 - Auto-merge: <off | on>
 - Max risk to merge: <2>
 - Merge method: <squash>

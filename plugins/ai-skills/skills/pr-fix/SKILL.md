@@ -17,6 +17,7 @@ Read from the user's request:
 
 - **PR**: number or URL. Default: the PR of the current branch.
 - **Mode**: `review` (default) asks for approval before pushing and replying; `auto` skips approval; `loop` = `auto` + watch CI and new comments until clean.
+  `auto` is one pass with no waiting, so it suits event-driven runs where each push or review event triggers the next pass.
 - **Guidance**: any remaining text narrows scope or sets priorities.
 
 ## 1. Load context (one call)

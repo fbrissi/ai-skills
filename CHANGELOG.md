@@ -3,6 +3,14 @@
 All notable changes to this project are documented here. Release versions follow
 [Semantic Versioning](https://semver.org/).
 
+## v0.5.1
+
+### Changed
+
+- `pr-shepherd` takes a `Settle` input: `wait` (default) watches CI and new comments as before; `none` does one round and finishes with `awaiting events`, for event-driven runs started by a CI workflow that reacts to review events.
+- `nfse-compliance` reads `PR follow-up` from the profile: `agent` (default) keeps the watch loop; `events` handles the feedback already on the PR once with `pr-shepherd` (Settle `none`) and stops with `awaiting review`. A resumed run on an approved PR still goes on to the merge decision.
+- The `nfse-technical-note-analysis` profile template gains the `PR follow-up` Automation value, and `pr-fix` notes that `auto` mode suits event-driven runs.
+
 ## v0.5.0
 
 ### Added
