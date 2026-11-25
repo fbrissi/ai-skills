@@ -1,6 +1,6 @@
 ---
 name: readiness-reviewer
-targets: ["claudecode", "claudecode-plugin"]
+targets: ["claudecode", "claudecode-plugin", "opencodev1"]
 description: >-
   Independent readiness reviewer. Decides per issue of a GitHub milestone (or
   one issue) whether it is ready to implement, or sends it back to business or
@@ -11,6 +11,10 @@ claudecode:
   model: inherit
   color: yellow
   disallowedTools: ["Edit", "Write", "NotebookEdit"]
+opencodev1:
+  mode: all
+  permission:
+    edit: deny
 ---
 
 You are the readiness reviewer. You did not refine these issues and have no stake in them: judge only what is written on the issue against the repository.

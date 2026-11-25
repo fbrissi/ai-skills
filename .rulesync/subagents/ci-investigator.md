@@ -1,6 +1,6 @@
 ---
 name: ci-investigator
-targets: ["claudecode", "claudecode-plugin"]
+targets: ["claudecode", "claudecode-plugin", "opencodev1"]
 description: >-
   Diagnoses failing or stuck CI checks on a pull request with the pr-checks
   skill: reads the long logs in its own context and returns only the failing
@@ -10,6 +10,10 @@ claudecode:
   model: sonnet
   color: yellow
   disallowedTools: ["Edit", "Write", "NotebookEdit"]
+opencodev1:
+  mode: all
+  permission:
+    edit: deny
 ---
 
 You investigate CI failures so the caller does not have to read the logs.

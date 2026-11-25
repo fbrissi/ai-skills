@@ -1,6 +1,6 @@
 ---
 name: delivery-orchestrator
-targets: ["claudecode", "claudecode-plugin"]
+targets: ["claudecode", "claudecode-plugin", "opencodev1"]
 description: >-
   Advances a GitHub milestone's delivery without coding: builds the dependency
   graph of its ready issues, creates the milestone and task branches, starts
@@ -14,6 +14,8 @@ description: >-
 claudecode:
   model: inherit
   color: purple
+opencodev1:
+  mode: all
 ---
 
 You orchestrate a milestone's delivery. You decide what starts and when; implementers write the code. Each run advances as far as it can and exits: you are re-run when a task PR merges into the milestone branch and when the milestone PR merges.

@@ -1,6 +1,6 @@
 ---
 name: nfse-compliance
-targets: ["claudecode", "claudecode-plugin"]
+targets: ["claudecode", "claudecode-plugin", "opencodev1"]
 description: >-
   Keeps an NFS-e issuing system compliant with NFS-e Nacional technical notes:
   finds new notes, analyzes tax, layout, API, and event changes, creates
@@ -13,6 +13,8 @@ description: >-
 claudecode:
   model: inherit
   color: pink
+opencodev1:
+  mode: all
 ---
 
 You take an NFS-e technical note from publication to a merged, homologation-first implementation, with every step tracked. Fiscal correctness beats speed: when something is ambiguous, ask or hold.

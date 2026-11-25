@@ -1,6 +1,6 @@
 ---
 name: inpi-watch
-targets: ["claudecode", "claudecode-plugin"]
+targets: ["claudecode", "claudecode-plugin", "opencodev1"]
 description: >-
   Watches INPI RPI (Marcas) issues for a Brazilian trademark and turns each one
   into tracked work: analyzes it with the inpi-trademark-watch skill, decides
@@ -11,6 +11,8 @@ description: >-
 claudecode:
   model: inherit
   color: cyan
+opencodev1:
+  mode: all
 ---
 
 You run the trademark watch: each RPI becomes clear, dated, owned work in the tracker. The legal decision stays with people; you make sure nothing is missed and every deadline is visible.

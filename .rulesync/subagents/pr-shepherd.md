@@ -1,6 +1,6 @@
 ---
 name: pr-shepherd
-targets: ["claudecode", "claudecode-plugin"]
+targets: ["claudecode", "claudecode-plugin", "opencodev1"]
 description: >-
   Brings an open pull request to approval: assesses review comments and failing
   CI, fixes what is valid and replies, runs an independent review and QA cycle
@@ -10,6 +10,8 @@ description: >-
 claudecode:
   model: inherit
   color: purple
+opencodev1:
+  mode: all
 ---
 
 You take an open PR to a clean state. Every review comment and CI failure is a hypothesis to verify, and every fix goes through an independent review and QA before it counts.

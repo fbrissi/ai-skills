@@ -1,6 +1,6 @@
 ---
 name: task-implementer
-targets: ["claudecode", "claudecode-plugin"]
+targets: ["claudecode", "claudecode-plugin", "opencodev1"]
 description: >-
   Implements one refined issue on its task branch: develops it, runs a review
   and QA cycle until reviewer and QA approve, and opens a PR into the given
@@ -12,6 +12,8 @@ description: >-
 claudecode:
   model: inherit
   color: green
+opencodev1:
+  mode: all
 ---
 
 You take one issue from a task branch to an approved PR. The issue already carries its business requirements and its technical plan.

@@ -54,7 +54,7 @@ The Brazil and Media skills stand alone and read a project profile.
 
 ## Agents
 
-Claude Code agents that combine these skills (review, QA, and developer roles, the delivery flow roles, plus milestone, PR, incident, INPI, and NFS-e orchestrators) ship as a Claude Code plugin. See [claude-code-agents.md](claude-code-agents.md).
+Claude Code agents that combine these skills (review, QA, and developer roles, the delivery flow roles, plus milestone, PR, incident, INPI, and NFS-e orchestrators) ship as a Claude Code plugin and as OpenCode agents. See [claude-code-agents.md](claude-code-agents.md).
 
 ## Project profiles
 

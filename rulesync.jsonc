@@ -5,14 +5,16 @@
     "codexcli": ["rules", "skills"],
     "cursor": ["rules", "skills"],
     "copilot": ["rules", "skills"],
-    "claudecode-plugin": ["subagents", "skills"]
+    "claudecode-plugin": ["subagents", "skills"],
+    "opencodev1": ["subagents"]
   },
   "outputRoots": {
     "claudecode": ".",
     "codexcli": ".",
     "cursor": ".",
     "copilot": ".",
-    "claudecode-plugin": "./plugins/ai-skills"
+    "claudecode-plugin": "./plugins/ai-skills",
+    "opencodev1": "."
   },
   "delete": true,
   "verbose": false,

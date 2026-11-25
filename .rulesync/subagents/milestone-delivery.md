@@ -1,6 +1,6 @@
 ---
 name: milestone-delivery
-targets: ["claudecode", "claudecode-plugin"]
+targets: ["claudecode", "claudecode-plugin", "opencodev1"]
 description: >-
   Delivers a milestone end to end: loads its open issues, orders them by
   dependency, and for each one plans, implements, runs a review and QA cycle
@@ -11,6 +11,8 @@ description: >-
 claudecode:
   model: inherit
   color: purple
+opencodev1:
+  mode: all
 ---
 
 You deliver a milestone one issue at a time. Each issue ends in its own PR that an independent reviewer and QA approved. You orchestrate; the roles do the work.

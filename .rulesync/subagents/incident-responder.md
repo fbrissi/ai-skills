@@ -1,6 +1,6 @@
 ---
 name: incident-responder
-targets: ["claudecode", "claudecode-plugin"]
+targets: ["claudecode", "claudecode-plugin", "opencodev1"]
 description: >-
   Troubleshoots production errors from an observability tool (Sentry, Datadog,
   and others) down to the root cause, then either asks the questions that
@@ -11,6 +11,8 @@ description: >-
 claudecode:
   model: inherit
   color: red
+opencodev1:
+  mode: all
 ---
 
 You take a production error from the alert to a merged fix, or to a clear question for a person. When the evidence does not settle the cause, ask; never fix a guess.

@@ -1,6 +1,6 @@
 # Agents
 
-Claude Code agents built on the skills in this library, shipped as the `ai-skills` Claude Code plugin. Other harnesses use the skills directly; agents for them may come later.
+Agents built on the skills in this library, for Claude Code (shipped as the `ai-skills` Claude Code plugin) and OpenCode (see [OpenCode](#opencode)). Other harnesses use the skills directly.
 
 ## Install
 
@@ -58,6 +58,29 @@ claude -p --agent ai-skills:inpi-watch "process the latest RPI"
 ```
 
 Started as a subagent instead, an orchestrator plays the roles itself one at a time, as `quality-cycle` describes.
+
+## OpenCode
+
+Every agent is also generated as an OpenCode agent in `plugins/ai-skills/opencode/agent/<name>.md`, with the same body. Copy the folder into the repository's `.opencode/agent/` (or `~/.config/opencode/agent/`) and install the skills with `npx skills add fbrissi/ai-skills -a opencode`. The files use the OpenCode 1.x agent format, which OpenCode 2.x still reads:
+
+```yaml
+---
+description: >-
+  Independent code reviewer. ...
+mode: all
+name: code-reviewer
+permission:
+  edit: deny
+---
+```
+
+- `mode: all`: each agent runs as the main agent (`opencode run --agent <name>`) and as a subagent through the task tool, so orchestrators delegate to the workers the same way.
+- `model` is unset: the agent uses the model of the run, or of its parent session.
+- `permission.edit: deny` for the agents that cannot write files in Claude Code (`code-reviewer`, `ci-investigator`, `readiness-reviewer`). OpenCode's `edit` permission also covers writing new files, so the agents that may write but not edit in Claude Code (`qa-tester`, `tech-lead`, `business-analyst`) keep `edit` allowed and rely on the rules in their body.
+
+```bash
+opencode run --agent milestone-delivery "deliver milestone 3"
+```
 
 ## Orchestrators
 

@@ -1,6 +1,6 @@
 # Delivery flow
 
-Four skills and five Claude Code agents take a request from a source ticket to reviewed PRs, one task at a time and in parallel where it is safe. Each step is a separate, non-interactive run, started by a person or by a workflow (for example a GitHub Actions `workflow_dispatch`). Questions never wait for an answer: they go on the ticket or issue, the item moves to a blocked state, and a resume picks up the answer. In CI the steps chain on their own, so one dispatch of the first step runs the whole flow until it needs a person.
+Four skills and five agents (Claude Code and OpenCode) take a request from a source ticket to reviewed PRs, one task at a time and in parallel where it is safe. Each step is a separate, non-interactive run, started by a person or by a workflow (for example a GitHub Actions `workflow_dispatch`). Questions never wait for an answer: they go on the ticket or issue, the item moves to a blocked state, and a resume picks up the answer. In CI the steps chain on their own, so one dispatch of the first step runs the whole flow until it needs a person.
 
 ```text
 source ticket (Jira, GitHub issue, or GitHub milestone with its issues)
