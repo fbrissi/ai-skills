@@ -32,6 +32,8 @@ Start the profile from [`references/profile-template.md`](../../.rulesync/skills
 5. Repeats until both approve in the same round, or escalates to the user at the round limit or when a round makes no progress.
 6. Pushes once after approval (asking first unless told), optionally opening a PR via [`pr-create`](pr-create.md) or [`ship`](ship.md).
 
+In a non-interactive run (CI) it never waits: anything that needs the user ends the cycle as escalated. QA in CI uses a real browser when a CI setup command can start the test environment; otherwise QA is tests-only (`SKIPPED (tests-only)`, relying on the PR checks), which counts as approval and is reported as `browser QA skipped: no CI environment`, never escalated.
+
 Reviewer and QA run as fresh, independent contexts when the harness can delegate; otherwise the skill switches roles explicitly. Every referenced skill has a fallback when not installed.
 
 ## Side effects

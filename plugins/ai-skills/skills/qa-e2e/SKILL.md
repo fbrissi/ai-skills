@@ -15,7 +15,7 @@ Act as a careful QA engineer using the app like a real user. Evidence over opini
 ## Inputs
 
 - **Scope**: scenario files or tags (`@smoke`, `@p1`), a capability, a branch or diff (run the scenarios that cover it plus their regression neighbours), or `all`. Default: the scenarios covering the current branch against its base, otherwise `@smoke`.
-- **Environment**: `local` (default) or a staging URL the user names in the request.
+- **Environment**: `local` (default), a staging URL the user names in the request, or `ci` (detected from `CI=true`; see CI runs).
 - **Profile**: default `docs/ai/qa-e2e.md`, or a path given in the request.
 - **Focus**: any remaining text sets priorities (for example "mobile only", "checkout").
 
@@ -31,6 +31,12 @@ Act as a careful QA engineer using the app like a real user. Evidence over opini
 
 Read the profile first; [references/profile-template.md](references/profile-template.md) lists its fields (app URLs, how to start and reset the stack, scenarios folder, test accounts source, mail catcher, viewports, report folder, known noise). Without a profile, ask for the app URL, where the scenarios are, and where test accounts come from, then offer to save the answers. If the scenarios folder is not set, use the `bdd-scenarios` profile's features folder, then `docs/bdd/`.
 
+## CI runs
+
+In CI nobody can start a stack by hand or answer a question. Run the CI setup command once (the caller's, for example the delivery profile's `QA in CI setup`, else the profile's `CI setup`), which installs the browsers and starts the test environment, then test as below with that browser tool (Playwright, or Selenium when the project uses it).
+
+When there is no setup command, the environment does not become reachable, or no browser capability exists, switch to **tests-only** mode instead of stopping or asking: run no browser scenarios, do not re-run the automated tests (they run as the PR's checks), list the scenarios in scope that no automated test covers, and report `browser QA skipped: no CI environment` with the verdict `SKIPPED (tests-only)`. This is not a failure and not a reason to escalate.
+
 ## 1. Prepare
 
 1. Confirm the stack is running (open the base URL; check the mail catcher if any scenario is `@email`). If it is down, start it with the profile's command, or stop and ask.
@@ -39,7 +45,7 @@ Read the profile first; [references/profile-template.md](references/profile-temp
 
 ## 2. Execute functional scenarios
 
-Use a browser automation capability (a real browser you can drive and screenshot). If the `webapp-testing` skill is installed, you may use its Playwright toolkit; otherwise drive the browser directly. If no browser capability exists, stop and say so: this skill does not fake browser results.
+Use a browser automation capability (a real browser you can drive and screenshot). If the `webapp-testing` skill is installed, you may use its Playwright toolkit; otherwise drive the browser directly. If no browser capability exists, stop and say so (in CI, use tests-only mode): this skill does not fake browser results.
 
 For each scenario, at the default desktop viewport (profile, default 1440x900):
 
@@ -82,7 +88,8 @@ Write the report from [references/report-format.md](references/report-format.md)
 QA: <scope> on <environment>
 Scenarios: <passed>/<total> passed, <failed> failed, <blocked> blocked
 Findings: <n> (<b> blocker, <h> high, <m> medium, <l> low)
-Verdict: <APPROVED | CHANGES REQUIRED>
+Verdict: <APPROVED | CHANGES REQUIRED | SKIPPED (tests-only)>
+Mode: <browser (<tool>) | tests-only: browser QA skipped: no CI environment>
 Report: <path>
 1. [blocker] <scenario ref> @<viewport> - <one line>
 ```
