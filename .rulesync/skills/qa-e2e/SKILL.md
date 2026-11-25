@@ -16,7 +16,7 @@ Act as a careful QA engineer using the app like a real user. Evidence over opini
 ## Inputs
 
 - **Scope**: scenario files or tags (`@smoke`, `@p1`), a capability, a branch or diff (run the scenarios that cover it plus their regression neighbours), or `all`. Default: the scenarios covering the current branch against its base, otherwise `@smoke`.
-- **Environment**: `local` (default) or a staging URL the user names in the request.
+- **Environment**: `local` (default), a staging URL the user names in the request, or `ci` (detected from `CI=true`; see CI runs).
 - **Profile**: default `docs/ai/qa-e2e.md`, or a path given in the request.
 - **Focus**: any remaining text sets priorities (for example "mobile only", "checkout").
 
@@ -30,17 +30,29 @@ Act as a careful QA engineer using the app like a real user. Evidence over opini
 
 ## Profile
 
-Read the profile first; [references/profile-template.md](references/profile-template.md) lists its fields (app URLs, how to start and reset the stack, scenarios folder, test accounts source, mail catcher, viewports, report folder, known noise). Without a profile, ask for the app URL, where the scenarios are, and where test accounts come from, then offer to save the answers. If the scenarios folder is not set, use the `bdd-scenarios` profile's features folder, then `docs/bdd/`.
+Read the profile first; [references/profile-template.md](references/profile-template.md) lists its fields (app URLs, how to start and reset the stack, scenarios folder, test accounts source, mail catcher, viewports, report folder, known noise). Without a profile, ask for the app URL, where the scenarios are, and where test accounts come from, then offer to save the answers. In a non-interactive run (CI, or a caller that says so) never ask: use the caller's inputs and what the repository documents, and follow [references/non-interactive.md](references/non-interactive.md) for anything still missing. If the scenarios folder is not set, use the `bdd-scenarios` profile's features folder, then `docs/bdd/`.
+
+## CI runs
+
+In CI nobody can start a stack by hand or answer a question. Run the CI setup command once (the caller's, for example the delivery profile's `QA in CI setup`, else the profile's `CI setup`), which installs the browsers and starts the test environment, then test as below with that browser tool (Playwright, or Selenium when the project uses it). Scope the run to what the task changed: the scenarios covering the diff against its base plus the `@smoke` scenarios of the touched areas, never the whole suite. New behavior with no scenario gets one first (the `bdd-scenarios` skill, or Given/When/Then bullets when it is not installed).
+
+When there is no setup command, the environment does not become reachable, or no browser capability exists, switch to **targeted validation** instead of stopping or asking. Validate the same scope without a browser and keep the evidence (commands and their results) for the report:
+
+1. **Focused tests**: run the tests that cover the changed behavior (not the whole suite; the PR checks run it). Where a behavior in scope has no test, write a focused one when the caller allows QA to write test files; otherwise report the gap as a `medium` finding for the Developer.
+2. **Exercise the change**: when feasible, start the app or API headless (the profile's start command, or the one the repository documents) and call the changed endpoints, CLI commands, or jobs with test data, checking each `Then` against the responses.
+3. **Smoke checks**: the framework's own checks that the app builds and boots (for example a boot or health check, or a pending-migrations check), where the project has them.
+
+Judge the verdict from that evidence as in step 5, with the mode `targeted validation (no E2E setup)`. A missing E2E setup is never a failure and never a reason to escalate.
 
 ## 1. Prepare
 
-1. Confirm the stack is running (open the base URL; check the mail catcher if any scenario is `@email`). If it is down, start it with the profile's command, or stop and ask.
+1. Confirm the stack is running (open the base URL; check the mail catcher if any scenario is `@email`). If it is down, start it with the profile's command, or stop and ask (non-interactive: see CI below).
 2. Load the scenarios in scope. If there are none, hand off to the `bdd-scenarios` skill for the scope; if it is not installed, derive a short checklist of behaviors from the diff and the app's routes, state that it is unscripted, and continue.
 3. Note the data each scenario needs. Reset or seed only with the profile's commands, and only on the test environment.
 
 ## 2. Execute functional scenarios
 
-Use a browser automation capability (a real browser you can drive and screenshot). If the `webapp-testing` skill is installed, you may use its Playwright toolkit; otherwise drive the browser directly. If no browser capability exists, stop and say so: this skill does not fake browser results.
+Use a browser automation capability (a real browser you can drive and screenshot). If the `webapp-testing` skill is installed, you may use its Playwright toolkit; otherwise drive the browser directly. If no browser capability exists, stop and say so (in CI, use targeted validation): this skill does not fake browser results.
 
 For each scenario, at the default desktop viewport (profile, default 1440x900):
 
@@ -84,6 +96,7 @@ QA: <scope> on <environment>
 Scenarios: <passed>/<total> passed, <failed> failed, <blocked> blocked
 Findings: <n> (<b> blocker, <h> high, <m> medium, <l> low)
 Verdict: <APPROVED | CHANGES REQUIRED>
+Mode: <browser (<tool>) | targeted validation (no E2E setup): <tests run or written, endpoints or commands exercised, smoke checks>>
 Report: <path>
 1. [blocker] <scenario ref> @<viewport> - <one line>
 ```

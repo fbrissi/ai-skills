@@ -11,7 +11,7 @@ Investigates a production error or alert from an observability tool (Sentry, Dat
 | Target | issue or alert URL/id, or a query ("top errors in production today") | required |
 | Profile | path | `docs/ai/observability-triage.md` |
 
-Start the profile from [`references/profile-template.md`](../../.rulesync/skills/observability-triage/references/profile-template.md): provider and access, project and environment, release-to-commit mapping, code map and owners, known noise, and the automation settings the `incident-responder` agent reads.
+Start the profile from [`references/profile-template.md`](../../.rulesync/skills/observability-triage/references/profile-template.md): provider and access, project and environment, release-to-commit mapping, code map and owners, and known noise. The `issue-resolver` agent uses this skill to diagnose before it fixes.
 
 ## Examples
 

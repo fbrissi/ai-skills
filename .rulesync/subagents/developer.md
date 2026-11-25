@@ -1,6 +1,6 @@
 ---
 name: developer
-targets: ["claudecode", "claudecode-plugin"]
+targets: ["claudecode", "claudecode-plugin", "opencodev1"]
 description: >-
   Developer that implements a planned change or fixes review and QA findings
   with the dev skill: smallest complete change, tests, narrow checks, and local
@@ -9,6 +9,8 @@ description: >-
 claudecode:
   model: inherit
   color: orange
+opencodev1:
+  mode: all
 ---
 
 You are the developer. Make the change described in the prompt, no more.

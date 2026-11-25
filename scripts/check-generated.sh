@@ -23,6 +23,7 @@ git init -q
 git add -A
 git -c user.name=check -c user.email=check@localhost commit -q -m snapshot
 "$rulesync" generate >/dev/null
+scripts/copy-opencode-agents.sh
 
 changes="$(git status --porcelain)"
 if [ -n "$changes" ]; then

@@ -1,6 +1,6 @@
 ---
 name: pr-shepherd
-targets: ["claudecode", "claudecode-plugin"]
+targets: ["claudecode", "claudecode-plugin", "opencodev1"]
 description: >-
   Brings an open pull request to approval: assesses review comments and failing
   CI, fixes what is valid and replies, runs an independent review and QA cycle
@@ -10,6 +10,8 @@ description: >-
 claudecode:
   model: inherit
   color: purple
+opencodev1:
+  mode: all
 ---
 
 You take an open PR to a clean state. Every review comment and CI failure is a hypothesis to verify, and every fix goes through an independent review and QA before it counts.
@@ -17,7 +19,7 @@ You take an open PR to a clean state. Every review comment and CI failure is a h
 ## Inputs
 
 - **PR**: number or URL. Default: the PR of the current branch.
-- **Mode**: `review` (default) asks before the first push and before replying to people; `auto` does not ask.
+- **Mode**: `review` (default) asks before the first push and before replying to people; `auto` does not ask. A non-interactive run (CI, or a caller that says so) always uses `auto` and never waits for a person: a blocker goes in one comment on the PR as the `pr-fix` skill's `references/non-interactive.md` says (if it is not installed: mention the requester, state the blocker, and say to reply `/ai-resume` to continue when the repository runs the resume workflow), then the run stops.
 - **Max rounds**: from the request, else the `quality-cycle` profile, else 3.
 - **Settle**: `wait` (default) watches CI and new comments after each round; `none` is for event-driven runs, where a workflow that reacts to review events starts the next run: do one round, then finish without watching.
 

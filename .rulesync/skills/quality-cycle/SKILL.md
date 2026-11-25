@@ -26,7 +26,7 @@ Stop if the working tree has uncommitted changes that are not part of the target
 
 Run Reviewer and QA as fresh, independent contexts when the harness can delegate (subagents or separate sessions). When the harness has agents named `code-reviewer`, `qa-tester`, and `developer` (for example from the ai-skills plugin), delegate the roles to them; otherwise use generic subagents. Give each only the target, the base branch, the previous round's findings, and its skill. Never let the Developer's reasoning leak into their prompts. Without delegation, run the roles sequentially yourself, announce each switch (`Role: Reviewer, round 2`), and judge only from the repository and the running app, not from what you remember writing.
 
-Decisions that belong to the user (scope changes, product rules, accepting a known risk, pushing, opening a PR) are asked, never assumed. Ask with the harness's question capability if it has one; otherwise ask in chat and wait.
+Decisions that belong to the user (scope changes, product rules, accepting a known risk, pushing, opening a PR) are asked, never assumed. Ask with the harness's question capability if it has one; otherwise ask in chat and wait. In a non-interactive run (CI, or a caller that says so) never wait, as [references/non-interactive.md](references/non-interactive.md) says: the caller's inputs decide pushing and the PR, and anything else that needs the user ends the cycle as `escalated` with the question in the output, ready for the caller's blocker comment.
 
 ## Skills and fallbacks
 
@@ -51,6 +51,7 @@ Decisions that belong to the user (scope changes, product rules, accepting a kno
 
 - **Reviewer** always reviews the **full diff against the base** (`<base>...HEAD`), never only the last commit, and runs the project's tests, lint, and typecheck for the changed areas. Verdict: APPROVED when no critical, high, or medium finding remains open; otherwise CHANGES REQUIRED.
 - **QA** runs round 1 on every scenario in scope. From round 2, it re-tests each previously failing scenario, the scenarios covering files changed by the fixes, and a regression pass over the touched areas (their `@smoke` scenarios at minimum). Verdict as defined by `qa-e2e`.
+- **QA in CI**: QA uses a real browser when a test environment can be set up in CI (the CI setup command from the caller or the `qa-e2e` profile), on the scenarios for what the task changed. Otherwise it runs **targeted validation** (focused tests for the new behavior, the app or API started headless to exercise the changed endpoints or commands when feasible, framework smoke checks) and returns a normal verdict from that evidence; the cycle reports the QA mode and evidence (also in the PR body). Never escalate only because there is no E2E setup.
 
 Run Reviewer and QA in parallel when both are delegated; otherwise Reviewer first.
 
@@ -91,7 +92,7 @@ Run the final full checks once more on the head commit, then ask the user before
 ```text
 Quality cycle: <branch> vs <base>
 Rounds: <n>/<max>   Status: <approved | escalated: reason | stopped: reason>
-Reviewer: <APPROVED | CHANGES REQUIRED>   QA: <APPROVED | CHANGES REQUIRED>
+Reviewer: <APPROVED | CHANGES REQUIRED>   QA: <APPROVED | CHANGES REQUIRED> (<browser | targeted validation>)
 Fixed: <n> (<sibling fixes> in sibling paths)   Follow-ups: <n>   Open: <n>
 Cycle log: <path>   QA report: <path>
 Pushed: <yes, <sha> | no (awaiting approval) | not requested>   PR: <url | none>

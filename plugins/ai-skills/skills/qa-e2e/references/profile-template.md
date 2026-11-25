@@ -12,6 +12,8 @@ Copy this template to `docs/ai/qa-e2e.md` in your repository and fill it in.
 - Start the stack: <command>
 - Check the stack is up: <command or URL>
 - Reset or seed test data: <command>                        # test environment only
+- CI setup: <command that installs the browsers and starts the stack in CI | none>   # none: targeted validation in CI (focused tests, headless app checks)
+- Browser tool: <playwright | selenium>
 
 ## Scenarios
 - Folder: <docs/bdd/>                                       # defaults to the bdd-scenarios profile folder

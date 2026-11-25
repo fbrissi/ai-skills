@@ -52,3 +52,6 @@ rulesync.local.jsonc
 # Root guidance files are generated but tracked
 !/AGENTS.md
 !/CLAUDE.md
+
+# OpenCode harness folder is generated; the committed copy is plugins/ai-skills/opencode/agent/
+/.opencode/
