@@ -32,7 +32,7 @@ If there are no uncommitted changes and no commits ahead of base, stop with `Not
 
 Keep the current branch if it is not the base and not a protected branch. Otherwise create one:
 
-- Name: `<type>/<kebab-slug>`, where type is `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `perf`, or `ci`, and the slug is 2-5 words taken from the change themes or ticket. Follow the repo's branch convention if it has one.
+- Name: the repo's branch convention if it has one (for example the branch templates of a delivery profile, `docs/ai/delivery.md`). Otherwise `<type>/<kebab-slug>`, where type is `feature`, `bugfix`, `hotfix`, `refactor`, `docs`, `test`, `chore`, `perf`, or `ci`, and the slug is 2-5 words taken from the change themes or ticket.
 - `git switch -c <name>`. If the name exists, add a short numeric suffix once.
 
 ## 3. Commit

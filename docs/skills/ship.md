@@ -16,7 +16,7 @@ Branch → commit → push → PR in one pass. Steps that are already done are s
 
 | Harness | Example |
 | --- | --- |
-| Claude Code / Cursor / Copilot | `/ship`, `/ship #42`, `/ship base develop, call the branch fix/login-timeout` |
+| Claude Code / Cursor / Copilot | `/ship`, `/ship #42`, `/ship base release/v1.2, call the branch bugfix/login-timeout` |
 | Codex CLI | `$ship skip ticket` |
 | OpenCode | "use the ship skill and link ABC-123" |
 
