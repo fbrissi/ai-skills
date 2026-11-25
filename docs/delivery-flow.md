@@ -2,30 +2,31 @@
 
 Four skills and five agents (Claude Code and OpenCode) take a request from a source ticket to reviewed PRs, one task at a time and in parallel where it is safe. Each step is a separate, non-interactive run, started by a person or by a workflow (for example a GitHub Actions `workflow_dispatch`). Questions never wait for an answer: they go on the ticket or issue, the item moves to a blocked state, and a resume picks up the answer. In CI the steps chain on their own, so one dispatch of the first step runs the whole flow until it needs a person.
 
-```text
-source ticket (Jira, GitHub issue, or GitHub milestone with its issues)
-  │ business-refinement      (business-analyst)
-  ▼
-milestone + business issues ── unclear ──► questions on the source/issue, business-blocked
-  │ technical-refinement     (tech-lead, uses ticket-plan per issue)
-  ▼
-issues with technical plans and dependencies ── questions ──► technical-blocked
-  │ readiness-review         (readiness-reviewer)
-  ▼
-ready ── not ready ──► back to business or technical refinement
-  │ delivery-orchestration   (delivery-orchestrator; re-run on each task PR merge)
-  ▼
-release (milestone) branch release/<milestone-slug> (from the default branch)
-  + feature branches feature/<milestone-slug>-<n>-<slug> (from the release branch)
-  + draft milestone PR: milestone branch -> default branch
-  │ implement                (task-implementer: dev ─► quality-cycle ─► pr-create)
-  ▼
-task PR into the milestone branch, in-review ── escalated ──► PR labeled ai:needs-human
-  │ PR follow-up             (pr-fix rounds, then merge-risk; task PRs may merge on their own)
-  ▼
-merged ─► done ─► all done: milestone PR ready for review ─► human approval and merge
-  ─► every issue done, milestone closed
+```mermaid
+flowchart TD
+  SRC["Source: Jira ticket, GitHub issue,<br/>or GitHub milestone with its issues"] --> BR["business-refinement<br/>agent: business-analyst"]
+  BR -->|unclear| BB(["business-blocked<br/>questions on the source + handoff"])
+  BR -->|clear| TR["technical-refinement<br/>agent: tech-lead (ticket-plan per issue)"]
+  TR -->|questions| TB(["technical-blocked<br/>handoff"])
+  TR -->|business gap| BR
+  TR -->|planned| RR["readiness-review<br/>agent: readiness-reviewer"]
+  RR -->|not ready| BR
+  RR -->|not ready| TR
+  RR -->|ready| OR["delivery-orchestration<br/>agent: delivery-orchestrator"]
+  OR -->|"release branch, feature branches,<br/>draft milestone PR"| IM["implement, one run per issue<br/>agent: task-implementer<br/>dev → quality-cycle → pr-create"]
+  IM -->|requirement unclear| TB
+  IM --> PR["task PR into the release branch<br/>issue in-review"]
+  IM -->|cycle escalated| NH(["PR labeled ai:needs-human<br/>handoff"])
+  PR --> FU["PR follow-up<br/>pr-fix rounds, then merge-risk"]
+  FU -->|task PR merged| OR
+  OR -->|every issue done| MP["milestone PR ready for review"]
+  MP -->|human approval and merge| DONE(["issues done, milestone closed"])
+  BB -.->|"/ai-resume"| BR
+  TB -.->|"/ai-resume"| TR
+  NH -.->|"/ai-resume pr-fix"| FU
 ```
+
+Solid arrows run on their own in CI; dotted arrows wait for a person to answer and post `/ai-resume`.
 
 | Task | Agent | Skills | Input | Leaves issues in |
 | --- | --- | --- | --- | --- |
@@ -68,6 +69,29 @@ Start with one dispatch of the business refinement workflow (`source`, or `jira_
 | | else issues `ready` | orchestrate |
 | orchestrate | | dispatches implement per startable issue |
 | implement | escalated or failed | handoff (resume implement, or pr-fix when a PR exists) |
+
+```mermaid
+sequenceDiagram
+  actor P as Person (requested-by)
+  participant W as Stage workflow (ai-task.yml)
+  participant A as Agent run
+  participant G as GitHub issues and labels
+  participant R as ai-resume.yml
+  P->>W: dispatch business refinement
+  W->>A: run the stage
+  A->>G: update issues, set status labels, post blocker comments
+  W->>G: follow-up job reads the status labels
+  alt next stage can run
+    W->>W: dispatch the next stage (loop guard per milestone and stage)
+  else blocked, failed, or loop guard reached
+    W->>G: handoff comment that mentions requested-by
+    P->>G: answer the questions, then comment /ai-resume
+    G->>R: issue_comment created
+    R->>G: eyes reaction, mark the handoff state=resumed
+    R->>W: dispatch the blocked stage again
+    R->>G: rocket reaction and run link
+  end
+```
 
 In CI no step asks or waits: every question point either uses its non-interactive default (for example `pr-fix` in `auto` mode) or ends in a blocker comment and a handoff.
 
@@ -119,6 +143,30 @@ The branch model has four kinds of branch, named by templates in the profile (de
 | hotfix | `Hotfix branch template` (`hotfix/{slug}`) | default branch | default branch |
 | bugfix | `Bugfix branch template` (`bugfix/{slug}`) | default branch | the open release branch (`Bugfix release branch`, else the oldest open one; with none, a handoff asks which) |
 
+```mermaid
+gitGraph
+  commit id: "start"
+  branch release/orders
+  checkout release/orders
+  branch feature/orders-1-cart
+  commit id: "task 1"
+  checkout release/orders
+  merge feature/orders-1-cart id: "task PR 1"
+  checkout main
+  branch hotfix/checkout-crash
+  commit id: "urgent fix"
+  checkout main
+  merge hotfix/checkout-crash id: "hotfix PR"
+  branch bugfix/wrong-total
+  commit id: "non-urgent fix"
+  checkout release/orders
+  merge bugfix/wrong-total id: "bugfix PR"
+  checkout main
+  merge release/orders id: "milestone PR"
+```
+
+`main` stands for the default branch. A `develop` mirror, when kept, is not drawn: after each merge into `main`, `branch-sync.yml` fast-forwards it to `main`, never with a merge commit.
+
 In the delivery flow the milestone branch is the release branch. A `develop` branch, when kept, is only a mirror of the default branch, fast-forwarded after each merge (the github-actions `branch-sync.yml` workflow). Branches that already exist under older names (for example `feat/<milestone-slug>`) are never renamed and keep being used until merged. Template placeholders and examples: [delivery-profile.md](../shared/references/delivery-profile.md#branch-model).
 
 One milestone produces many PRs, so they are stacked:
@@ -128,6 +176,33 @@ One milestone produces many PRs, so they are stacked:
 3. One milestone PR, from the release branch into the default branch, aggregates every task PR, so reviewers see one combined diff. Orchestration opens it as a draft as soon as the release branch has a commit, keeps its body current (every issue with `Closes #<n>`, its status and task PR), and marks it ready for review, requesting `requested-by` as reviewer, when every issue is done. It always needs a human approval.
 4. When the milestone PR merges, orchestration runs again, moves every issue to `done`, and closes the milestone.
 
+The task PR follow-up is event-driven: each review or CI event starts the next run, and nothing polls.
+
+```mermaid
+sequenceDiagram
+  participant TI as task-implementer
+  participant PR as Task PR (into release branch)
+  participant CK as CI and AI code review
+  participant FX as pr-fix workflow
+  participant MD as merge-decision workflow
+  participant OR as delivery-orchestrator
+  TI->>PR: open the PR, issue in-review
+  PR->>CK: checks and review run
+  loop review comments or failing checks
+    CK-->>FX: review or check event
+    FX->>PR: fix, push, reply in each thread (pr-fix auto)
+    PR->>CK: checks and review run again
+  end
+  CK-->>MD: approved and green
+  MD->>MD: merge-risk: gates, then the risk limit for this base
+  alt agent PR into a release branch, risk within the limit
+    MD->>PR: merge
+    PR-->>OR: merged: orchestration runs again
+  else needs a person (human PR, default-branch PR, or risk too high)
+    MD->>PR: request review from requested-by and hold
+  end
+```
+
 ## Issue resolution
 
 Production problems take a shorter path than milestones, with the [`issue-resolver`](claude-code-agents.md#issue-resolver) agent:
@@ -135,6 +210,22 @@ Production problems take a shorter path than milestones, with the [`issue-resolv
 1. **Intake** (for example a weekly schedule) reads the source with [`sentry-issues`](skills/sentry-issues.md) and keeps one GitHub issue per Sentry issue (marker `<!-- ai-issue source=sentry id=<id> -->`, so it never duplicates), with a severity label decided by the profile's `Hotfix criteria` and the `Resolve label` (`ai:resolve`).
 2. **Resolve** runs when an issue gets the resolve label (people can label any issue). Critical issues get a hotfix branch into the default branch; the rest get a bugfix branch into the open release branch. It diagnoses with `observability-triage`, writes a failing test first, runs the review and QA cycle, opens the PR, and stops.
 3. **Follow-up** is the usual PR follow-up: `pr-fix` on review and CI events, then the merge decision. Hotfix PRs into the default branch need a human approval.
+
+```mermaid
+flowchart LR
+  SRC[("Sentry")] -->|"weekly intake<br/>issue-resolver + sentry-issues"| ISS["one GitHub issue per Sentry issue<br/>(dedupe marker)"]
+  ISS --> CRIT{"Hotfix criteria?"}
+  CRIT -->|yes| HC["severity:critical + ai:resolve"]
+  CRIT -->|no| NC["severity:normal + ai:resolve"]
+  HUM(["a person labels any issue ai:resolve"]) --> RES
+  HC -->|"issues: labeled"| RES["resolve: issue-resolver<br/>observability-triage → failing test<br/>→ quality-cycle → pr-create"]
+  NC -->|"issues: labeled"| RES
+  RES -->|critical| HF["hotfix branch, PR into the default branch<br/>needs a human approval"]
+  RES -->|normal| BF["bugfix branch, PR into the open release branch"]
+  RES -->|not a clear code defect| BLK(["blocker comment for requested-by"])
+  HF --> FU["PR follow-up: pr-fix, then merge-risk"]
+  BF --> FU
+```
 
 Configure it in the profile's `## Issue resolution` section and the `sentry-issues` profile; credentials (`SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, optional `SENTRY_BASE_URL`) come from secrets.
 
@@ -149,6 +240,36 @@ For a Jira source, each issue gets an `## Attachments` section: each attachment'
 ## Status
 
 Each issue carries one status label, `status:<state>` by default: `needs-business-refinement`, `business-blocked`, `needs-technical-refinement`, `technical-blocked`, `needs-review`, `ready`, `in-progress`, `in-review`, `done`. Each transition replaces the previous label. Override labels with `status-labels` (`state=label` lines). With `project` (`owner/number`), the issue is added to that GitHub Project and its single-select `project-status-field` (default `Status`) is set to the matching option: `project-status-options` maps states to option names (`state=Option name` lines, several states may share one option), and an unmapped state defaults to its Title Case name, for example `In review`. A state with no matching option leaves the field unchanged and is reported. Rules: [work-status.md](../shared/references/work-status.md).
+
+```mermaid
+stateDiagram-v2
+  state "needs-business-refinement" as NBR
+  state "business-blocked" as BB
+  state "needs-technical-refinement" as NTR
+  state "technical-blocked" as TB
+  state "needs-review" as NR
+  state "ready" as RD
+  state "in-progress" as IP
+  state "in-review" as IR
+  state "done" as DN
+  [*] --> NBR
+  NBR --> NTR: business refinement
+  NBR --> BB: questions
+  BB --> NBR: answered, /ai-resume
+  NTR --> NR: technical refinement
+  NTR --> TB: questions
+  NTR --> NBR: business gap
+  TB --> NTR: answered, /ai-resume
+  NR --> RD: readiness review
+  NR --> NBR: not ready
+  NR --> NTR: not ready
+  RD --> IP: orchestration starts it
+  IP --> IR: task PR opened
+  IP --> TB: requirement unclear
+  IP --> RD: dispatch failed
+  IR --> DN: task PR merged
+  DN --> [*]
+```
 
 ## Triage
 

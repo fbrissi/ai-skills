@@ -33,15 +33,105 @@ The plugin contains every skill too, so you do not need `npx skills add` for Cla
 | `delivery-orchestrator` | Orchestrator | Starts a milestone's unblocked issues up to a limit, with `delivery-orchestration`; keeps the draft milestone PR, marks it ready, closes the milestone after it merges | Branches, labels, workflow dispatches, PR, milestone |
 | `task-implementer` | Orchestrator | One issue on its task branch: `dev`, `quality-cycle`, `pr-create` into the milestone branch | Commits, push, PR, labels |
 
-```text
-milestone-delivery ─┐
-pr-shepherd        ─┤                  ┌─► developer
-issue-resolver     ─┼─ delegate to ────┼─► code-reviewer
-inpi-watch         ─┤                  ├─► qa-tester
-nfse-compliance    ─┤                  └─► ci-investigator
-task-implementer   ─┘
+How the agents delegate to each other:
 
-delivery-orchestrator ─► task-implementer (local) | implement workflow (CI)
+```mermaid
+flowchart LR
+  subgraph ORCH["Orchestrators"]
+    MD["milestone-delivery"]
+    PS["pr-shepherd"]
+    IR["issue-resolver"]
+    NC["nfse-compliance"]
+    TI["task-implementer"]
+    DO["delivery-orchestrator"]
+  end
+  subgraph WORK["Workers"]
+    DEV["developer"]
+    CR["code-reviewer"]
+    QA["qa-tester"]
+    CI["ci-investigator"]
+  end
+  IRD["incident-responder<br/>deprecated alias"] -.-> IR
+  DO -->|local run| TI
+  DO -->|"CI: implement workflow"| TI
+  MD -.->|"and watch the PRs"| PS
+  NC --> PS
+  MD & IR & TI --> DEV & CR & QA
+  PS & NC --> DEV & CR & QA & CI
+```
+
+`inpi-watch` and the delivery agents `business-analyst`, `tech-lead`, and `readiness-reviewer` work alone.
+
+Which skills each agent follows (an agent that delegates uses the skills through its workers):
+
+```mermaid
+flowchart LR
+  subgraph AG["Agents"]
+    BA["business-analyst"]
+    TL["tech-lead"]
+    RV["readiness-reviewer"]
+    DO["delivery-orchestrator"]
+    TI["task-implementer"]
+    MD["milestone-delivery"]
+    PS["pr-shepherd"]
+    IR["issue-resolver"]
+    NC["nfse-compliance"]
+    IW["inpi-watch"]
+    DEV["developer"]
+    CR["code-reviewer"]
+    QA["qa-tester"]
+    CI["ci-investigator"]
+  end
+  subgraph SK["Skills"]
+    sBR["business-refinement"]
+    sTR["technical-refinement"]
+    sTP["ticket-plan"]
+    sRR["readiness-review"]
+    sDO["delivery-orchestration"]
+    sDEV["dev"]
+    sQC["quality-cycle"]
+    sPC["pr-create"]
+    sPF["pr-fix"]
+    sMR["merge-risk"]
+    sRC["review-changes"]
+    sQE["qa-e2e"]
+    sBDD["bdd-scenarios"]
+    sCK["pr-checks"]
+    sSI["sentry-issues"]
+    sOT["observability-triage"]
+    sTC["ticket-create"]
+    sNT["nfse-technical-note-analysis"]
+    sIN["inpi-trademark-watch"]
+  end
+  BA --> sBR
+  TL --> sTR & sTP
+  RV --> sRR
+  DO --> sDO
+  TI --> sQC & sPC
+  MD --> sTP & sQC & sPC
+  PS --> sPF & sQC
+  IR --> sSI & sOT & sTP & sQC & sPC
+  NC --> sNT & sTC & sQC & sPC & sPF & sMR
+  IW --> sIN & sTC
+  DEV --> sDEV
+  CR --> sRC
+  QA --> sQE & sBDD
+  CI --> sCK
+```
+
+The review and QA loop that `quality-cycle` runs inside `task-implementer`, `milestone-delivery`, `pr-shepherd`, `issue-resolver`, and `nfse-compliance`:
+
+```mermaid
+flowchart TD
+  B["branch with the change"] --> R["Reviewer: code-reviewer<br/>review-changes on the full diff"]
+  B --> Q["QA: qa-tester<br/>BDD scenarios with qa-e2e,<br/>or targeted validation"]
+  R --> D{"both approve?"}
+  Q --> D
+  D -->|yes| P["push once, cycle log"]
+  D -->|"no, rounds left"| F["Developer: developer<br/>dev fixes the findings"]
+  F --> R2["re-review and re-test<br/>what changed and its regressions"]
+  R2 --> D
+  D -->|round limit| E["escalated: the question goes to the user,<br/>or ai:needs-human on the PR in CI"]
 ```
 
 **Workers** run as subagents. Claude Code picks them by description, or you ask for them by name ("use the code-reviewer agent on this branch"). `quality-cycle` delegates its Reviewer, QA, and Developer roles to them when they are installed.
