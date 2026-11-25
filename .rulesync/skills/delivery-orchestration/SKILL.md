@@ -19,12 +19,12 @@ As orchestrator you never write code, review it, or merge; only in `local` mode 
 
 One milestone produces many PRs, so they are stacked for review:
 
-- The milestone branch is created first, from `base-branch`. Every task branch is created from the milestone branch, and every task PR targets the milestone branch. Task PRs follow the repository's PR follow-up and may merge on their own where the repository allows it.
+- The milestone branch is the release branch of the [branch model](references/delivery-profile.md) and is created first, from `base-branch`. Every task branch is created from the milestone branch, and every task PR targets the milestone branch. Task PRs follow the repository's PR follow-up and may merge on their own where the repository allows it.
 - One milestone PR, from the milestone branch into `base-branch`, aggregates the task PRs so reviewers see the whole delivery as one combined diff. It is opened as a draft as soon as the milestone branch has a commit ahead of `base-branch`, its body is kept current on every run, and it is marked ready for review when every issue is done. It always needs a human approval; this skill never merges it.
 
 ## Inputs
 
-Resolve every value with [references/delivery-profile.md](references/delivery-profile.md), which also defines the branch names. This skill reads `milestone` (required), `base-branch`, `implement-workflow`, `max-parallel`, `status-labels`, `project`, `project-status-field`, `project-status-options`, `context`, `requested-by`, and `profile`.
+Resolve every value with [references/delivery-profile.md](references/delivery-profile.md), which also defines the branch names. This skill reads `milestone` (required), `base-branch`, `release-branch-template`, `feature-branch-template`, `implement-workflow`, `max-parallel`, `status-labels`, `project`, `project-status-field`, `project-status-options`, `context`, `requested-by`, and `profile`.
 
 Stop with `Unable to orchestrate: missing milestone` if there is none.
 
@@ -33,8 +33,8 @@ Stop with `Unable to orchestrate: missing milestone` if there is none.
 ## 1. Load
 
 1. Load every issue in the milestone with labels, body, and state (`gh issue list --milestone "<title>" --state all --json number,title,labels,body,state`), and the milestone itself (`gh api repos/{owner}/{repo}/milestones?state=all`) for its number, state, and the `requested-by` marker in its description when the run has none.
-2. Resolve the milestone branch `feat/<milestone-slug>`. If it does not exist on the remote, create it from the head of `base-branch` (`git fetch origin <base-branch>`, then `git push origin origin/<base-branch>:refs/heads/<milestone-branch>`).
-3. Load the task PRs into the milestone branch (`gh pr list --base <milestone-branch> --state all --json number,title,state,headRefName,body,mergedAt,url`). Match a PR to its issue by the task branch name (`feat/<milestone-slug>-<n>-`) or an issue link in its body.
+2. Resolve the milestone branch from `release-branch-template` (default `release/<milestone-slug>`). When it does not exist but the milestone already has an open milestone PR from another branch (an older name), keep using that branch. If it does not exist on the remote, create it from the head of `base-branch` (`git fetch origin <base-branch>`, then `git push origin origin/<base-branch>:refs/heads/<milestone-branch>`).
+3. Load the task PRs into the milestone branch (`gh pr list --base <milestone-branch> --state all --json number,title,state,headRefName,body,mergedAt,url`). Match a PR to its issue by the task branch name (`feature-branch-template` up to `{n}`, for example `feature/<milestone-slug>-<n>-`, or an older prefix such as `feat/<milestone-slug>-<n>-`) or an issue link in its body.
 4. Load the milestone PR (`gh pr list --head <milestone-branch> --base <base-branch> --state all --json number,state,isDraft,mergedAt,url`). If it is merged, go to step 6 and stop there.
 
 ## 2. Update done
@@ -53,7 +53,7 @@ With [references/work-status.md](references/work-status.md), move an issue to `d
 For each startable issue, while slots are free, in order of highest Priority, then earliest Target date, then lowest number (triage fields as [references/triage.md](references/triage.md) reads them; this skill never changes them):
 
 1. Re-read its labels; skip it if it is no longer `ready`.
-2. Create the task branch `feat/<milestone-slug>-<n>-<issue-slug>` from the current head of the milestone branch if it does not exist (`git push origin origin/<milestone-branch>:refs/heads/<task-branch>` after a fresh fetch). Reuse it if it exists.
+2. Create the task branch from `feature-branch-template` (default `feature/<milestone-slug>-<n>-<issue-slug>`) from the current head of the milestone branch if it does not exist (`git push origin origin/<milestone-branch>:refs/heads/<task-branch>` after a fresh fetch). Reuse it, or the branch of an existing task PR for the issue, if it exists.
 3. Move the issue to `in-progress`.
 4. Start the work:
    - `dispatch`: `gh workflow run <implement-workflow> --ref <default-branch> -f issue=<n> -f branch=<task-branch> -f base_branch=<milestone-branch>`, plus `-f requested_by=<login>` when `requested-by` is known and the workflow declares that input. `<default-branch>` is the repository's default branch, where the workflow file lives. If the dispatch fails, move the issue back to `ready` and report the error.

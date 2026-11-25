@@ -17,7 +17,7 @@ Inventory → classify → confirm → delete → report. Nothing is deleted bef
 - **Target**: the work branch to clean up. Default: the branch of the work just finished (the current branch, or the one named in the conversation).
 - **Scope**: `work` (the target, its worktrees, and its remote branch) or `all` (also every other local branch whose PR is merged or closed, or whose upstream is gone). Default: `work`.
 - **Remote**: `yes` to also offer the matching remote branches, `no` to skip them. Default: `yes`; they are always confirmed separately.
-- **Protected**: branch names or patterns never removed. Default: the remote's default branch, `main`, `master`, `develop`, `development`, `release/*`, `release-*`, plus the repo's protected branches if it documents them.
+- **Protected**: branch names or patterns never removed. Default: the remote's default branch, `main`, `master`, `develop`, `development`, `release/*`, `release-*`, `hotfix/*`, plus the repo's protected branches if it documents them.
 
 ## 1. Load once
 

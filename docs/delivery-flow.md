@@ -15,8 +15,8 @@ issues with technical plans and dependencies ── questions ──► technica
 ready ── not ready ──► back to business or technical refinement
   │ delivery-orchestration   (delivery-orchestrator; re-run on each task PR merge)
   ▼
-milestone branch feat/<milestone-slug> (from the default branch)
-  + task branches feat/<milestone-slug>-<n>-<slug> (from the milestone branch)
+release (milestone) branch release/<milestone-slug> (from the default branch)
+  + feature branches feature/<milestone-slug>-<n>-<slug> (from the release branch)
   + draft milestone PR: milestone branch -> default branch
   │ implement                (task-implementer: dev ─► quality-cycle ─► pr-create)
   ▼
@@ -48,8 +48,8 @@ You need a repository with GitHub Actions, the reusable workflows from [fbrissi/
    - `ai:auto-fix` and `ai:needs-human` (PR follow-up)
    - your hold labels for merges (`merge-risk` default: `do-not-merge`, `hold`)
 4. **Project (optional).** With `project`, the issue's single-select Status field must already have an option for each state, by default `Needs business refinement`, `Business blocked`, `Needs technical refinement`, `Technical blocked`, `Needs review`, `Ready`, `In progress`, `In review`, `Done`. Map several states to one option with `project-status-options` (for example `business-blocked=Blocked`). The steps never create options.
-5. **Profile.** Add `docs/ai/delivery.md` from the [template](../shared/references/delivery-profile.md#profile-template): repository scope, source tracker, milestone template, base branch, and `## QA in CI`. Add the `quality-cycle`, `review-changes`, `qa-e2e`, and `bdd-scenarios` profiles for the implement step.
-6. **Workflows.** Add the stage callers from the github-actions `ai-task.yml` reusable workflow (default files `ai-business-refinement.yml`, `ai-technical-refinement.yml`, `ai-readiness-review.yml`, `ai-orchestrate.yml`, `ai-implement.yml`), the PR follow-up callers (`pr-fix`, `merge-decision`) with branch prefixes that cover task branches and the milestone branch, and a caller of `ai-resume.yml` on `issue_comment: [edited]`.
+5. **Profile.** Add `docs/ai/delivery.md` from the [template](../shared/references/delivery-profile.md#profile-template): repository scope, source tracker, milestone template, base branch, branch templates, and `## QA in CI`. Add the `quality-cycle`, `review-changes`, `qa-e2e`, and `bdd-scenarios` profiles for the implement step.
+6. **Workflows.** Add the stage callers from the github-actions `ai-task.yml` reusable workflow (default files `ai-business-refinement.yml`, `ai-technical-refinement.yml`, `ai-readiness-review.yml`, `ai-orchestrate.yml`, `ai-implement.yml`), the PR follow-up callers (`pr-fix`, `merge-decision`) with branch prefixes that cover the branch model (`feature/ release/ hotfix/ bugfix/`, plus any older prefixes still open), and a caller of `ai-resume.yml` on `issue_comment: [edited]`.
 7. **Versions.** Pin the ai-skills version the workflows install. Release this library first (merging tags `vX.Y.Z`), then github-actions, then bump the pins in your repository.
 
 ## Start and chain
@@ -95,11 +95,22 @@ A GitHub milestone source needs no description: its existing issues are the requ
 
 ## Branches and PRs
 
+The branch model has four kinds of branch, named by templates in the profile (defaults shown):
+
+| Branch | Template (default) | From | PR into |
+| --- | --- | --- | --- |
+| release | `Release branch template` (`release/{slug}`) | default branch | default branch |
+| feature | `Feature branch template` (`feature/{release-slug}-{n}-{slug}`) | its release branch | that release branch |
+| hotfix | `Hotfix branch template` (`hotfix/{slug}`) | default branch | default branch |
+| bugfix | `Bugfix branch template` (`bugfix/{slug}`) | default branch | the open release branch (`Bugfix release branch`, else the oldest open one; with none, a handoff asks which) |
+
+In the delivery flow the milestone branch is the release branch. A `develop` branch, when kept, is only a mirror of the default branch, fast-forwarded after each merge (the github-actions `branch-sync.yml` workflow). Branches that already exist under older names (for example `feat/<milestone-slug>`) are never renamed and keep being used until merged. Template placeholders and examples: [delivery-profile.md](../shared/references/delivery-profile.md#branch-model).
+
 One milestone produces many PRs, so they are stacked:
 
-1. Orchestration creates the milestone branch `feat/<milestone-slug>` from the default branch (`base-branch`) first.
-2. Each task branch `feat/<milestone-slug>-<n>-<slug>` is created from the milestone branch, and each task PR targets the milestone branch. Task PRs go through PR follow-up (`pr-fix` rounds, then `merge-risk`) and may merge on their own when the AI review approved, CI is green, and the risk is low, where the repository enables it.
-3. One milestone PR, from the milestone branch into the default branch, aggregates every task PR, so reviewers see one combined diff. Orchestration opens it as a draft as soon as the milestone branch has a commit, keeps its body current (every issue with `Closes #<n>`, its status and task PR), and marks it ready for review, requesting `requested-by` as reviewer, when every issue is done. It always needs a human approval.
+1. Orchestration creates the release branch (default `release/<milestone-slug>`) from the default branch (`base-branch`) first.
+2. Each feature branch (default `feature/<milestone-slug>-<n>-<slug>`) is created from the release branch, and each task PR targets the release branch. Task PRs go through PR follow-up (`pr-fix` rounds, then `merge-risk`) and may merge on their own when the AI review approved, CI is green, and the risk is low, where the repository enables it.
+3. One milestone PR, from the release branch into the default branch, aggregates every task PR, so reviewers see one combined diff. Orchestration opens it as a draft as soon as the release branch has a commit, keeps its body current (every issue with `Closes #<n>`, its status and task PR), and marks it ready for review, requesting `requested-by` as reviewer, when every issue is done. It always needs a human approval.
 4. When the milestone PR merges, orchestration runs again, moves every issue to `done`, and closes the milestone.
 
 ## QA in CI
@@ -120,7 +131,7 @@ Every issue the flow creates or refines carries triage for metrics and future es
 
 ## Profile
 
-Run inputs override the repository profile `docs/ai/delivery.md` (or `profile`), which overrides the defaults. One profile serves every step: repository scope and code map, source tracker, milestone template, languages, status labels and Project, triage fields, base branch, implement workflow, parallel limit, research sources, and free-text context. Template and the full input list: [delivery-profile.md](../shared/references/delivery-profile.md).
+Run inputs override the repository profile `docs/ai/delivery.md` (or `profile`), which overrides the defaults. One profile serves every step: repository scope and code map, source tracker, milestone template, languages, status labels and Project, triage fields, base branch, branch templates, implement workflow, parallel limit, research sources, and free-text context. Template and the full input list: [delivery-profile.md](../shared/references/delivery-profile.md).
 
 ## Trackers
 

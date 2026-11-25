@@ -37,7 +37,7 @@ Delegate the roles to the `developer`, `code-reviewer`, and `qa-tester` agents, 
 ## 2. Per issue
 
 1. **Plan** with the `ticket-plan` skill (no sync unless the user asked). If the issue is ambiguous or blocked by a product decision, ask (or comment the questions on the issue in non-interactive runs), skip it, and continue with the next.
-2. **Branch** from the base (`feat/<n>-<slug>` or `fix/<n>-<slug>`). When it depends on an issue delivered in this run whose PR is not merged yet, branch from that branch and say in the PR that it is stacked.
+2. **Branch** from the base, named with the `Feature branch template` of the delivery profile (`docs/ai/delivery.md`, as the `delivery-orchestration` skill's `references/delivery-profile.md` defines; default `feature/{release-slug}-{n}-{slug}` with the milestone slug as `{release-slug}`). Reuse a branch the issue already has. When it depends on an issue delivered in this run whose PR is not merged yet, branch from that branch and say in the PR that it is stacked.
 3. **Implement** with the `developer` agent and the plan.
 4. **Quality cycle** with the `quality-cycle` skill: `code-reviewer` and `qa-tester` in parallel, `developer` fixes, repeat until both approve or the round limit escalates. Push only after approval.
 5. **PR** with the `pr-create` skill, linking the issue (`Closes #<n>`) and summarizing the cycle (rounds, findings fixed, follow-ups, QA report).

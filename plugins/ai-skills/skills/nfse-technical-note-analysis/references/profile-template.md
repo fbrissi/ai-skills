@@ -55,7 +55,8 @@ Copy this template to `docs/ai/nfse-technical-note-analysis.md` in your reposito
 - Implementable sources: <technical notes and XSD packages | also other official source items with a required change, such as deployment rows, annexes, or news>
 - Split into one issue per change: <no | yes>
 - Implement optional changes: <no | yes>
-- Base branch: <main>
+- Base branch: <main | the open release branch>
+- Branch template: <feature/nfse-nt-{number}-{slug}>; other source items: <feature/nfse-{slug}>
 - PR follow-up: <agent (the agent watches the PR until approved) | events (one pass, then a workflow that reacts to review events starts the next run)>
 - Auto-merge: <off | on>
 - Max risk to merge: <2>

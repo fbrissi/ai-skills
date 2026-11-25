@@ -13,6 +13,11 @@ For every value: the run's input (from the request, a calling agent, or a workfl
 | `milestone` / `issue` | n/a | required by the later steps (one of them) |
 | `branch` | n/a | set by orchestration |
 | `base-branch` | Base branch | the repository's default branch |
+| `release-branch-template` | Release branch template | `release/{slug}` |
+| `feature-branch-template` | Feature branch template | `feature/{release-slug}-{n}-{slug}` |
+| `hotfix-branch-template` | Hotfix branch template | `hotfix/{slug}` |
+| `bugfix-branch-template` | Bugfix branch template | `bugfix/{slug}` |
+| `bugfix-release` | Bugfix release branch | none: the oldest open release branch |
 | `milestone-template` | Milestone template | `{key}` (for example `JIRA:{key}` gives `JIRA:ABC-123`) |
 | `output-language` | Output language | `English` |
 | `source-language` | Source language | `auto`: the language of the source ticket |
@@ -53,7 +58,23 @@ Every run ends with a state a workflow can read without parsing prose:
 
 - Milestone title: `milestone-template` with `{key}` replaced by the source key (`ABC-123`). For a GitHub milestone source, keep its title.
 - Milestone slug: the title lowercased, every run of characters other than `a-z0-9` replaced by `-`, trimmed of `-` (`JIRA:ABC-123` -> `jira-abc-123`).
-- Milestone branch: `feat/<milestone-slug>`. Task branch: `feat/<milestone-slug>-<issue>-<issue-slug>`, with the issue title slugged the same way and cut to about 40 characters. Never create refs under the milestone branch name (`feat/<milestone-slug>/...`): Git cannot hold both.
+- Milestone name form: slugged the same way but keeping `.` (`v0.1.0-beta.2.3` stays `v0.1.0-beta.2.3`).
+- Issue slug: the issue title slugged the same way, cut to about 40 characters.
+
+### Branch model
+
+| Branch | From | PR into | Use |
+| --- | --- | --- | --- |
+| release (`release-branch-template`) | `base-branch` | `base-branch` | A release being prepared. In the delivery flow the milestone branch is the release branch. |
+| feature (`feature-branch-template`) | its release branch | that release branch | New work: one task of the milestone. |
+| hotfix (`hotfix-branch-template`) | `base-branch` | `base-branch` | Urgent production fix. |
+| bugfix (`bugfix-branch-template`) | `base-branch` | the open release branch | Non-urgent production bug. |
+
+- Template placeholders: `{slug}` is the milestone slug in the release template and the issue slug in the others; `{name}` is the milestone name form; `{release-slug}` and `{release-name}` are the release's milestone slug and name form; `{n}` is the issue number. For example `release/{name}` gives `release/v0.1.0-beta.2.3`, and `feature/{release-name}-{n}-{slug}` gives `feature/v0.1.0-beta.2.3-12-login-timeout`.
+- Bugfix target: `bugfix-release` when the run or profile names it; else the oldest open release branch (the release branch with the oldest open PR into `base-branch`, else the release branch of the oldest open milestone that exists on the remote). If there is none, do not guess: stop with a blocker that asks which release the fix goes into.
+- Never create refs under another branch's name (`release/<x>/...` when `release/<x>` exists): Git cannot hold both.
+- Existing branches are never renamed. When the milestone or task already has a branch or PR under an older name (for example `feat/<milestone-slug>`), keep using it until that work is merged.
+- A `develop` branch, when the repository keeps one, only mirrors `base-branch`; nothing branches from or merges into it.
 
 ## Profile template
 
@@ -97,6 +118,11 @@ Copy to `docs/ai/delivery.md` and remove the lines you do not need.
 
 ## Branches and orchestration
 - Base branch: <main>
+- Release branch template: <release/{slug}>
+- Feature branch template: <feature/{release-slug}-{n}-{slug}>
+- Hotfix branch template: <hotfix/{slug}>
+- Bugfix branch template: <bugfix/{slug}>
+- Bugfix release branch: <release branch name | none: the oldest open release branch>
 - Implement workflow: <ai-implement.yml>
 - Max parallel: <3>
 
