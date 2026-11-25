@@ -1,6 +1,6 @@
 # delivery-orchestration
 
-Fourth step of the [delivery flow](../delivery-flow.md). Never codes. Loads the milestone's issues, marks `status:done` the ones whose task PR merged into the milestone branch, builds the dependency graph, and creates the milestone branch `feat/<milestone-slug>` from `base-branch` if missing. Each issue that is `ready`, has every dependency done, and fits in the `max-parallel` free slots gets a task branch `feat/<milestone-slug>-<issue>-<slug>` from the milestone branch, `status:in-progress`, and an implementation start: in CI it dispatches `implement-workflow` with the dispatch inputs `issue`, `branch`, and `base_branch` (the milestone branch); locally it hands the task to the `task-implementer` agent, or to `dev`, `quality-cycle`, and `pr-create` in turn. When every issue is done it opens the PR from the milestone branch into `base-branch`, closing each issue. It never merges and never waits: re-run it when a task PR merges.
+Fourth step of the [delivery flow](../delivery-flow.md). Never codes. Loads the milestone's issues, marks `status:done` the ones whose task PR merged into the milestone branch, builds the dependency graph, and creates the milestone branch `feat/<milestone-slug>` from `base-branch` if missing. Each issue that is `ready`, has every dependency done, and fits in the `max-parallel` free slots gets a task branch `feat/<milestone-slug>-<issue>-<slug>` from the milestone branch, `status:in-progress`, and an implementation start: in CI it dispatches `implement-workflow` with the dispatch inputs `issue`, `branch`, and `base_branch` (the milestone branch); locally it hands the task to the `task-implementer` agent, or to `dev`, `quality-cycle`, and `pr-create` in turn. Task PRs always target the milestone branch. One milestone PR, from the milestone branch into `base-branch`, aggregates them: it is opened as a draft once the milestone branch has a commit, its body (every issue with `Closes #<n>`, status, and task PR) is kept current on every run, and it is marked ready for review, with `requested-by` as reviewer, when every issue is done. It always needs a human approval. When it merges, the next run moves every issue to `done` and closes the milestone. It never merges and never waits: re-run it when a task PR or the milestone PR merges. Dispatches pass `requested_by` when the implement workflow declares it.
 
 **Requires:** `git`, `gh` (authenticated; `actions: write` to dispatch workflows). Optional [delivery profile](../delivery-flow.md#profile) at `docs/ai/delivery.md`.
 
@@ -14,6 +14,7 @@ Fourth step of the [delivery flow](../delivery-flow.md). Never codes. Loads the 
 | `max-parallel` | number | `3` |
 | `status-labels`, `project`, `project-status-field`, `project-status-options` | see [work status](../../shared/references/work-status.md) | `status:<state>`, none, `Status`, Title Case of the state |
 | `context` | free text | none |
+| `requested-by` | GitHub login of the person who started the flow | the milestone's `requested-by` marker |
 | `profile` | path | `docs/ai/delivery.md` |
 
 ## Examples
@@ -26,4 +27,4 @@ Fourth step of the [delivery flow](../delivery-flow.md). Never codes. Loads the 
 
 ## Side effects
 
-Branches, labels, Project status, workflow dispatches (CI) or implementation runs (local), and the milestone PR. Never merges.
+Branches, labels, Project status, workflow dispatches (CI) or implementation runs (local), the draft milestone PR and its updates, and closing the milestone after its PR merges. Never merges.
