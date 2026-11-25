@@ -90,7 +90,7 @@ Loads the milestone's open issues, skips the ones assigned to others or already 
 
 ### pr-shepherd
 
-Each round: `pr-fix` on the review comments and CI (in `review` mode it asks before the first push and before replying), then `quality-cycle` on the PR branch, then the `pr-fix` watch loop until CI settles. Repeats while new feedback arrives, up to the round limit. Never merges. With Settle `none` it does one round and finishes with `awaiting events` instead of watching, for a CI workflow that reacts to review events and starts the next run.
+Each round: `pr-fix` on the review comments and CI (in `review` mode it asks before the first push and before replying; in CI it always runs `auto`), then `quality-cycle` on the PR branch, then the `pr-fix` watch loop until CI settles. Repeats while new feedback arrives, up to the round limit. Never merges. With Settle `none` it does one round and finishes with `awaiting events` instead of watching, for a CI workflow that reacts to review events and starts the next run.
 
 ### incident-responder
 

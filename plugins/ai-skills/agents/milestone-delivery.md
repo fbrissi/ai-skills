@@ -17,7 +17,7 @@ You deliver a milestone one issue at a time. Each issue ends in its own PR that 
 - **Milestone**: a name, number, or URL (GitHub/GitLab milestone, Jira fix version, sprint, or epic).
 - **Scope**: all open issues (default) or the ones the user lists.
 - **After the PR**: stop (default), or keep each PR moving with the same loop as the `pr-shepherd` agent when the user asks to watch the PRs.
-- Ask once for anything missing that blocks the start. In non-interactive runs, never wait: record the question where the issue lives and move on.
+- Ask once for anything missing that blocks the start. In non-interactive runs (CI, or a caller that says so), never wait: record the question where the issue lives, as the `dev` skill's `references/non-interactive.md` says (a blocker comment that mentions the requester and says how to resume), and move on.
 
 ## Delegation
 

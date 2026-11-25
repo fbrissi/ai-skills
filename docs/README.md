@@ -60,6 +60,8 @@ Claude Code agents that combine these skills (review, QA, and developer roles, t
 
 Domain skills keep the method in the skill and the project's specifics in a profile: a Markdown file in your repository, by default `docs/ai/<skill>.md`. Pass another path in the request ("profile docs/x.md") to override it. Each of these skills ships `references/profile-template.md` to start from (the delivery skills share `references/delivery-profile.md`); without a profile, the skill asks for the missing values (or fails clearly in automation).
 
+In CI (`CI` or `GITHUB_ACTIONS` set), or when a caller says so, no skill asks or waits: each question point uses its non-interactive default or posts one blocker comment on the issue or PR, mentioning the requester and saying how to resume (reply `/ai-resume`, optionally with instructions, where the resume workflow runs), and stops. The rule is the shared [`non-interactive.md`](../shared/references/non-interactive.md) reference.
+
 | Skill | Profile holds |
 | --- | --- |
 | `inpi-trademark-watch` | the mark, classes, specification, own processes, watch pattern and variants, language, owner |
@@ -68,8 +70,8 @@ Domain skills keep the method in the skill and the project's specifics in a prof
 | `qa-e2e` | URLs, start and reset commands, scenarios folder, test account source, mail catcher, test modes, viewports, report folder |
 | `quality-cycle` | round limit, base branch, cycle log folder, checks, triage policy, follow-up tracker, shipping preference |
 | `observability-triage` | provider and access, project and environment, release mapping, code map and owners, known noise, `incident-responder` automation |
-| `merge-risk` | auto-merge, max risk, base branch, merge method, required human approvals, hold labels, path floors |
-| `business-refinement`, `technical-refinement`, `readiness-review`, `delivery-orchestration` (one shared `docs/ai/delivery.md`) | repository scope and code map, source tracker, milestone template, languages, status labels and Project, triage fields and Size scale, base branch, implement workflow, parallel limit, research sources, context |
+| `merge-risk` | auto-merge, max risk, base branches and per-base limits, merge method, required human approvals, hold labels, path floors |
+| `business-refinement`, `technical-refinement`, `readiness-review`, `delivery-orchestration` (one shared `docs/ai/delivery.md`) | repository scope and code map, source tracker, milestone template, languages, status labels and Project, triage fields and Size scale, base branch, branch templates, implement workflow, parallel limit, research sources, context |
 | `flow-video-ad` | product name and pronunciation, folders, claim sources, forbidden claims, character, voice, setting, crop, end card, privacy rules |
 
 ## Using the skills per harness

@@ -37,7 +37,7 @@ Keep the current branch if it is not the base and not a protected branch. Otherw
 
 ## 3. Commit
 
-If there are uncommitted changes, stage and commit them following `references/commits.md`. Use the diff you already loaded; do not re-run discovery commands. If the worktree contains unrelated changes, ask which ones to include.
+If there are uncommitted changes, stage and commit them following `references/commits.md`. Use the diff you already loaded; do not re-run discovery commands. If the worktree contains unrelated changes, ask which ones to include; in a non-interactive run (CI, or a caller that says so), commit only what the caller named, or stop as [references/non-interactive.md](references/non-interactive.md) says.
 
 ## 4. Push and PR
 

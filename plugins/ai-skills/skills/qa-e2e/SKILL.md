@@ -29,7 +29,7 @@ Act as a careful QA engineer using the app like a real user. Evidence over opini
 
 ## Profile
 
-Read the profile first; [references/profile-template.md](references/profile-template.md) lists its fields (app URLs, how to start and reset the stack, scenarios folder, test accounts source, mail catcher, viewports, report folder, known noise). Without a profile, ask for the app URL, where the scenarios are, and where test accounts come from, then offer to save the answers. If the scenarios folder is not set, use the `bdd-scenarios` profile's features folder, then `docs/bdd/`.
+Read the profile first; [references/profile-template.md](references/profile-template.md) lists its fields (app URLs, how to start and reset the stack, scenarios folder, test accounts source, mail catcher, viewports, report folder, known noise). Without a profile, ask for the app URL, where the scenarios are, and where test accounts come from, then offer to save the answers. In a non-interactive run (CI, or a caller that says so) never ask: use the caller's inputs and what the repository documents, and follow [references/non-interactive.md](references/non-interactive.md) for anything still missing. If the scenarios folder is not set, use the `bdd-scenarios` profile's features folder, then `docs/bdd/`.
 
 ## CI runs
 
@@ -39,7 +39,7 @@ When there is no setup command, the environment does not become reachable, or no
 
 ## 1. Prepare
 
-1. Confirm the stack is running (open the base URL; check the mail catcher if any scenario is `@email`). If it is down, start it with the profile's command, or stop and ask.
+1. Confirm the stack is running (open the base URL; check the mail catcher if any scenario is `@email`). If it is down, start it with the profile's command, or stop and ask (non-interactive: see CI below).
 2. Load the scenarios in scope. If there are none, hand off to the `bdd-scenarios` skill for the scope; if it is not installed, derive a short checklist of behaviors from the diff and the app's routes, state that it is unscripted, and continue.
 3. Note the data each scenario needs. Reset or seed only with the profile's commands, and only on the test environment.
 

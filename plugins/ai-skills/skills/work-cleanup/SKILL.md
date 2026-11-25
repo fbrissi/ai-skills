@@ -97,6 +97,8 @@ Ask the user, and wait for an explicit answer:
 - the switch to `<default>` and the branch removal that depends on it, if offered;
 - the remote items, as a separate question.
 
+In a non-interactive run (CI, or a caller that says so; see [references/non-interactive.md](references/non-interactive.md)) nothing is confirmed: report the plan and remove nothing.
+
 Remove only what was confirmed. Silence, an unclear answer, or a general "go ahead" that does not cover remote or `-D` items confirms none of them.
 
 ## 5. Clean up

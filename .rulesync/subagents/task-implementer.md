@@ -44,7 +44,7 @@ The PR follow-up (review, `pr-fix`, merge decision) happens after you, in its ow
 
 - One issue, one branch, one PR, always into `base-branch`. Never merge.
 - Non-interactive by default: never wait for input.
-- Never exit with the issue in `in-progress`. Every run ends in one of these states, and every blocked end leaves a comment whose first line is `<!-- ai-delivery blocker stage=implement -->` and second line `Blocked: <one line>`, followed by the details:
+- Never exit with the issue in `in-progress`. Every run ends in one of these states, and every blocked end leaves a comment whose first line is `<!-- ai-delivery blocker stage=implement -->` and second line `Blocked: <one line>`, followed by the details, a mention of `requested-by`, and how to resume as the `dev` skill's `references/non-interactive.md` says (reply `/ai-resume`, optionally with instructions, when the repository runs the resume workflow; never a checkbox):
   - **Done**: PR open into `base-branch`, issue `in-review`.
   - **Requirement unclear** (the issue or its plan cannot be implemented without a decision): the blocker comment with the questions goes on the issue, the issue moves to `technical-blocked`, and you stop without a PR. Push any useful commits to the task branch.
   - **Cycle escalated** (round limit, no progress, reviewer and QA disagreement, broken environment) with commits on the branch: push, open the PR anyway with the label `ai:needs-human` (create the label once if missing), put the blocker comment with what is still open on the PR and link it from the issue, and move the issue to `in-review`. The PR follow-up resumes from there.

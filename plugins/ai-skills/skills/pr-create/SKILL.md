@@ -28,7 +28,7 @@ git diff --stat origin/<base>...HEAD
 
 Stop and report if any of these hold:
 
-- There are uncommitted changes the user did not mention. Ask whether to commit them first (the `ship` skill does that), or continue with only the commits.
+- There are uncommitted changes the user did not mention. Ask whether to commit them first (the `ship` skill does that), or continue with only the commits. In a non-interactive run ([references/non-interactive.md](references/non-interactive.md)), continue with only the commits and say so.
 - The current branch equals the base.
 - There are no commits ahead of base.
 - An **open** PR/MR already exists for the branch: `gh pr view --json url,state` returns `state: OPEN` (a closed or merged PR does not block), or `glab mr list --source-branch <branch>` lists one. Report its URL instead of creating a duplicate.
@@ -37,7 +37,7 @@ Scope is **the commits ahead of base**. Read commit messages first, then diffs o
 
 ## 2. Resolve ticket
 
-In order of precedence: a reference given → use it. `skip` → `SKIPPED`. `auto` → create one. Otherwise, check the commits and branch name for a clear reference (`#123`, `Closes ABC-123`, `feature/abc-123-x`), as described in `references/tickets.md`. If none is found, ask the user once: provide a ticket, create one automatically, or skip. If you cannot ask, default to `SKIPPED`.
+In order of precedence: a reference given → use it. `skip` → `SKIPPED`. `auto` → create one. Otherwise, check the commits and branch name for a clear reference (`#123`, `Closes ABC-123`, `feature/abc-123-x`), as described in `references/tickets.md`. If none is found, ask the user once: provide a ticket, create one automatically, or skip. In a non-interactive run ([references/non-interactive.md](references/non-interactive.md)), default to `SKIPPED`.
 
 To create one: use the change themes with `references/body-format.md` (no `## Ticket` section) and the create command from `references/tickets.md`, with the assignee resolved as above. If no access can create it, stop and say which tool, MCP server, or CLI is needed.
 
