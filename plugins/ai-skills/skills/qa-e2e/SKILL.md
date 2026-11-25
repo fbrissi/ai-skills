@@ -33,9 +33,15 @@ Read the profile first; [references/profile-template.md](references/profile-temp
 
 ## CI runs
 
-In CI nobody can start a stack by hand or answer a question. Run the CI setup command once (the caller's, for example the delivery profile's `QA in CI setup`, else the profile's `CI setup`), which installs the browsers and starts the test environment, then test as below with that browser tool (Playwright, or Selenium when the project uses it).
+In CI nobody can start a stack by hand or answer a question. Run the CI setup command once (the caller's, for example the delivery profile's `QA in CI setup`, else the profile's `CI setup`), which installs the browsers and starts the test environment, then test as below with that browser tool (Playwright, or Selenium when the project uses it). Scope the run to what the task changed: the scenarios covering the diff against its base plus the `@smoke` scenarios of the touched areas, never the whole suite. New behavior with no scenario gets one first (the `bdd-scenarios` skill, or Given/When/Then bullets when it is not installed).
 
-When there is no setup command, the environment does not become reachable, or no browser capability exists, switch to **tests-only** mode instead of stopping or asking: run no browser scenarios, do not re-run the automated tests (they run as the PR's checks), list the scenarios in scope that no automated test covers, and report `browser QA skipped: no CI environment` with the verdict `SKIPPED (tests-only)`. This is not a failure and not a reason to escalate.
+When there is no setup command, the environment does not become reachable, or no browser capability exists, switch to **targeted validation** instead of stopping or asking. Validate the same scope without a browser and keep the evidence (commands and their results) for the report:
+
+1. **Focused tests**: run the tests that cover the changed behavior (not the whole suite; the PR checks run it). Where a behavior in scope has no test, write a focused one when the caller allows QA to write test files; otherwise report the gap as a `medium` finding for the Developer.
+2. **Exercise the change**: when feasible, start the app or API headless (the profile's start command, or the one the repository documents) and call the changed endpoints, CLI commands, or jobs with test data, checking each `Then` against the responses.
+3. **Smoke checks**: the framework's own checks that the app builds and boots (for example a boot or health check, or a pending-migrations check), where the project has them.
+
+Judge the verdict from that evidence as in step 5, with the mode `targeted validation (no E2E setup)`. A missing E2E setup is never a failure and never a reason to escalate.
 
 ## 1. Prepare
 
@@ -45,7 +51,7 @@ When there is no setup command, the environment does not become reachable, or no
 
 ## 2. Execute functional scenarios
 
-Use a browser automation capability (a real browser you can drive and screenshot). If the `webapp-testing` skill is installed, you may use its Playwright toolkit; otherwise drive the browser directly. If no browser capability exists, stop and say so (in CI, use tests-only mode): this skill does not fake browser results.
+Use a browser automation capability (a real browser you can drive and screenshot). If the `webapp-testing` skill is installed, you may use its Playwright toolkit; otherwise drive the browser directly. If no browser capability exists, stop and say so (in CI, use targeted validation): this skill does not fake browser results.
 
 For each scenario, at the default desktop viewport (profile, default 1440x900):
 
@@ -88,8 +94,8 @@ Write the report from [references/report-format.md](references/report-format.md)
 QA: <scope> on <environment>
 Scenarios: <passed>/<total> passed, <failed> failed, <blocked> blocked
 Findings: <n> (<b> blocker, <h> high, <m> medium, <l> low)
-Verdict: <APPROVED | CHANGES REQUIRED | SKIPPED (tests-only)>
-Mode: <browser (<tool>) | tests-only: browser QA skipped: no CI environment>
+Verdict: <APPROVED | CHANGES REQUIRED>
+Mode: <browser (<tool>) | targeted validation (no E2E setup): <tests run or written, endpoints or commands exercised, smoke checks>>
 Report: <path>
 1. [blocker] <scenario ref> @<viewport> - <one line>
 ```

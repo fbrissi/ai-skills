@@ -31,7 +31,7 @@ Start the profile from [`references/profile-template.md`](../../.rulesync/skills
 4. Optionally runs one short exploratory charter on the riskiest change.
 5. Writes `docs/qa/reports/<date>-<scope>.md` with a pass/fail summary, findings (steps, expected vs actual, viewport, severity, screenshot, scenario reference), and the verdict.
 
-In CI it runs the profile's `CI setup` command (or the caller's) to install the browsers (Playwright, or Selenium) and start the stack. Without one, or when the environment does not come up, it runs tests-only: no browser scenarios, no re-run of the tests that run as PR checks, a list of scenarios no automated test covers, and the verdict `SKIPPED (tests-only)` with `browser QA skipped: no CI environment`.
+In CI it runs the profile's `CI setup` command (or the caller's) to install the browsers (Playwright, or Selenium) and start the stack. It tests only what the task changed (the scenarios covering the diff plus the `@smoke` scenarios of the touched areas) and writes scenarios for new behavior first. Without a setup command, or when the environment does not come up, it runs targeted validation: focused tests for the changed behavior (written when the caller allows it, otherwise reported as gaps), the app or API started headless to exercise the changed endpoints or commands, and the framework's smoke checks, with an APPROVED or CHANGES REQUIRED verdict from that evidence.
 
 Safety: test environments and test credentials only, no production writes, no real payments, no CAPTCHA bypass (uses the provider's test keys). It reports; it does not fix code.
 

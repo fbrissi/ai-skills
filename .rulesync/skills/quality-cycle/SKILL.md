@@ -51,7 +51,7 @@ Decisions that belong to the user (scope changes, product rules, accepting a kno
 
 - **Reviewer** always reviews the **full diff against the base** (`<base>...HEAD`), never only the last commit, and runs the project's tests, lint, and typecheck for the changed areas. Verdict: APPROVED when no critical, high, or medium finding remains open; otherwise CHANGES REQUIRED.
 - **QA** runs round 1 on every scenario in scope. From round 2, it re-tests each previously failing scenario, the scenarios covering files changed by the fixes, and a regression pass over the touched areas (their `@smoke` scenarios at minimum). Verdict as defined by `qa-e2e`.
-- **QA in CI**: QA uses a real browser when a test environment can be set up in CI (the CI setup command from the caller or the `qa-e2e` profile). Otherwise it runs tests-only and returns `SKIPPED (tests-only)`: that counts as QA approval for the round, the automated tests running as PR checks are the QA evidence, and the cycle reports `browser QA skipped: no CI environment` (also in the PR body). Never escalate for that reason.
+- **QA in CI**: QA uses a real browser when a test environment can be set up in CI (the CI setup command from the caller or the `qa-e2e` profile), on the scenarios for what the task changed. Otherwise it runs **targeted validation** (focused tests for the new behavior, the app or API started headless to exercise the changed endpoints or commands when feasible, framework smoke checks) and returns a normal verdict from that evidence; the cycle reports the QA mode and evidence (also in the PR body). Never escalate only because there is no E2E setup.
 
 Run Reviewer and QA in parallel when both are delegated; otherwise Reviewer first.
 
@@ -92,7 +92,7 @@ Run the final full checks once more on the head commit, then ask the user before
 ```text
 Quality cycle: <branch> vs <base>
 Rounds: <n>/<max>   Status: <approved | escalated: reason | stopped: reason>
-Reviewer: <APPROVED | CHANGES REQUIRED>   QA: <APPROVED | CHANGES REQUIRED | SKIPPED (tests-only): browser QA skipped: no CI environment>
+Reviewer: <APPROVED | CHANGES REQUIRED>   QA: <APPROVED | CHANGES REQUIRED> (<browser | targeted validation>)
 Fixed: <n> (<sibling fixes> in sibling paths)   Follow-ups: <n>   Open: <n>
 Cycle log: <path>   QA report: <path>
 Pushed: <yes, <sha> | no (awaiting approval) | not requested>   PR: <url | none>

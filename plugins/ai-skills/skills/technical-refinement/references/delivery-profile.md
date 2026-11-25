@@ -30,7 +30,7 @@ For every value: the run's input (from the request, a calling agent, or a workfl
 | `implement-workflow` | Implement workflow | `ai-implement.yml` |
 | `max-parallel` | Max parallel | `3` |
 | `requested-by` | n/a | the milestone's `requested-by` marker, else none |
-| `qa-ci-setup` | QA in CI setup | none (tests-only QA in CI) |
+| `qa-ci-setup` | QA in CI setup | none (targeted validation in CI: focused tests, the app or API headless, smoke checks) |
 | `qa-browser` | QA browser | `playwright` (`playwright` or `selenium`) |
 
 - Triage classification (category labels, Priority, Effort, Start and Target date, Size, Estimate, Owner) comes only from the profile's `## Triage` section and follows `triage.md`. A missing key skips that field; say which ones in the output.
@@ -127,7 +127,7 @@ Copy to `docs/ai/delivery.md` and remove the lines you do not need.
 - Max parallel: <3>
 
 ## QA in CI
-- QA in CI setup: <command that installs the browsers and starts the test environment in CI | none>
+- QA in CI setup: <command that installs the browsers and starts the test environment in CI | none: targeted validation>
 - QA browser: <playwright | selenium>
 
 ## Research

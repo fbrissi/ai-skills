@@ -115,7 +115,7 @@ One milestone produces many PRs, so they are stacked:
 
 ## QA in CI
 
-The implement step runs a review and QA cycle before opening its PR. When the project can provide a browser and a test environment in CI (the profile's `QA in CI setup` command, which installs Playwright or Selenium browsers and starts the stack), QA runs the BDD scenarios in a real browser. Otherwise QA runs tests-only: it relies on the automated tests that already run as PR checks (without re-running them), reports `browser QA skipped: no CI environment` in the cycle and the PR body, and does not escalate for that reason.
+The implement step runs a review and QA cycle before opening its PR. When the project can provide a browser and a test environment in CI (the profile's `QA in CI setup` command, which installs Playwright or Selenium browsers and starts the stack), QA runs the BDD scenarios for what the task changed in a real browser, writing scenarios for new behavior first. Otherwise QA runs targeted validation: it runs (or writes) focused tests for the new behavior, starts the app or API headless when feasible and exercises the changed endpoints or commands, runs the framework's smoke checks, and reports that evidence in the cycle and the PR body. It never escalates only because there is no E2E setup; adding one later only needs the profile value.
 
 ## Attachments
 
