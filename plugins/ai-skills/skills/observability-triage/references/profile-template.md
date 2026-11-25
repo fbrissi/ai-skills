@@ -1,6 +1,6 @@
 # Observability triage profile
 
-Copy this template to `docs/ai/observability-triage.md` in your repository and fill it in. Keep tokens and other secrets out of it: name the environment variable or tool that holds them instead.
+Copy this template to `docs/ai/observability-triage.md` in your repository and fill it in. Keep tokens and other secrets out of it: name the environment variable or tool that holds them instead. Fix automation (branches, severity, resolve label) lives in the delivery profile the `issue-resolver` agent reads.
 
 ```markdown
 # Observability triage
@@ -21,12 +21,4 @@ Copy this template to `docs/ai/observability-triage.md` in your repository and f
 
 ## Known noise
 - <errors that are expected and how to recognize them>
-
-## Automation (read by the incident-responder agent)
-- Tracker: <GitHub issues in this repo | other>
-- Labels: <incident, bug>
-- Confirm diagnosis before fixing: <yes | no>
-- Auto-merge: <off | on>
-- Max risk to merge: <2>
-- Resolve the observability issue after merge: <no | yes>
 ```

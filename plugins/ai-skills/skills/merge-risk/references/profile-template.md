@@ -1,6 +1,6 @@
 # Merge risk profile
 
-Copy this template to `docs/ai/merge-risk.md` in your repository and fill it in. Agents that merge (for example `incident-responder` and `nfse-compliance`) read their own profile's automation section first and fall back to this file.
+Copy this template to `docs/ai/merge-risk.md` in your repository and fill it in. Agents that merge (for example `nfse-compliance`) read their own profile's automation section first and fall back to this file.
 
 ```markdown
 # Merge risk

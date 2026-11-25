@@ -23,7 +23,7 @@ Full catalog and per-harness usage: [docs/](docs/README.md).
 | Kind | Agents |
 | --- | --- |
 | Workers | `code-reviewer`, `qa-tester`, `developer`, `ci-investigator` |
-| Orchestrators | `milestone-delivery`, `pr-shepherd`, `incident-responder`, `inpi-watch`, `nfse-compliance` |
+| Orchestrators | `milestone-delivery`, `pr-shepherd`, `issue-resolver`, `inpi-watch`, `nfse-compliance` (`incident-responder` is a deprecated alias of `issue-resolver`) |
 | Delivery flow | `business-analyst`, `tech-lead`, `readiness-reviewer`, `delivery-orchestrator`, `task-implementer` ([flow](docs/delivery-flow.md)) |
 
 They ship with every skill as the `ai-skills` Claude Code plugin:
@@ -33,7 +33,7 @@ They ship with every skill as the `ai-skills` Claude Code plugin:
 /plugin install ai-skills@fbrissi
 ```
 
-Run an orchestrator as the main agent so it can delegate to the workers: `claude --agent ai-skills:milestone-delivery`. `incident-responder` and `nfse-compliance` can merge their own PRs, but only with auto-merge turned on (off by default), a human approval, and a risk rating within the limit. The same agents are generated for OpenCode in `plugins/ai-skills/opencode/agent/` (copy them into `.opencode/agent/`; run with `opencode run --agent <name>`). Details: [docs/claude-code-agents.md](docs/claude-code-agents.md).
+Run an orchestrator as the main agent so it can delegate to the workers: `claude --agent ai-skills:milestone-delivery`. `nfse-compliance` can merge its own PRs, but only with auto-merge turned on (off by default), a human approval, and a risk rating within the limit. The same agents are generated for OpenCode in `plugins/ai-skills/opencode/agent/` (copy them into `.opencode/agent/`; run with `opencode run --agent <name>`). Details: [docs/claude-code-agents.md](docs/claude-code-agents.md).
 
 ## Install
 

@@ -72,7 +72,7 @@ In CI (`CI` or `GITHUB_ACTIONS` set), or when a caller says so, no skill asks or
 | `bdd-scenarios` | features folder, step language, source paths, roles and tags, test data sources, mail catcher, sandboxes |
 | `qa-e2e` | URLs, start and reset commands, scenarios folder, test account source, mail catcher, test modes, viewports, report folder |
 | `quality-cycle` | round limit, base branch, cycle log folder, checks, triage policy, follow-up tracker, shipping preference |
-| `observability-triage` | provider and access, project and environment, release mapping, code map and owners, known noise, `incident-responder` automation |
+| `observability-triage` | provider and access, project and environment, release mapping, code map and owners, known noise |
 | `sentry-issues` | organization, projects, environment, period, filters, limit, tracker title and labels, code map, resolve after merge, known noise |
 | `merge-risk` | auto-merge, max risk, base branches and per-base limits, merge method, required human approvals, hold labels, path floors |
 | `business-refinement`, `technical-refinement`, `readiness-review`, `delivery-orchestration` (one shared `docs/ai/delivery.md`) | repository scope and code map, source tracker, milestone template, languages, status labels and Project, triage fields and Size scale, base branch, branch templates, implement workflow, parallel limit, research sources, context |

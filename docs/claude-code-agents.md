@@ -23,7 +23,8 @@ The plugin contains every skill too, so you do not need `npx skills add` for Cla
 | `ci-investigator` | Worker | Diagnoses failing CI with `pr-checks`; read-only | None |
 | `milestone-delivery` | Orchestrator | Per milestone issue: plan, implement, review and QA cycle, PR | Branches, commits, push, PRs, issue comments |
 | `pr-shepherd` | Orchestrator | Takes an open PR to clean: review feedback, CI, review and QA cycle | Commits, push, PR replies |
-| `incident-responder` | Orchestrator | Observability error to root cause, then questions or a fix PR, auto-fix, risk rating, optional merge | Tickets, branches, PRs, merge when allowed |
+| `issue-resolver` | Orchestrator | `intake`: source items (Sentry) to deduplicated GitHub issues with severity and the resolve label; `resolve`: one issue to a hotfix or bugfix PR, then stops | Issues, labels, branches, PRs |
+| `incident-responder` | Deprecated | Alias of `issue-resolver` for one observability error; no longer merges | Issues, branches, PRs |
 | `inpi-watch` | Orchestrator | RPI analysis to tracked issues with labels, owner, and due dates | Issues, labels, comments |
 | `nfse-compliance` | Orchestrator | NFS-e technical note to estimated issues, implementation, PR, auto-fix, risk rating, optional merge | Issues, branches, PRs, merge when allowed |
 | `business-analyst` | Delivery | Source ticket to a milestone with business issues, or questions on the source, with `business-refinement` | Milestone, issues, labels, source comment |
@@ -35,7 +36,7 @@ The plugin contains every skill too, so you do not need `npx skills add` for Cla
 ```text
 milestone-delivery ─┐
 pr-shepherd        ─┤                  ┌─► developer
-incident-responder ─┼─ delegate to ────┼─► code-reviewer
+issue-resolver     ─┼─ delegate to ────┼─► code-reviewer
 inpi-watch         ─┤                  ├─► qa-tester
 nfse-compliance    ─┤                  └─► ci-investigator
 task-implementer   ─┘
@@ -92,9 +93,18 @@ Loads the milestone's open issues, skips the ones assigned to others or already 
 
 Each round: `pr-fix` on the review comments and CI (in `review` mode it asks before the first push and before replying; in CI it always runs `auto`), then `quality-cycle` on the PR branch, then the `pr-fix` watch loop until CI settles. Repeats while new feedback arrives, up to the round limit. Never merges. With Settle `none` it does one round and finishes with `awaiting events` instead of watching, for a CI workflow that reacts to review events and starts the next run.
 
-### incident-responder
+### issue-resolver
 
-Runs `observability-triage`. A high-confidence code defect goes to a fix: ticket, `fix/` branch, failing test first, `quality-cycle`, `pr-create`, then the `pr-shepherd` loop in `auto` mode until a person approves, then `merge-risk` in `decide` mode. Anything less certain becomes questions (interactive) or a ticket with the questions (non-interactive). Configuration, dependency, and data causes become a ticket for the owner; it never touches infrastructure or production data. Re-running it resumes from the existing ticket or PR.
+Two modes, each its own run. `intake` reads a source skill (`sentry-issues` by default) with its profile's filters and keeps one GitHub issue per source item, found by the marker `<!-- ai-issue source=sentry id=<id> -->`: it creates missing issues, refreshes open ones, and reopens closed ones when the item comes back. Each new issue gets a severity label from the delivery profile's hotfix criteria and the resolve label (`ai:resolve`), which starts a resolve run where the repository's workflows react to `issues: labeled`. `resolve` fixes one issue: `observability-triage` (or `ticket-plan` for an issue without a source), then a hotfix branch into the base branch for critical issues or a bugfix branch into the open release branch otherwise (with no release branch it asks which one), a failing test first, `quality-cycle`, and `pr-create`, then it stops. It never waits for approval and never merges: `pr-fix` and the merge decision run on later events. Anything but a high-confidence code defect becomes a blocker comment for `requested-by`. Run on an issue whose PR merged, it marks the source item resolved when the source profile allows it.
+
+```bash
+claude -p --agent ai-skills:issue-resolver "intake"
+claude -p --agent ai-skills:issue-resolver "resolve issue 42"
+```
+
+### incident-responder (deprecated)
+
+Kept as an alias so existing callers keep working: it runs `observability-triage` on one error and, for a high-confidence code defect, finds or creates the GitHub issue and resolves it as `issue-resolver` does. It no longer watches the PR or merges. Move callers to `issue-resolver`; the alias will be removed in a later release.
 
 ### inpi-watch
 
@@ -118,9 +128,9 @@ claude -p --agent ai-skills:delivery-orchestrator "milestone JIRA:ABC-123 max-pa
 
 ## Auto-merge
 
-`incident-responder` and `nfse-compliance` can merge their own PRs. Both stop before merging unless every condition holds:
+`nfse-compliance` can merge its own PRs. It stops before merging unless every condition holds:
 
-1. **Auto-merge is on.** It is off by default. Turn it on, or off again, per agent in its profile's Automation section (`docs/ai/observability-triage.md` and `docs/ai/nfse-technical-note-analysis.md`), or for one run in the request ("no merge", "auto-merge on"). Missing values fall back to `docs/ai/merge-risk.md`.
+1. **Auto-merge is on.** It is off by default. Turn it on, or off again, in its profile's Automation section (`docs/ai/nfse-technical-note-analysis.md`), or for one run in the request ("no merge", "auto-merge on"). Missing values fall back to `docs/ai/merge-risk.md`.
 2. **A person approved the PR** on the current head commit (`Required human approvals`, default 1), CI is green, and no review thread is open.
 3. **The risk rating is within the limit** (`Max risk to merge`, default 2), after the profile's risk floors.
 
@@ -132,8 +142,9 @@ The agents read the profiles of the skills they use:
 
 | Agent | Profiles |
 | --- | --- |
-| `milestone-delivery`, `pr-shepherd` | `quality-cycle`, `review-changes`, `qa-e2e`, `bdd-scenarios` |
-| `incident-responder` | `observability-triage` (Automation section), `merge-risk`, plus the cycle profiles |
+| `milestone-delivery` | `delivery` (branch templates), plus the cycle profiles |
+| `pr-shepherd` | `quality-cycle`, `review-changes`, `qa-e2e`, `bdd-scenarios` |
+| `issue-resolver`, `incident-responder` | `delivery` (branches and `## Issue resolution`), the source skill's (`sentry-issues`), `observability-triage`, plus the cycle profiles |
 | `inpi-watch` | `inpi-trademark-watch` (Automation section) |
 | `nfse-compliance` | `nfse-technical-note-analysis` (Automation section), `merge-risk`, plus the cycle profiles |
 | `business-analyst`, `tech-lead`, `readiness-reviewer`, `delivery-orchestrator` | `delivery` (`docs/ai/delivery.md`) |

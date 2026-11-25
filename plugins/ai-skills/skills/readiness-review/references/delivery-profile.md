@@ -1,6 +1,6 @@
 # Delivery inputs and profile
 
-One profile serves the whole delivery flow: `business-refinement`, `technical-refinement`, `readiness-review`, and `delivery-orchestration`.
+One profile serves the whole delivery flow: `business-refinement`, `technical-refinement`, `readiness-review`, and `delivery-orchestration`, and the agents that create branches (`issue-resolver`, `milestone-delivery`).
 
 ## Resolving values
 
@@ -18,6 +18,11 @@ For every value: the run's input (from the request, a calling agent, or a workfl
 | `hotfix-branch-template` | Hotfix branch template | `hotfix/{slug}` |
 | `bugfix-branch-template` | Bugfix branch template | `bugfix/{slug}` |
 | `bugfix-release` | Bugfix release branch | none: the oldest open release branch |
+| `issue-sources` | Issue sources | `sentry` (source skills the `issue-resolver` intake reads) |
+| `resolve-label` | Resolve label | `ai:resolve` |
+| `hotfix-label` | Hotfix label | `severity:critical` |
+| `bugfix-label` | Bugfix label | `severity:normal` |
+| `hotfix-criteria` | Hotfix criteria | the source marks it `fatal`, or a person added the hotfix label |
 | `milestone-template` | Milestone template | `{key}` (for example `JIRA:{key}` gives `JIRA:ABC-123`) |
 | `output-language` | Output language | `English` |
 | `source-language` | Source language | `auto`: the language of the source ticket |
@@ -75,6 +80,7 @@ Every run ends with a state a workflow can read without parsing prose:
 - Never create refs under another branch's name (`release/<x>/...` when `release/<x>` exists): Git cannot hold both.
 - Existing branches are never renamed. When the milestone or task already has a branch or PR under an older name (for example `feat/<milestone-slug>`), keep using it until that work is merged.
 - A `develop` branch, when the repository keeps one, only mirrors `base-branch`; nothing branches from or merges into it.
+- Severity picks the branch for a production issue: one that meets `hotfix-criteria` (or carries `hotfix-label`) gets a hotfix branch into `base-branch`; anything else gets a bugfix branch into the bugfix target.
 
 ## Profile template
 
@@ -125,6 +131,13 @@ Copy to `docs/ai/delivery.md` and remove the lines you do not need.
 - Bugfix release branch: <release branch name | none: the oldest open release branch>
 - Implement workflow: <ai-implement.yml>
 - Max parallel: <3>
+
+## Issue resolution
+- Issue sources: <sentry>
+- Resolve label: <ai:resolve>
+- Hotfix label: <severity:critical>
+- Bugfix label: <severity:normal>
+- Hotfix criteria: <for example: level fatal, or at least 100 users affected in the period, or a core flow (login, checkout) fails>
 
 ## QA in CI
 - QA in CI setup: <command that installs the browsers and starts the test environment in CI | none: targeted validation>
