@@ -82,7 +82,7 @@ Why the copies: the `skills` CLI and `rulesync install` fetch one skill director
 
 | Name | Kind | Purpose |
 | --- | --- | --- |
-| `AI_HARNESS` | variable | `opencode` (default when empty) or `claude` |
+| `AI_HARNESS` | variable | `claude` (default when empty) or `opencode` |
 | `AGENT_APP_ID`, `AGENT_APP_PRIVATE_KEY` | variable, secret | GitHub App that publishes the review |
 | `OPENCODE_MODEL`, `OPENCODE_VARIANT` | variables | OpenCode model (`provider/model`) and variant; `OPENCODE_MODEL` is required for `opencode` |
 | `OPEN_AI_TOKEN` | secret | Provider key used by OpenCode |
