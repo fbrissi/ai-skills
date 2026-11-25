@@ -46,10 +46,11 @@ You need a repository with GitHub Actions, the reusable workflows from [fbrissi/
 3. **Labels.** Create them once (the steps also create a missing label on first use, unless the profile says labels are managed elsewhere):
    - `status:needs-business-refinement`, `status:business-blocked`, `status:needs-technical-refinement`, `status:technical-blocked`, `status:needs-review`, `status:ready`, `status:in-progress`, `status:in-review`, `status:done` (or the names in `status-labels`)
    - `ai:auto-fix` and `ai:needs-human` (PR follow-up)
+   - `ai:resolve`, `severity:critical`, and `severity:normal` (issue resolution, or the names in the profile)
    - your hold labels for merges (`merge-risk` default: `do-not-merge`, `hold`)
 4. **Project (optional).** With `project`, the issue's single-select Status field must already have an option for each state, by default `Needs business refinement`, `Business blocked`, `Needs technical refinement`, `Technical blocked`, `Needs review`, `Ready`, `In progress`, `In review`, `Done`. Map several states to one option with `project-status-options` (for example `business-blocked=Blocked`). The steps never create options.
 5. **Profile.** Add `docs/ai/delivery.md` from the [template](../shared/references/delivery-profile.md#profile-template): repository scope, source tracker, milestone template, base branch, branch templates, and `## QA in CI`. Add the `quality-cycle`, `review-changes`, `qa-e2e`, and `bdd-scenarios` profiles for the implement step.
-6. **Workflows.** Add the stage callers from the github-actions `ai-task.yml` reusable workflow (default files `ai-business-refinement.yml`, `ai-technical-refinement.yml`, `ai-readiness-review.yml`, `ai-orchestrate.yml`, `ai-implement.yml`), the PR follow-up callers (`pr-fix`, `merge-decision`) with branch prefixes that cover the branch model (`feature/ release/ hotfix/ bugfix/`, plus any older prefixes still open), and a caller of `ai-resume.yml` on `issue_comment: [edited]`.
+6. **Workflows.** Add the stage callers from the github-actions `ai-task.yml` reusable workflow (default files `ai-business-refinement.yml`, `ai-technical-refinement.yml`, `ai-readiness-review.yml`, `ai-orchestrate.yml`, `ai-implement.yml`), the PR follow-up callers (`pr-fix`, `merge-decision`) with branch prefixes that cover the branch model (`feature/ release/ hotfix/ bugfix/`, plus any older prefixes still open), and a caller of `ai-resume.yml` on `issue_comment: [created]`. For production issues, add a weekly intake caller and a resolve caller on `issues: [labeled]` for the github-actions issue intake and resolve tasks (see [Issue resolution](#issue-resolution)), and a `branch-sync.yml` caller on `push` to the default branch when you keep a `develop` mirror.
 7. **Versions.** Pin the ai-skills version the workflows install. Release this library first (merging tags `vX.Y.Z`), then github-actions, then bump the pins in your repository.
 
 ## Start and chain
@@ -68,6 +69,8 @@ Start with one dispatch of the business refinement workflow (`source`, or `jira_
 | orchestrate | | dispatches implement per startable issue |
 | implement | escalated or failed | handoff (resume implement, or pr-fix when a PR exists) |
 
+In CI no step asks or waits: every question point either uses its non-interactive default (for example `pr-fix` in `auto` mode) or ends in a blocker comment and a handoff.
+
 A loop guard limits automatic dispatches per milestone and step (default 3); above it, the workflow hands off instead. A failed or timed-out run hands off with the run URL and moves an issue stuck in `in-progress` back to `ready`.
 
 This works because every step leaves a state a workflow can read: one status label per issue in scope, and for each blocked item one comment that starts with `<!-- ai-delivery blocker stage=<stage> -->` and `Blocked: <one line>`, followed by the questions. Each step's output ends with a `Blocked:` list (`- #<issue> <state>: <summary> | questions: <comment URL>`), which the handoff quotes.
@@ -76,14 +79,26 @@ A Jira source with open questions and no GitHub issue yet gets a tracking issue 
 
 ## Resume
 
-A handoff is one bot comment per blocked issue (or PR) that mentions `requested-by`, names the step, quotes the blocker, links the questions, and ends with a checkbox:
+A handoff is one bot comment per blocked issue (or PR) that mentions `requested-by`, names the step, quotes the blocker, links the questions, and says how to continue:
 
 ```md
-- [ ] Resume: technical-refinement -> continues automatically to readiness-review
-<!-- ai-resume stage=technical-refinement milestone=JIRA:ABC-123 issue=42 pr= requested-by=octocat -->
+Reply `/ai-resume` (optionally with instructions on the next lines) to continue: technical-refinement -> readiness-review.
+<!-- ai-resume stage=technical-refinement milestone=JIRA:ABC-123 issue=42 pr= requested-by=octocat state=open -->
 ```
 
-Answer the questions where they were asked (the Jira comment or the issue), then tick the box. The `ai-resume.yml` workflow acts only on a bot comment with that marker whose box went from unchecked to checked by someone with write access. It re-runs the blocked step, which reads your answer, and the chain continues from there. The comment is edited to `Resumed by @<you> -> <run link>`, so it cannot fire twice. A collapsed block in the comment has the equivalent `gh workflow run` command.
+Answer the questions where they were asked (the Jira comment or the issue), then post a new comment whose first line starts with `/ai-resume`:
+
+- `/ai-resume` resumes the newest open handoff on that issue or PR.
+- `/ai-resume <stage>` resumes that stage (for example `/ai-resume pr-fix`), with or without an open handoff.
+- Anything after the stage on the first line, and every following line, is passed to the resumed run as its `instructions`.
+
+The `ai-resume.yml` workflow acts only on comments from people with write, maintain, or admin access (bots are ignored). It adds an `eyes` reaction, marks the handoff `state=resumed` (`Resumed by @<you> -> <run link>`) before it dispatches, so a handoff runs once, then adds a `rocket` reaction and replies with the run link, or replies with the reason when it rejects the command. With no open handoff and no stage, it replies with the stages it knows. Resuming `pr-fix` removes `ai:needs-human`. A collapsed block in the handoff has the equivalent `gh workflow run` command. There is no checkbox to tick.
+
+Skills that stop in CI write their own blocker comment the same way: they mention `requested-by`, say what is missing, and end with the `/ai-resume` line when the repository runs the resume workflow (shared rule: [non-interactive.md](../shared/references/non-interactive.md)).
+
+## Instructions
+
+Every entry point takes an optional `instructions` input (stage workflows, `pr-fix`, `merge-decision`, `code-review`, and `/ai-resume` from the comment). The text is appended to the agent prompt as additional instructions for that run only: chained dispatches do not pass it on. Like `context`, it adds information and constraints and never overrides the skills' rules or a person's decision on the issue.
 
 ## Requested-by
 
@@ -109,9 +124,19 @@ In the delivery flow the milestone branch is the release branch. A `develop` bra
 One milestone produces many PRs, so they are stacked:
 
 1. Orchestration creates the release branch (default `release/<milestone-slug>`) from the default branch (`base-branch`) first.
-2. Each feature branch (default `feature/<milestone-slug>-<n>-<slug>`) is created from the release branch, and each task PR targets the release branch. Task PRs go through PR follow-up (`pr-fix` rounds, then `merge-risk`) and may merge on their own when the AI review approved, CI is green, and the risk is low, where the repository enables it.
+2. Each feature branch (default `feature/<milestone-slug>-<n>-<slug>`) is created from the release branch, and each task PR targets the release branch. Task PRs go through PR follow-up (`pr-fix` rounds, then `merge-risk`) and may merge on their own when the AI review approved, CI is green, and the risk is low, where the repository enables it. Only PRs the agent App opened into a release branch can skip the human approval; PRs people open, and every PR into the default branch (release and hotfix PRs), need one. `merge-risk` takes the base list and a max risk per base from its profile, so task PRs into `release/*` can use a different limit than PRs into the default branch.
 3. One milestone PR, from the release branch into the default branch, aggregates every task PR, so reviewers see one combined diff. Orchestration opens it as a draft as soon as the release branch has a commit, keeps its body current (every issue with `Closes #<n>`, its status and task PR), and marks it ready for review, requesting `requested-by` as reviewer, when every issue is done. It always needs a human approval.
 4. When the milestone PR merges, orchestration runs again, moves every issue to `done`, and closes the milestone.
+
+## Issue resolution
+
+Production problems take a shorter path than milestones, with the [`issue-resolver`](claude-code-agents.md#issue-resolver) agent:
+
+1. **Intake** (for example a weekly schedule) reads the source with [`sentry-issues`](skills/sentry-issues.md) and keeps one GitHub issue per Sentry issue (marker `<!-- ai-issue source=sentry id=<id> -->`, so it never duplicates), with a severity label decided by the profile's `Hotfix criteria` and the `Resolve label` (`ai:resolve`).
+2. **Resolve** runs when an issue gets the resolve label (people can label any issue). Critical issues get a hotfix branch into the default branch; the rest get a bugfix branch into the open release branch. It diagnoses with `observability-triage`, writes a failing test first, runs the review and QA cycle, opens the PR, and stops.
+3. **Follow-up** is the usual PR follow-up: `pr-fix` on review and CI events, then the merge decision. Hotfix PRs into the default branch need a human approval.
+
+Configure it in the profile's `## Issue resolution` section and the `sentry-issues` profile; credentials (`SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, optional `SENTRY_BASE_URL`) come from secrets.
 
 ## QA in CI
 
@@ -131,7 +156,7 @@ Every issue the flow creates or refines carries triage for metrics and future es
 
 ## Profile
 
-Run inputs override the repository profile `docs/ai/delivery.md` (or `profile`), which overrides the defaults. One profile serves every step: repository scope and code map, source tracker, milestone template, languages, status labels and Project, triage fields, base branch, branch templates, implement workflow, parallel limit, research sources, and free-text context. Template and the full input list: [delivery-profile.md](../shared/references/delivery-profile.md).
+Run inputs override the repository profile `docs/ai/delivery.md` (or `profile`), which overrides the defaults. One profile serves every step: repository scope and code map, source tracker, milestone template, languages, status labels and Project, triage fields, base branch, branch templates, issue resolution, implement workflow, parallel limit, research sources, and free-text context. Template and the full input list: [delivery-profile.md](../shared/references/delivery-profile.md).
 
 ## Trackers
 
