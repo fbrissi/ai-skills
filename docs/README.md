@@ -25,6 +25,7 @@
 | Quality | [`qa-e2e`](skills/qa-e2e.md) | Runs BDD scenarios in a real browser at desktop and mobile viewports; APPROVED or CHANGES REQUIRED | Writes a QA report |
 | Quality | [`quality-cycle`](skills/quality-cycle.md) | Review + QA → fixes → re-review and re-test until both approve or a round limit | Local commits, cycle log; push once |
 | Operations | [`observability-triage`](skills/observability-triage.md) | Traces a production error from an observability tool to its root cause, with confidence and a recommendation | None |
+| Operations | [`sentry-issues`](skills/sentry-issues.md) | Lists unresolved Sentry issues with the project's filters, reads stack traces, and writes deduplicated tracker issue bodies; resolves after merge when allowed | Sentry status only on `resolve` |
 | Operations | [`merge-risk`](skills/merge-risk.md) | Rates a PR's production risk 1-5 and decides MERGE or HOLD; merges only when allowed | PR comment, merge when allowed |
 | Brazil | [`inpi-trademark-watch`](skills/inpi-trademark-watch.md) | Analyzes an INPI RPI issue for a watched trademark: actions and deadlines | Writes an issue body file |
 | Brazil | [`nfse-technical-note-analysis`](skills/nfse-technical-note-analysis.md) | Maps an NFS-e Nacional technical note to code changes and a rollout plan | Writes an issue body file |
@@ -44,6 +45,8 @@ bdd-scenarios ──► qa-e2e ──┐
 review-changes ────────────┘
 
 observability-triage ──► dev ──► quality-cycle ──► pr-create ──► pr-fix (loop) ──► merge-risk
+
+sentry-issues ──► tracker issues ──► observability-triage ──► dev ──► quality-cycle ──► pr-create (issue-resolver)
 
 business-refinement ──► technical-refinement ──► readiness-review ──► delivery-orchestration ──► dev ──► quality-cycle ──► pr-create
 ```
@@ -70,6 +73,7 @@ In CI (`CI` or `GITHUB_ACTIONS` set), or when a caller says so, no skill asks or
 | `qa-e2e` | URLs, start and reset commands, scenarios folder, test account source, mail catcher, test modes, viewports, report folder |
 | `quality-cycle` | round limit, base branch, cycle log folder, checks, triage policy, follow-up tracker, shipping preference |
 | `observability-triage` | provider and access, project and environment, release mapping, code map and owners, known noise, `incident-responder` automation |
+| `sentry-issues` | organization, projects, environment, period, filters, limit, tracker title and labels, code map, resolve after merge, known noise |
 | `merge-risk` | auto-merge, max risk, base branches and per-base limits, merge method, required human approvals, hold labels, path floors |
 | `business-refinement`, `technical-refinement`, `readiness-review`, `delivery-orchestration` (one shared `docs/ai/delivery.md`) | repository scope and code map, source tracker, milestone template, languages, status labels and Project, triage fields and Size scale, base branch, branch templates, implement workflow, parallel limit, research sources, context |
 | `flow-video-ad` | product name and pronunciation, folders, claim sources, forbidden claims, character, voice, setting, crop, end card, privacy rules |
@@ -102,6 +106,7 @@ Every harness also picks a skill **automatically** when your request matches its
 - Jira/Linear/other tickets need some access to that tracker: an MCP server or connector, a project or harness tool (for example an OpenCode tool in `.opencode/tools/`), an authenticated CLI, the tracker's REST API with credentials already in the environment (for Jira `JIRA_BASE_URL`, `JIRA_EMAIL`, `JIRA_API_TOKEN`), or a public URL. Ticket skills stop without it; `review-changes` continues and notes the missing ticket. See [tickets](../shared/references/tickets.md).
 - `qa-e2e` (and the QA step of `quality-cycle`) needs a browser automation capability in the harness and a running local or staging stack.
 - `observability-triage` needs access to the observability tool (MCP server, CLI, or a token already in the environment).
+- `sentry-issues` needs `SENTRY_AUTH_TOKEN` and `SENTRY_ORG` in the environment (optional `SENTRY_BASE_URL`), and `bash`, `curl`, and `jq` for its script, or a Sentry MCP server.
 - `inpi-trademark-watch` needs Ruby and `unzip` to download RPI issues; `flow-video-ad` needs `ffmpeg` and `whisper-cli` to assemble the video.
 
 ## Background

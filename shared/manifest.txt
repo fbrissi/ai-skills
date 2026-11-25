@@ -8,4 +8,4 @@ references/commits.md      ship todo pr-fix
 references/triage.md       ticket-create ticket-plan business-refinement technical-refinement readiness-review delivery-orchestration
 references/work-status.md  business-refinement technical-refinement readiness-review delivery-orchestration dev
 references/delivery-profile.md  business-refinement technical-refinement readiness-review delivery-orchestration
-references/non-interactive.md  dev pr-create qa-e2e ticket-plan pr-fix quality-cycle ship todo work-cleanup observability-triage
+references/non-interactive.md  dev pr-create qa-e2e ticket-plan pr-fix quality-cycle ship todo work-cleanup observability-triage sentry-issues

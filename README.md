@@ -12,7 +12,7 @@ Personal library of reusable AI agent skills. Plain [Agent Skills](https://agent
 | Orchestration | [`dev`](docs/skills/dev.md), [`ship`](docs/skills/ship.md), [`todo`](docs/skills/todo.md), [`work-cleanup`](docs/skills/work-cleanup.md) |
 | Delivery | [`business-refinement`](docs/skills/business-refinement.md), [`technical-refinement`](docs/skills/technical-refinement.md), [`readiness-review`](docs/skills/readiness-review.md), [`delivery-orchestration`](docs/skills/delivery-orchestration.md) |
 | Quality | [`bdd-scenarios`](docs/skills/bdd-scenarios.md), [`qa-e2e`](docs/skills/qa-e2e.md), [`quality-cycle`](docs/skills/quality-cycle.md) |
-| Operations | [`observability-triage`](docs/skills/observability-triage.md), [`merge-risk`](docs/skills/merge-risk.md) |
+| Operations | [`observability-triage`](docs/skills/observability-triage.md), [`sentry-issues`](docs/skills/sentry-issues.md), [`merge-risk`](docs/skills/merge-risk.md) |
 | Brazil | [`inpi-trademark-watch`](docs/skills/inpi-trademark-watch.md), [`nfse-technical-note-analysis`](docs/skills/nfse-technical-note-analysis.md) |
 | Media | [`flow-video-ad`](docs/skills/flow-video-ad.md) |
 
