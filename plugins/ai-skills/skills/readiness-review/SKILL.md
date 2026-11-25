@@ -13,7 +13,7 @@ An independent gate between refinement and implementation. Judge the issue as wr
 
 ## Inputs
 
-Resolve every value with [references/delivery-profile.md](references/delivery-profile.md). This skill reads `milestone` or `issue` (one is required), `output-language`, `status-labels`, `project`, `project-status-field`, `project-status-options`, `context`, and `profile`.
+Resolve every value with [references/delivery-profile.md](references/delivery-profile.md). This skill reads `milestone` or `issue` (one is required), `output-language`, `status-labels`, `project`, `project-status-field`, `project-status-options`, `context`, `requested-by`, and `profile`.
 
 Stop with `Unable to review: missing milestone or issue` if neither is given.
 
@@ -45,7 +45,7 @@ Readiness: <ready | back to business refinement | back to technical refinement>
 <one to three lines: what is missing or wrong, and what would make it ready>
 ```
 
-Never edit the issue body or anything else beyond its status.
+Never edit the issue body or anything else beyond its status. Every issue in scope ends the run with exactly one of `ready`, `needs-business-refinement`, or `needs-technical-refinement`, so a workflow can decide the next step from the labels alone; this step never blocks.
 
 ## Output
 
@@ -54,4 +54,5 @@ Readiness review: <milestone | #issue>
 | Issue | Decision | Reason |
 |---|---|---|
 Ready: <n>   Back to business: <n>   Back to technical: <n>
+Blocked: none
 ```

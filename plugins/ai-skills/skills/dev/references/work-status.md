@@ -9,12 +9,12 @@ Track where each GitHub issue is in the delivery flow with one status label, and
 | `needs-business-refinement` | `status:needs-business-refinement` | readiness review | The business request must be clarified or redone |
 | `business-blocked` | `status:business-blocked` | business refinement | Questions for the requester are waiting |
 | `needs-technical-refinement` | `status:needs-technical-refinement` | business refinement, readiness review | Ready for the technical approach |
-| `technical-blocked` | `status:technical-blocked` | technical refinement | Technical questions are waiting |
+| `technical-blocked` | `status:technical-blocked` | technical refinement, implementation | Technical questions are waiting, or implementation could not start or produce a PR |
 | `needs-review` | `status:needs-review` | technical refinement | Ready for the readiness review |
 | `ready` | `status:ready` | readiness review | Can be implemented |
 | `in-progress` | `status:in-progress` | orchestration, implementation | A task branch exists and work started |
-| `in-review` | `status:in-review` | implementation | Its PR is open |
-| `done` | `status:done` | orchestration | Its PR was merged into the target branch |
+| `in-review` | `status:in-review` | implementation | Its PR is open (labeled `ai:needs-human` when the implementation escalated) |
+| `done` | `status:done` | orchestration | Its task PR was merged into the milestone branch, or the milestone PR was merged |
 
 - `status-labels` overrides labels, one `state=label` line each (for example `ready=workflow:ready`). Unlisted states keep the default.
 - An issue has exactly one status label. A transition removes every other status label and adds the new one in the same edit.

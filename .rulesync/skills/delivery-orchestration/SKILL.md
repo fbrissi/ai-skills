@@ -5,17 +5,26 @@ description: >-
   builds the dependency graph, creates the milestone branch and one task branch
   per issue, starts implementation for the issues whose dependencies are done
   (dispatching a workflow in CI or handing off locally) up to a parallel limit,
-  and opens the milestone PR when every issue is done. Use when the user or a
-  workflow asks to orchestrate, start, or advance a milestone's delivery.
+  keeps a draft milestone PR that aggregates the task PRs, marks it ready when
+  every issue is done, and closes the milestone after it merges. Use when the
+  user or a workflow asks to orchestrate, start, or advance a milestone's
+  delivery.
 ---
 
 # Delivery orchestration
 
-As orchestrator you never write code, review it, or merge; only in `local` mode without delegation do you play the implementer role, one task at a time, as step 4 says. Each run advances the milestone as far as it can and exits; it is re-run when a task PR merges into the milestone branch, so never wait for work to finish.
+As orchestrator you never write code, review it, or merge; only in `local` mode without delegation do you play the implementer role, one task at a time, as step 4 says. Each run advances the milestone as far as it can and exits; it is re-run when a task PR merges into the milestone branch and when the milestone PR merges, so never wait for work to finish.
+
+## PR structure
+
+One milestone produces many PRs, so they are stacked for review:
+
+- The milestone branch is created first, from `base-branch`. Every task branch is created from the milestone branch, and every task PR targets the milestone branch. Task PRs follow the repository's PR follow-up and may merge on their own where the repository allows it.
+- One milestone PR, from the milestone branch into `base-branch`, aggregates the task PRs so reviewers see the whole delivery as one combined diff. It is opened as a draft as soon as the milestone branch has a commit ahead of `base-branch`, its body is kept current on every run, and it is marked ready for review when every issue is done. It always needs a human approval; this skill never merges it.
 
 ## Inputs
 
-Resolve every value with [references/delivery-profile.md](references/delivery-profile.md), which also defines the branch names. This skill reads `milestone` (required), `base-branch`, `implement-workflow`, `max-parallel`, `status-labels`, `project`, `project-status-field`, `project-status-options`, `context`, and `profile`.
+Resolve every value with [references/delivery-profile.md](references/delivery-profile.md), which also defines the branch names. This skill reads `milestone` (required), `base-branch`, `implement-workflow`, `max-parallel`, `status-labels`, `project`, `project-status-field`, `project-status-options`, `context`, `requested-by`, and `profile`.
 
 Stop with `Unable to orchestrate: missing milestone` if there is none.
 
@@ -23,9 +32,10 @@ Stop with `Unable to orchestrate: missing milestone` if there is none.
 
 ## 1. Load
 
-1. Load every issue in the milestone with labels, body, and state (`gh issue list --milestone "<title>" --state all --json number,title,labels,body,state`).
+1. Load every issue in the milestone with labels, body, and state (`gh issue list --milestone "<title>" --state all --json number,title,labels,body,state`), and the milestone itself (`gh api repos/{owner}/{repo}/milestones?state=all`) for its number, state, and the `requested-by` marker in its description when the run has none.
 2. Resolve the milestone branch `feat/<milestone-slug>`. If it does not exist on the remote, create it from the head of `base-branch` (`git fetch origin <base-branch>`, then `git push origin origin/<base-branch>:refs/heads/<milestone-branch>`).
-3. Load the task PRs into the milestone branch (`gh pr list --base <milestone-branch> --state all --json number,state,headRefName,body,mergedAt`). Match a PR to its issue by the task branch name (`feat/<milestone-slug>-<n>-`) or an issue link in its body.
+3. Load the task PRs into the milestone branch (`gh pr list --base <milestone-branch> --state all --json number,title,state,headRefName,body,mergedAt,url`). Match a PR to its issue by the task branch name (`feat/<milestone-slug>-<n>-`) or an issue link in its body.
+4. Load the milestone PR (`gh pr list --head <milestone-branch> --base <base-branch> --state all --json number,state,isDraft,mergedAt,url`). If it is merged, go to step 6 and stop there.
 
 ## 2. Update done
 
@@ -34,7 +44,7 @@ With [references/work-status.md](references/work-status.md), move an issue to `d
 ## 3. Build the graph
 
 - Edges come from `Depends on #<n>` lines in the issue body (also "blocked by #<n>"). A dependency outside the milestone counts as done only when that issue is closed.
-- On a cycle, or a dependency on a missing issue, do not start any issue in it: comment on each affected issue, move it to `needs-technical-refinement`, and report it.
+- On a cycle, or a dependency on a missing issue, do not start any issue in it: comment on each affected issue in the stop-point format of [references/delivery-profile.md](references/delivery-profile.md) with stage `orchestrate`, move it to `needs-technical-refinement`, and report it.
 - **Startable**: `ready`, every dependency `done`, and no open task PR.
 - **Running**: `in-progress`. Free slots = `max-parallel` minus running.
 
@@ -46,14 +56,22 @@ For each startable issue, while slots are free, in order of highest Priority, th
 2. Create the task branch `feat/<milestone-slug>-<n>-<issue-slug>` from the current head of the milestone branch if it does not exist (`git push origin origin/<milestone-branch>:refs/heads/<task-branch>` after a fresh fetch). Reuse it if it exists.
 3. Move the issue to `in-progress`.
 4. Start the work:
-   - `dispatch`: `gh workflow run <implement-workflow> --ref <default-branch> -f issue=<n> -f branch=<task-branch> -f base_branch=<milestone-branch>`. The workflow's dispatch inputs are exactly `issue`, `branch`, and `base_branch` (underscore); `<default-branch>` is the repository's default branch, where the workflow file lives. If the dispatch fails, move the issue back to `ready` and report the error.
-   - `local`: hand the task (issue, task branch, milestone branch as base) to an implementer: the `task-implementer` agent when the harness has it, in parallel up to the free slots; otherwise do it yourself one task at a time with the `dev` skill, then the `quality-cycle` skill, then the `pr-create` skill with the milestone branch as base, and move the issue to `in-review` once its PR is open. Report each result; do not wait for merges.
+   - `dispatch`: `gh workflow run <implement-workflow> --ref <default-branch> -f issue=<n> -f branch=<task-branch> -f base_branch=<milestone-branch>`, plus `-f requested_by=<login>` when `requested-by` is known and the workflow declares that input. `<default-branch>` is the repository's default branch, where the workflow file lives. If the dispatch fails, move the issue back to `ready` and report the error.
+   - `local`: hand the task (issue, task branch, milestone branch as base, `requested-by`) to an implementer: the `task-implementer` agent when the harness has it, in parallel up to the free slots; otherwise do it yourself one task at a time with the `dev` skill, then the `quality-cycle` skill, then the `pr-create` skill with the milestone branch as base, and move the issue to `in-review` once its PR is open. Report each result; do not wait for merges.
 
-## 5. Close the milestone
+## 5. Milestone PR
 
-When every open issue in the milestone is `done`, open the PR from the milestone branch into `base-branch` with the `pr-create` skill (if it is not installed: `gh pr create --base <base-branch> --head <milestone-branch>` with a body file). Its body lists every issue with `Closes #<n>`, links the milestone and its source, and summarizes the task PRs. If an open PR already exists for the milestone branch, report it instead. Never merge it: the repository's review and merge process decides.
+Use the `pr-create` skill (if it is not installed: `gh pr create --base <base-branch> --head <milestone-branch> --draft` with a body file; never more than one open PR for the milestone branch).
 
-Issues that are blocked, still in refinement, or waiting for review keep the milestone open; list them in the report.
+1. **Open it as a draft** when none is open and the milestone branch has at least one commit ahead of `base-branch` (`git rev-list --count origin/<base-branch>..origin/<milestone-branch>`), assigned to `requested-by` when known.
+2. **Keep its body current** on every run (`gh pr edit <n> --body-file <f>`): the milestone and its source, then one line per issue with its status and task PR (`- [x] Closes #<n> <title> (#<task PR>, merged)`, `- [ ] Closes #<n> <title> (<status>)`), and a short summary of the merged task PRs.
+3. **Mark it ready** when every open issue in the milestone is `done` (`gh pr ready <n>`), request review from `requested-by` when known (`gh pr edit <n> --add-reviewer <login>`), and comment once mentioning them that the milestone is ready for review. Never merge it, and never change its review requirements: it always needs a human approval.
+
+Issues that are blocked, still in refinement, or waiting for review keep the PR in draft; list them in the report.
+
+## 6. Complete the milestone
+
+When the milestone PR is merged: move every issue of the milestone that is not `done` and not closed as not planned to `done`, close any of them still open (`gh issue close <n> --comment "Delivered in #<milestone PR>"`), and close the milestone (`gh api -X PATCH repos/{owner}/{repo}/milestones/<number> -f state=closed`). Start nothing new.
 
 ## Output
 
@@ -64,5 +82,7 @@ Milestone branch: <branch> (<created | existing>)   Base: <base-branch>
 |---|---|---|---|---|---|
 Started: <n> (<free slots> free of <max-parallel>)   Done: <n>/<total>
 Waiting: <issue: reason>
-Milestone PR: <url | not yet: reason>
+Milestone PR: <url> (<draft | ready for review | merged, milestone closed> | not yet: reason)
+Blocked:
+- #<issue> <state>: <summary> | questions: <comment URL>
 ```

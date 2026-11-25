@@ -15,13 +15,13 @@ Plan only. Do not edit source files, create branches, or change the business sec
 
 ## Inputs
 
-Resolve every value with [references/delivery-profile.md](references/delivery-profile.md). This skill reads `milestone` or `issue` (one is required, on GitHub), `base-branch`, `output-language`, `status-labels`, `project`, `project-status-field`, `project-status-options`, `research-sources`, `context`, and `profile`.
+Resolve every value with [references/delivery-profile.md](references/delivery-profile.md). This skill reads `milestone` or `issue` (one is required, on GitHub), `base-branch`, `output-language`, `status-labels`, `project`, `project-status-field`, `project-status-options`, `research-sources`, `context`, `requested-by`, and `profile`.
 
 Stop with `Unable to refine: missing milestone or issue` if neither is given.
 
 ## 1. Load
 
-1. Load the target with comments and attachments following [references/tickets.md](references/tickets.md): for a milestone, every issue in it (`gh issue list --milestone "<title>" --state all --json number,title,labels,body,state`), so plans already written count in the conflict pass.
+1. Load the target with comments and attachments following [references/tickets.md](references/tickets.md): for a milestone, every issue in it (`gh issue list --milestone "<title>" --state all --json number,title,labels,body,state`), so plans already written count in the conflict pass. Download and read the tracker attachments an issue lists under `## Attachments` when the access exists, as `tickets.md` says.
 2. In scope: issues in `needs-technical-refinement`, and issues in `technical-blocked` whose questions were answered since. Leave the others as they are.
 3. Read the repository's guidance (`AGENTS.md`, `CLAUDE.md`, project docs, the profile's Code map and Context) once for the whole run.
 
@@ -52,7 +52,8 @@ Issues in a milestone are implemented in parallel, each on its own branch from t
 2. For every pair that touches the same file, migration sequence, shared contract, or generated artifact:
    - Make them disjoint by moving the shared change into the issue that owns it, or
    - Add `Depends on #<n>` to the later one so it starts only after the other is done, or
-   - Split an issue whose parts have different dependencies, or merge two issues that cannot be separated. Splits and merges keep the business sections and acceptance criteria intact across the result, link the originals, and close a merged-away issue with a comment pointing to the survivor.
+   - Split an issue whose parts have different dependencies, or merge two issues that cannot be separated. Splits and merges keep the business sections and acceptance criteria intact across the result, keep every resulting issue in the milestone, link the originals, and close a merged-away issue with a comment pointing to the survivor.
+   - Business refinement already shaped the issues by deliverable. Split or merge here only for code reasons (areas, dependencies, size), say the code reason in the linking comment, and never undo a business split or merge for a reason that is not technical.
 3. Reject dependency cycles: reorder or merge until the graph is acyclic.
 4. Never edit an issue that is already `in-progress` or later. If it conflicts, add the dependency to the other issue instead.
 
@@ -65,7 +66,7 @@ With [references/triage.md](references/triage.md) and the profile's `## Triage` 
 Write the plan into the issue body as the `## Technical plan` section, after the business sections, replacing that section on a re-run (body through a temp file). Then, with [references/work-status.md](references/work-status.md):
 
 - Planned without open questions: `needs-review`.
-- Blocked: comment the questions on the issue (what is missing, why it blocks, options when known) and set `technical-blocked`.
+- Blocked: comment the questions on the issue (what is missing, why it blocks, options when known) in the stop-point format of `references/delivery-profile.md` with stage `technical-refinement`, and set `technical-blocked`.
 - The business content is wrong or contradicts the code in a way only the requester can settle: comment why and set `needs-business-refinement`.
 
 ## Output
@@ -78,4 +79,6 @@ Triage fields skipped: <field: reason, or none>
 Conflicts resolved: <pair: how>
 Splits / merges: <what changed, or none>
 Questions: <issue: question, or none>
+Blocked:
+- #<issue> technical-blocked: <summary> | questions: <comment URL>
 ```

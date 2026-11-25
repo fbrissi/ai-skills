@@ -12,7 +12,7 @@ Apply these fields only when the request, a calling agent, or a profile asks for
 | Estimate (points) | Fibonacci `1, 2, 3, 5, 8, 13`; with a profile scale (for example `XS=3, S=5, M=8, L=13, XL=21`), the value for the Size | Follow the Size through the scale when there is one. State the main driver in one line. |
 | Effort | The profile's options (for example `High, Medium, Low`) | Hands-on work required, independent of priority. |
 | Start date / Target date | none | Start: when the work can begin (after its dependencies and earlier work in the same milestone). Target: the deadline, or the plan's recommended date that leaves its buffers. Always absolute (`YYYY-MM-DD`), and never a target before the start. |
-| Owner | the profile's owner, otherwise `@me` (none when the profile says so) | |
+| Owner | the caller's assignee (for example `requested-by`), else the profile's owner, otherwise `@me` (none when the profile says so, or with a GitHub App or bot token, where `@me` fails) | |
 
 When a profile defines the triage fields (for example the `## Triage` section of the delivery profile), a field whose profile key is missing is skipped: say which ones in the output.
 
