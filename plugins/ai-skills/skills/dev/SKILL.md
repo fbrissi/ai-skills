@@ -13,6 +13,7 @@ description: >-
 - **Source**: a ticket reference/URL/file, or a direct request. Default: the request from the conversation.
 - **Ship**: when the user says "ship", "open a PR", or "end to end", continue into shipping after validation. Otherwise stop at a validated, uncommitted change.
 - **Guidance**: any remaining text sets scope, priorities, or tradeoffs.
+- **Status**: only when the request or a calling agent asks to track status on the issue (for example the delivery flow's `status-labels` or `project`): move it to `in-progress` when you start and to `in-review` once its PR is open (here when shipping, or when the caller reports it), following `references/work-status.md`.
 
 Stop with `Missing implementation request` if there is no source.
 
@@ -21,7 +22,7 @@ Stop with `Missing implementation request` if there is no source.
 1. For a ticket, load the body and comments following `references/tickets.md`. Keep the ticket URL for the PR. If no access can load it, stop and say which tool, MCP server, or CLI is needed.
 2. Write a 2-4 line brief: goal, constraints, acceptance criteria. If the source already contains a plan (for example from `ticket-plan`), use it.
 3. Survey before editing: find the code paths, existing patterns, and tests that the change touches. Read the nearest `AGENTS.md`/`CLAUDE.md`.
-4. If the request is ambiguous in a way that changes the implementation, ask once. Otherwise state your assumption and proceed.
+4. If the request is ambiguous in a way that changes the implementation, ask once; in a non-interactive run (CI, or a caller that says so), follow [references/non-interactive.md](references/non-interactive.md) instead: a blocker comment on the ticket, then stop. Otherwise state your assumption and proceed.
 
 ## 2. Implement
 

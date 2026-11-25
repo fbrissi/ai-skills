@@ -1,6 +1,6 @@
 # Merge risk profile
 
-Copy this template to `docs/ai/merge-risk.md` in your repository and fill it in. Agents that merge (for example `incident-responder` and `nfse-compliance`) read their own profile's automation section first and fall back to this file.
+Copy this template to `docs/ai/merge-risk.md` in your repository and fill it in. Agents that merge (for example `nfse-compliance`) read their own profile's automation section first and fall back to this file.
 
 ```markdown
 # Merge risk
@@ -8,9 +8,16 @@ Copy this template to `docs/ai/merge-risk.md` in your repository and fill it in.
 ## Policy
 - Auto-merge: <off | on>
 - Max risk to merge: <2>
-- Base branch: <main>
+- Base branches: <main, release/*>
 - Merge method: <squash | merge | rebase>
 - Required human approvals: <1>
+
+## Per base
+Optional. The first matching row wins over the Policy values for PRs into that base.
+| Base pattern | Max risk to merge | Required human approvals |
+|---|---|---|
+| <release/*> | <3> | <0> |
+| <main> | <2> | <1> |
 - Hold labels: <do-not-merge, hold>
 - Label to add on HOLD: <needs-human-merge | none>
 

@@ -11,10 +11,14 @@ Rates the risk of an approved pull request reaching production on a 1-5 scale an
 | PR | number or URL | PR of the current branch |
 | Mode | `report`, `decide` | `report` |
 | Auto-merge | `on`, `off` | profile, otherwise `off` |
-| Max risk | 1-5 | profile, otherwise 2 |
+| Max risk | 1-5 | profile (per base, then general), otherwise 2 |
+| Base branches | names or patterns (`release/*`) | profile, otherwise the default branch |
+| Required human approvals | number | profile (per base, then general), otherwise 1 |
 | Profile | path | `docs/ai/merge-risk.md` |
 
-Start the profile from [`references/profile-template.md`](../../.rulesync/skills/merge-risk/references/profile-template.md): auto-merge, max risk, base branch, merge method, required human approvals, hold labels, and path floors.
+Start the profile from [`references/profile-template.md`](../../.rulesync/skills/merge-risk/references/profile-template.md): auto-merge, max risk, base branches, merge method, required human approvals, an optional per-base table (max risk and approvals per base pattern, for example task PRs into `release/*` versus `main`), hold labels, and path floors.
+
+With 0 required approvals for the base, an empty review decision passes and only changes requested (or a review required by branch protection) holds. Otherwise it counts human approvals on the head commit from the reviews, never the review decision alone.
 
 ## Examples
 

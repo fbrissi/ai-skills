@@ -9,7 +9,7 @@ Triage PR review feedback and failing CI, fix what is valid, push, and reply to 
 | Input | Values | Default |
 | --- | --- | --- |
 | PR | number or URL | PR of the current branch |
-| Mode | `review` (asks before pushing/replying), `auto` (no approval), `loop` (auto + watch CI and new comments) | `review` |
+| Mode | `review` (asks before pushing/replying), `auto` (no approval, one pass, no waiting; suits event-driven runs), `loop` (auto + watch CI and new comments) | `review` (`auto` in CI) |
 | Pass limit | e.g. "max 3 passes" (loop only) | 5 |
 | Guidance | free text | none |
 

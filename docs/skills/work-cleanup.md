@@ -11,7 +11,7 @@ Cleans up the local branches, worktrees, and optionally remote branches left ove
 | Target | branch name | the branch of the work just finished |
 | Scope | `work`, `all` | `work` (target, its worktrees, its remote branch) |
 | Remote | `yes`, `no` | `yes`, always confirmed separately |
-| Protected | branch names or patterns | default branch, `main`, `master`, `develop`, `development`, `release/*`, `release-*` |
+| Protected | branch names or patterns | default branch, `main`, `master`, `develop`, `development`, `release/*`, `release-*`, `hotfix/*` |
 
 ## Examples
 

@@ -31,12 +31,12 @@ If there are no uncommitted changes and no commits ahead of base, stop with `Not
 
 Keep the current branch if it is not the base and not a protected branch. Otherwise create one:
 
-- Name: `<type>/<kebab-slug>`, where type is `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `perf`, or `ci`, and the slug is 2-5 words taken from the change themes or ticket. Follow the repo's branch convention if it has one.
+- Name: the repo's branch convention if it has one (for example the branch templates of a delivery profile, `docs/ai/delivery.md`). Otherwise `<type>/<kebab-slug>`, where type is `feature`, `bugfix`, `hotfix`, `refactor`, `docs`, `test`, `chore`, `perf`, or `ci`, and the slug is 2-5 words taken from the change themes or ticket.
 - `git switch -c <name>`. If the name exists, add a short numeric suffix once.
 
 ## 3. Commit
 
-If there are uncommitted changes, stage and commit them following `references/commits.md`. Use the diff you already loaded; do not re-run discovery commands. If the worktree contains unrelated changes, ask which ones to include.
+If there are uncommitted changes, stage and commit them following `references/commits.md`. Use the diff you already loaded; do not re-run discovery commands. If the worktree contains unrelated changes, ask which ones to include; in a non-interactive run (CI, or a caller that says so), commit only what the caller named, or stop as [references/non-interactive.md](references/non-interactive.md) says.
 
 ## 4. Push and PR
 

@@ -17,7 +17,7 @@ Inventory → classify → confirm → delete → report. Nothing is deleted bef
 - **Target**: the work branch to clean up. Default: the branch of the work just finished (the current branch, or the one named in the conversation).
 - **Scope**: `work` (the target, its worktrees, and its remote branch) or `all` (also every other local branch whose PR is merged or closed, or whose upstream is gone). Default: `work`.
 - **Remote**: `yes` to also offer the matching remote branches, `no` to skip them. Default: `yes`; they are always confirmed separately.
-- **Protected**: branch names or patterns never removed. Default: the remote's default branch, `main`, `master`, `develop`, `development`, `release/*`, `release-*`, plus the repo's protected branches if it documents them.
+- **Protected**: branch names or patterns never removed. Default: the remote's default branch, `main`, `master`, `develop`, `development`, `release/*`, `release-*`, `hotfix/*`, plus the repo's protected branches if it documents them.
 
 ## 1. Load once
 
@@ -97,6 +97,8 @@ Ask the user, and wait for an explicit answer:
 - each `-D` item, by name;
 - the switch to `<default>` and the branch removal that depends on it, if offered;
 - the remote items, as a separate question.
+
+In a non-interactive run (CI, or a caller that says so; see [references/non-interactive.md](references/non-interactive.md)) nothing is confirmed: report the plan and remove nothing.
 
 Remove only what was confirmed. Silence, an unclear answer, or a general "go ahead" that does not cover remote or `-D` items confirms none of them.
 

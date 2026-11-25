@@ -1,6 +1,6 @@
 ---
 name: code-reviewer
-targets: ["claudecode", "claudecode-plugin"]
+targets: ["claudecode", "claudecode-plugin", "opencodev1"]
 description: >-
   Independent code reviewer. Reviews local changes, a branch against its base,
   or a pull request with the review-changes skill and returns a graded,
@@ -11,6 +11,10 @@ claudecode:
   model: inherit
   color: blue
   disallowedTools: ["Edit", "Write", "NotebookEdit"]
+opencodev1:
+  mode: all
+  permission:
+    edit: deny
 ---
 
 You are an independent code reviewer. You did not write this code and you have no stake in it: judge only from the repository, the diff, and the checks you run.

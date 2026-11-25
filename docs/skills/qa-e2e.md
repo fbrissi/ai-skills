@@ -9,11 +9,11 @@ Runs BDD scenarios end to end against a running test environment, in a real brow
 | Input | Values | Default |
 | --- | --- | --- |
 | Scope | feature files, tags (`@smoke`, `@p1`), a capability, a branch, or `all` | scenarios covering the current branch, otherwise `@smoke` |
-| Environment | `local`, or a staging or preview URL you name | `local` |
+| Environment | `local`, a staging or preview URL you name, or `ci` | `local` (`ci` when `CI=true`) |
 | Profile | path | `docs/ai/qa-e2e.md` |
 | Focus | free text (e.g. "mobile only") | none |
 
-Start the profile from [`references/profile-template.md`](../../.rulesync/skills/qa-e2e/references/profile-template.md): URLs, start and reset commands, scenarios folder, test account source, mail catcher, payment and CAPTCHA test modes, viewports, report folder, known console noise.
+Start the profile from [`references/profile-template.md`](../../.rulesync/skills/qa-e2e/references/profile-template.md): URLs, start and reset commands, CI setup command and browser tool, scenarios folder, test account source, mail catcher, payment and CAPTCHA test modes, viewports, report folder, known console noise.
 
 ## Examples
 
@@ -30,6 +30,8 @@ Start the profile from [`references/profile-template.md`](../../.rulesync/skills
 3. Switches to the mobile viewport (default 375x812) on each distinct screen, `@mobile` scenario, and changed screen, and checks layout, overflow, touch targets, keyboard and focus, contrast, and loading, empty, and error states.
 4. Optionally runs one short exploratory charter on the riskiest change.
 5. Writes `docs/qa/reports/<date>-<scope>.md` with a pass/fail summary, findings (steps, expected vs actual, viewport, severity, screenshot, scenario reference), and the verdict.
+
+In CI it runs the profile's `CI setup` command (or the caller's) to install the browsers (Playwright, or Selenium) and start the stack. It tests only what the task changed (the scenarios covering the diff plus the `@smoke` scenarios of the touched areas) and writes scenarios for new behavior first. Without a setup command, or when the environment does not come up, it runs targeted validation: focused tests for the changed behavior (written when the caller allows it, otherwise reported as gaps), the app or API started headless to exercise the changed endpoints or commands, and the framework's smoke checks, with an APPROVED or CHANGES REQUIRED verdict from that evidence.
 
 Safety: test environments and test credentials only, no production writes, no real payments, no CAPTCHA bypass (uses the provider's test keys). It reports; it does not fix code.
 

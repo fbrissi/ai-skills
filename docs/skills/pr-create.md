@@ -11,6 +11,7 @@ Opens a pull request for the current branch from its committed work. It pushes t
 | Base | branch name | the remote default branch |
 | Ticket | reference/URL, `auto` (create one), `skip` | detect from commits/branch, otherwise ask |
 | Draft | "as draft" | ready for review |
+| Assignee | a login | you, when the identity is a person; none with a GitHub App or bot token |
 | Guidance | free text for the description | none |
 
 ## Examples

@@ -11,7 +11,7 @@ description: >-
 ## Inputs
 
 - **File**: a path to a markdown checklist. Default: `TODO.md` at the repo root.
-- **Approval**: `per-item` (default) asks before implementing each item; `once` asks once for the whole batch of plans; `auto` asks never. Use `auto` only when the user explicitly says not to ask.
+- **Approval**: `per-item` (default) asks before implementing each item; `once` asks once for the whole batch of plans; `auto` asks never. Use `auto` only when the user explicitly says not to ask. In a non-interactive run (CI, or a caller that says so) a mode other than `auto` never waits: stop before implementing, with the plans in the output, as [references/non-interactive.md](references/non-interactive.md) says.
 - **Limit**: optional maximum number of items for this run.
 - **Guidance**: any remaining text sets constraints and validation expectations.
 

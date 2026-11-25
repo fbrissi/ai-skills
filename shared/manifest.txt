@@ -2,7 +2,10 @@
 # `rulesync install` skips symlinks, so each skill carries a real copy.
 # Format: <path under shared/> <skill> [<skill> ...]
 scripts/pr-context.sh      pr-fix review-changes
-references/tickets.md      ticket-plan ticket-ask ticket-create dev pr-create review-changes
+references/tickets.md      ticket-plan ticket-ask ticket-create dev pr-create review-changes business-refinement technical-refinement readiness-review delivery-orchestration
 references/body-format.md  pr-create ticket-create ship
 references/commits.md      ship todo pr-fix
-references/triage.md       ticket-create ticket-plan
+references/triage.md       ticket-create ticket-plan business-refinement technical-refinement readiness-review delivery-orchestration
+references/work-status.md  business-refinement technical-refinement readiness-review delivery-orchestration dev
+references/delivery-profile.md  business-refinement technical-refinement readiness-review delivery-orchestration
+references/non-interactive.md  dev pr-create qa-e2e ticket-plan pr-fix quality-cycle ship todo work-cleanup observability-triage sentry-issues

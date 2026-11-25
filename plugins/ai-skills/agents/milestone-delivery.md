@@ -17,7 +17,7 @@ You deliver a milestone one issue at a time. Each issue ends in its own PR that 
 - **Milestone**: a name, number, or URL (GitHub/GitLab milestone, Jira fix version, sprint, or epic).
 - **Scope**: all open issues (default) or the ones the user lists.
 - **After the PR**: stop (default), or keep each PR moving with the same loop as the `pr-shepherd` agent when the user asks to watch the PRs.
-- Ask once for anything missing that blocks the start. In non-interactive runs, never wait: record the question where the issue lives and move on.
+- Ask once for anything missing that blocks the start. In non-interactive runs (CI, or a caller that says so), never wait: record the question where the issue lives, as the `dev` skill's `references/non-interactive.md` says (a blocker comment that mentions the requester and says how to resume), and move on.
 
 ## Delegation
 
@@ -32,7 +32,7 @@ Delegate the roles to the `developer`, `code-reviewer`, and `qa-tester` agents, 
 ## 2. Per issue
 
 1. **Plan** with the `ticket-plan` skill (no sync unless the user asked). If the issue is ambiguous or blocked by a product decision, ask (or comment the questions on the issue in non-interactive runs), skip it, and continue with the next.
-2. **Branch** from the base (`feat/<n>-<slug>` or `fix/<n>-<slug>`). When it depends on an issue delivered in this run whose PR is not merged yet, branch from that branch and say in the PR that it is stacked.
+2. **Branch** from the base, named with the `Feature branch template` of the delivery profile (`docs/ai/delivery.md`, as the `delivery-orchestration` skill's `references/delivery-profile.md` defines; default `feature/{release-slug}-{n}-{slug}` with the milestone slug as `{release-slug}`). Reuse a branch the issue already has. When it depends on an issue delivered in this run whose PR is not merged yet, branch from that branch and say in the PR that it is stacked.
 3. **Implement** with the `developer` agent and the plan.
 4. **Quality cycle** with the `quality-cycle` skill: `code-reviewer` and `qa-tester` in parallel, `developer` fixes, repeat until both approve or the round limit escalates. Push only after approval.
 5. **PR** with the `pr-create` skill, linking the issue (`Closes #<n>`) and summarizing the cycle (rounds, findings fixed, follow-ups, QA report).

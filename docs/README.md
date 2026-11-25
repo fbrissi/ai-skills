@@ -17,10 +17,15 @@
 | Orchestration | [`ship`](skills/ship.md) | Branch → commit → push → PR | Branch, commit, push, PR |
 | Orchestration | [`todo`](skills/todo.md) | Works through a checklist file item by item with approval and commits | Code edits, commits |
 | Orchestration | [`work-cleanup`](skills/work-cleanup.md) | Removes leftover branches and worktrees of finished work after an itemized confirmation | Deletes confirmed branches and worktrees |
+| Delivery | [`business-refinement`](skills/business-refinement.md) | Source ticket to a milestone with business issues, or questions on the source | Milestone, issues, labels, source comment |
+| Delivery | [`technical-refinement`](skills/technical-refinement.md) | Technical plan per issue and a cross-issue pass for safe parallel work | Issue plans, dependencies, labels |
+| Delivery | [`readiness-review`](skills/readiness-review.md) | Ready, or back to business or technical refinement, with a reason | Labels, one comment per issue |
+| Delivery | [`delivery-orchestration`](skills/delivery-orchestration.md) | Milestone and task branches, starts unblocked issues up to a limit, opens the milestone PR | Branches, labels, workflow dispatches, PR |
 | Quality | [`bdd-scenarios`](skills/bdd-scenarios.md) | Maps features and writes Gherkin scenarios with roles, tags, and a coverage matrix | Writes feature files |
 | Quality | [`qa-e2e`](skills/qa-e2e.md) | Runs BDD scenarios in a real browser at desktop and mobile viewports; APPROVED or CHANGES REQUIRED | Writes a QA report |
 | Quality | [`quality-cycle`](skills/quality-cycle.md) | Review + QA → fixes → re-review and re-test until both approve or a round limit | Local commits, cycle log; push once |
 | Operations | [`observability-triage`](skills/observability-triage.md) | Traces a production error from an observability tool to its root cause, with confidence and a recommendation | None |
+| Operations | [`sentry-issues`](skills/sentry-issues.md) | Lists unresolved Sentry issues with the project's filters, reads stack traces, and writes deduplicated tracker issue bodies; resolves after merge when allowed | Sentry status only on `resolve` |
 | Operations | [`merge-risk`](skills/merge-risk.md) | Rates a PR's production risk 1-5 and decides MERGE or HOLD; merges only when allowed | PR comment, merge when allowed |
 | Brazil | [`inpi-trademark-watch`](skills/inpi-trademark-watch.md) | Analyzes an INPI RPI issue for a watched trademark: actions and deadlines | Writes an issue body file |
 | Brazil | [`nfse-technical-note-analysis`](skills/nfse-technical-note-analysis.md) | Maps an NFS-e Nacional technical note to code changes and a rollout plan | Writes an issue body file |
@@ -40,17 +45,25 @@ bdd-scenarios ──► qa-e2e ──┐
 review-changes ────────────┘
 
 observability-triage ──► dev ──► quality-cycle ──► pr-create ──► pr-fix (loop) ──► merge-risk
+
+sentry-issues ──► tracker issues ──► observability-triage ──► dev ──► quality-cycle ──► pr-create (issue-resolver)
+
+business-refinement ──► technical-refinement ──► readiness-review ──► delivery-orchestration ──► dev ──► quality-cycle ──► pr-create
 ```
+
+The delivery skills, their agents, statuses, and CI use are described once in [delivery-flow.md](delivery-flow.md).
 
 The Brazil and Media skills stand alone and read a project profile.
 
 ## Agents
 
-Claude Code agents that combine these skills (review, QA, and developer roles, plus milestone, PR, incident, INPI, and NFS-e orchestrators) ship as a Claude Code plugin. See [claude-code-agents.md](claude-code-agents.md).
+Claude Code agents that combine these skills (review, QA, and developer roles, the delivery flow roles, plus milestone, PR, incident, INPI, and NFS-e orchestrators) ship as a Claude Code plugin and as OpenCode agents. See [claude-code-agents.md](claude-code-agents.md).
 
 ## Project profiles
 
-Domain skills keep the method in the skill and the project's specifics in a profile: a Markdown file in your repository, by default `docs/ai/<skill>.md`. Pass another path in the request ("profile docs/x.md") to override it. Each of these skills ships `references/profile-template.md` to start from; without a profile, the skill asks for the missing values (or fails clearly in automation).
+Domain skills keep the method in the skill and the project's specifics in a profile: a Markdown file in your repository, by default `docs/ai/<skill>.md`. Pass another path in the request ("profile docs/x.md") to override it. Each of these skills ships `references/profile-template.md` to start from (the delivery skills share `references/delivery-profile.md`); without a profile, the skill asks for the missing values (or fails clearly in automation).
+
+In CI (`CI` or `GITHUB_ACTIONS` set), or when a caller says so, no skill asks or waits: each question point uses its non-interactive default or posts one blocker comment on the issue or PR, mentioning the requester and saying how to resume (reply `/ai-resume`, optionally with instructions, where the resume workflow runs), and stops. The rule is the shared [`non-interactive.md`](../shared/references/non-interactive.md) reference.
 
 | Skill | Profile holds |
 | --- | --- |
@@ -59,8 +72,10 @@ Domain skills keep the method in the skill and the project's specifics in a prof
 | `bdd-scenarios` | features folder, step language, source paths, roles and tags, test data sources, mail catcher, sandboxes |
 | `qa-e2e` | URLs, start and reset commands, scenarios folder, test account source, mail catcher, test modes, viewports, report folder |
 | `quality-cycle` | round limit, base branch, cycle log folder, checks, triage policy, follow-up tracker, shipping preference |
-| `observability-triage` | provider and access, project and environment, release mapping, code map and owners, known noise, `incident-responder` automation |
-| `merge-risk` | auto-merge, max risk, base branch, merge method, required human approvals, hold labels, path floors |
+| `observability-triage` | provider and access, project and environment, release mapping, code map and owners, known noise |
+| `sentry-issues` | organization, projects, environment, period, filters, limit, tracker title and labels, code map, resolve after merge, known noise |
+| `merge-risk` | auto-merge, max risk, base branches and per-base limits, merge method, required human approvals, hold labels, path floors |
+| `business-refinement`, `technical-refinement`, `readiness-review`, `delivery-orchestration` (one shared `docs/ai/delivery.md`) | repository scope and code map, source tracker, milestone template, languages, status labels and Project, triage fields and Size scale, base branch, branch templates, implement workflow, parallel limit, research sources, context |
 | `flow-video-ad` | product name and pronunciation, folders, claim sources, forbidden claims, character, voice, setting, crop, end card, privacy rules |
 
 ## Using the skills per harness
@@ -88,9 +103,10 @@ Every harness also picks a skill **automatically** when your request matches its
 ## Requirements
 
 - `git`. Also `gh` (authenticated) for GitHub PR/issue skills, `glab` for GitLab, and `bash` + `jq` for `scripts/pr-context.sh` (`pr-fix`, `review-changes`) and `scripts/failed-checks.sh` (`pr-checks`). On Windows, run the harness from Git Bash or WSL for those skills.
-- Jira/Linear/other tickets need some access to that tracker: an MCP server or connector, a project or harness tool (for example an OpenCode tool in `.opencode/tools/`), an authenticated CLI, or a public URL. Ticket skills stop without it; `review-changes` continues and notes the missing ticket. See [tickets](../shared/references/tickets.md).
+- Jira/Linear/other tickets need some access to that tracker: an MCP server or connector, a project or harness tool (for example an OpenCode tool in `.opencode/tools/`), an authenticated CLI, the tracker's REST API with credentials already in the environment (for Jira `JIRA_BASE_URL`, `JIRA_EMAIL`, `JIRA_API_TOKEN`), or a public URL. Ticket skills stop without it; `review-changes` continues and notes the missing ticket. See [tickets](../shared/references/tickets.md).
 - `qa-e2e` (and the QA step of `quality-cycle`) needs a browser automation capability in the harness and a running local or staging stack.
 - `observability-triage` needs access to the observability tool (MCP server, CLI, or a token already in the environment).
+- `sentry-issues` needs `SENTRY_AUTH_TOKEN` and `SENTRY_ORG` in the environment (optional `SENTRY_BASE_URL`), and `bash`, `curl`, and `jq` for its script, or a Sentry MCP server.
 - `inpi-trademark-watch` needs Ruby and `unzip` to download RPI issues; `flow-video-ad` needs `ffmpeg` and `whisper-cli` to assemble the video.
 
 ## Background
