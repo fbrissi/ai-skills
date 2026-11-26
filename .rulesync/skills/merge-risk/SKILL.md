@@ -71,9 +71,11 @@ MERGE only when Mode is `decide`, Auto-merge is `on`, every gate passed, and rat
 
 ## 5. Act (`decide` mode)
 
-1. Post one PR comment with the assessment (the Output block plus the evidence lines). Post it for HOLD and for MERGE, so every decision leaves a record.
-2. MERGE: `gh pr merge <pr> --<method> --match-head-commit <headRefOid>` with the profile's method (default `squash`). Never use `--admin`, never bypass branch protection, never force-push. If the merge is refused, report HOLD with the reason.
-3. HOLD: add the profile's hold label if it names one (default none) and list what would allow a merge (for example "add a migration rollback test", "a human approval on the current head").
+1. MERGE: `gh pr merge <pr> --<method> --match-head-commit <headRefOid>` with the profile's method (default `squash`). Never use `--admin`, never bypass branch protection, never force-push. When the merge is refused:
+   - for the PR's state (a check, an approval, a conflict, branch protection, or a new head commit): the result is HOLD with that reason;
+   - for a tooling or access problem (a failing CLI, an API, authentication, or permission error, a rate limit): the result is `NOT EVALUATED` with the reason, as in step 1, and no HOLD is posted.
+2. HOLD: add the profile's hold label if it names one (default none) and list what would allow a merge (for example "add a migration rollback test", "a human approval on the current head").
+3. Post one PR comment with the assessment for MERGE and HOLD (the Output block without its `merge-risk-result:` line, plus the evidence lines), so every decision leaves a record. Post nothing for `NOT EVALUATED`.
 
 ## Output
 
@@ -86,4 +88,4 @@ Merged: <sha | no>   Comment: <url | not posted>
 merge-risk-result: <merged | held | not-evaluated>
 ```
 
-The last line is the machine-readable result for calling workflows: `merged` only when the merge succeeded, `held` for a HOLD decided from the PR's data, `not-evaluated` when step 1 stopped. Print it exactly once, as the final line, in `decide` and `report` mode.
+The last line is the machine-readable result for calling workflows: `merged` only when the merge succeeded, `held` for a HOLD decided from the PR's data (including a merge the PR's state refused), `not-evaluated` when step 1 stopped or the merge failed for a tooling or access reason. Print it exactly once, as the very last line of the run, after the merge attempt and the PR comment, in `decide` and `report` mode. Never put it in the PR comment.

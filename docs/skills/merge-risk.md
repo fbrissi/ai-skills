@@ -42,7 +42,7 @@ Path floors from the profile set minimums. One mitigation verified from the diff
 
 ## Result
 
-The output ends with one machine-readable line, `merge-risk-result: merged | held | not-evaluated`. `held` is a decision about the PR (a failed gate or a rating above the limit). When it cannot load what it needs (a missing or failing `gh`, an API or auth error), it reports `NOT EVALUATED`, posts nothing, and ends with `not-evaluated`, so a calling workflow can hand the PR to a person and decide it again instead of recording a HOLD.
+The run ends, after the merge attempt, with one machine-readable line, `merge-risk-result: merged | held | not-evaluated`, which is never part of the PR comment. `held` is a decision about the PR (a failed gate, a rating above the limit, or a merge the PR's state refused). When it cannot load what it needs, or the merge fails for a tooling or access reason (a missing or failing `gh`, an API, auth, or permission error), it reports `NOT EVALUATED`, posts nothing, and ends with `not-evaluated`, so a calling workflow can hand the PR to a person and decide it again instead of recording a HOLD.
 
 ## Side effects
 
