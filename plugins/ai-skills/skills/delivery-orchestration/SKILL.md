@@ -19,7 +19,7 @@ As orchestrator you never write code, review it, or merge (the release notes of 
 One milestone produces many PRs, so they are stacked for review:
 
 - The milestone branch is the release branch of the [branch model](references/delivery-profile.md) and is created first, from `base-branch`. Every task branch is created from the milestone branch, and every task PR targets the milestone branch. Task PRs follow the repository's PR follow-up and may merge on their own where the repository allows it.
-- One milestone PR, from the milestone branch into `base-branch`, aggregates the task PRs so reviewers see the whole delivery as one combined diff. It is opened as a draft as soon as the milestone branch has a commit ahead of `base-branch`, its body is kept current on every run, and it is marked ready for review when every issue is done. It always needs a human approval; this skill never merges it.
+- One milestone PR, from the milestone branch into `base-branch`, aggregates the task PRs so reviewers see the whole delivery as one combined diff. It is opened as a draft as soon as the milestone branch has a commit ahead of `base-branch`, its body is kept current on every run, and it is marked ready for review when every issue is done and it merges cleanly into `base-branch`. It always needs a human approval; this skill never merges it.
 
 ## Inputs
 
@@ -70,7 +70,8 @@ Use the `pr-create` skill (if it is not installed: `gh pr create --base <base-br
    - Already done (the milestone branch has the section for the version): go to the next sub-step.
    - An open release notes PR exists (head from `release-notes-branch-template`, base the milestone branch): leave the milestone PR in draft and report it as waiting for that PR.
    - Otherwise create the release notes branch from the head of the milestone branch, start `release-notes-file` (and changed version files) from `base-branch` without merging it (the profile's Sync rule), compute the version above every version in the notes, release tags, and other open release branches (a release opened for a bugfix uses its milestone title, the profile's Version rule), write the section at the top and the version files, commit (`docs: add release notes for <version>`), push, and open a PR into the milestone branch with the `pr-create` skill (title `docs: release notes for <version>`, body listing the task PRs it summarizes, assignee `requested-by` when known). It follows the same PR follow-up as the task PRs; its merge runs this skill again. Leave the milestone PR in draft.
-4. **Mark it ready** when every open issue in the milestone is `done` and the release notes are done or `release-notes-file` is unset (`gh pr ready <n>`), request review from `requested-by` when known (`gh pr edit <n> --add-reviewer <login>`), and comment once mentioning them that the milestone is ready for review. Never merge it, and never change its review requirements: it always needs a human approval.
+4. **Check that it merges cleanly**, only once every open issue in the milestone is `done` and the release notes are done or `release-notes-file` is unset: fetch both branches (`git fetch origin <base-branch> <milestone-branch>`) and read `gh pr view <n> --json mergeable,mergeStateStatus` (while it is `UNKNOWN`, GitHub is still computing it: wait a few seconds and read it again, up to about a minute). When it is `CONFLICTING`, list the conflicting files with `git merge-tree --write-tree --name-only origin/<base-branch> origin/<milestone-branch>` (git 2.38 or newer; exit code 1 means conflicts were found, not a failed command: the names follow the tree id) or a local `git merge --no-commit --no-ff` that you abort afterwards, and never push a merge. Leave the PR in draft and stop with a blocker (stop-point format, stage `orchestrate`) on the milestone PR that names the files and asks a person to bring `base-branch` into the milestone branch and resolve them; for a conflict only in `release-notes-file`, tell them to keep the milestone branch's version of that file plus any newer base sections. Never resolve it yourself: the merge may carry workflow files the run cannot push. When it is still `UNKNOWN` after waiting, leave the PR in draft and report it, so the next run checks again. When it is mergeable, go on.
+5. **Mark it ready** when the check above found it mergeable (`gh pr ready <n>`), request review from `requested-by` when known (`gh pr edit <n> --add-reviewer <login>`), and comment once mentioning them that the milestone is ready for review. Never merge it, and never change its review requirements: it always needs a human approval.
 
 Issues that are blocked, still in refinement, or waiting for review, and release notes not merged yet, keep the PR in draft; list them in the report.
 
@@ -88,7 +89,7 @@ Milestone branch: <branch> (<created | existing>)   Base: <base-branch>
 Started: <n> (<free slots> free of <max-parallel>)   Done: <n>/<total>
 Waiting: <issue: reason>
 Release notes: <version>: <merged | PR <url> | not needed>
-Milestone PR: <url> (<draft | ready for review | merged, milestone closed> | not yet: reason)
+Milestone PR: <url> (<draft | ready for review | merged, milestone closed> | not yet: reason) (mergeable: <yes | conflicting: files | unknown>)
 Blocked:
 - #<issue> <state>: <summary> | questions: <comment URL>
 ```
