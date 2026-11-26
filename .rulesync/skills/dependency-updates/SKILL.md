@@ -43,7 +43,7 @@ For each package, in order of risk (majors, then framework and runtime packages,
 1. Read the release notes or changelog of every version between from and to, and the upgrade guide for a major: the bot PR's notes, the package repository's releases and `CHANGELOG`, then the registry page.
 2. List the breaking changes, removed or renamed APIs, new minimum runtime versions, changed defaults, and deprecations, and keep only the ones that apply to this repository.
 3. Search the code, configuration, and build files for each one (`git grep` on the API, option, class, or config key names) and note every place to change.
-4. Decide: **adopt** (with the changes it needs) or **hold**. Hold a package when its new version needs a runtime or platform change outside the repository, a product decision, a migration of production data, or a change too large to review with the others; say why in one line. A security fix is never held for convenience: hold it only with a reason a person must see, and flag it in the PR.
+4. Decide: **adopt** (with the changes it needs) or **hold**. Hold a package when its new version needs a runtime or platform change outside the repository, a product decision, a migration of production data, a change the run cannot push (for example workflow files without the permission to change them), or a change too large to review with the others; say why in one line. A security fix is never held for convenience: hold it only with a reason a person must see, and flag it in the PR.
 
 ## 4. Apply
 
