@@ -143,7 +143,7 @@ The branch model has four kinds of branch, named by templates in the profile (de
 | release | `Release branch template` (`release/{slug}`) | default branch | default branch |
 | feature | `Feature branch template` (`feature/{release-slug}-{n}-{slug}`) | its release branch | that release branch |
 | hotfix | `Hotfix branch template` (`hotfix/{slug}`) | default branch | default branch |
-| bugfix | `Bugfix branch template` (`bugfix/{slug}`) | default branch | the open release branch (`Bugfix release branch`, else the oldest open one; with none, a handoff asks which) |
+| bugfix | `Bugfix branch template` (`bugfix/{slug}`) | its target, the open release branch (so the PR carries only the fix, not the default branch's newer changes) | the open release branch (`Bugfix release branch`, else the oldest open one; with none, a handoff asks which) |
 
 ```mermaid
 gitGraph
@@ -159,6 +159,7 @@ gitGraph
   commit id: "urgent fix"
   checkout main
   merge hotfix/checkout-crash id: "hotfix PR"
+  checkout release/orders
   branch bugfix/wrong-total
   commit id: "non-urgent fix"
   checkout release/orders
@@ -237,7 +238,7 @@ Configure it in the profile's `## Issue resolution` section and the `sentry-issu
 Dependency bumps follow the issue resolution branch model, with the [`dependency-updater`](claude-code-agents.md#dependency-updater) agent and one run instead of intake plus resolve:
 
 1. **Update** (a weekly schedule after the dependency bots run, for example Monday 12:00 UTC for bots that run at 09:00) follows [`dependency-updates`](skills/dependency-updates.md): it collects the open Dependabot or Renovate PRs into the base branch (and outdated packages when the profile asks) and the open advisories, reads each package's release notes and upgrade guide, adapts the code, holds back what is unsafe, and runs the checks and the review and QA cycle.
-2. **Route.** Urgent updates (a high or critical security advisory on the version in use, or a bot PR or issue a person labeled with the `Hotfix label`; a new major alone is not urgent) go to `hotfix/dependency-updates-<date>`, PR into the base branch with its release section. The rest go to `bugfix/dependency-updates-<date>`, PR into the bugfix target (`Bugfix release branch`, else the oldest open release branch), with no release section. With no release branch to target there is no blocker: the non-urgent updates wait for a later run and the report says since when. A repository without release branches sets `Bugfix release branch: base`.
+2. **Route.** Urgent updates (a high or critical security advisory on the version in use, or a bot PR or issue a person labeled with the `Hotfix label`; a new major alone is not urgent) go to `hotfix/dependency-updates-<date>`, PR into the base branch with its release section. The rest go to `bugfix/dependency-updates-<date>`, branched from and PR'd into the bugfix target (`Bugfix release branch`, else the oldest open release branch), with no release section. Updates the target already has (for example from an earlier bugfix PR while the bot PRs into the base branch stay open) are skipped, not redone. With no release branch to target there is no blocker: the non-urgent updates wait for a later run and the report says since when. A repository without release branches sets `Bugfix release branch: base`.
 3. **Follow-up** is the usual PR follow-up for `hotfix/` and `bugfix/` branches: `pr-fix` on review and CI events, then the merge decision, with a human approval for a PR into the default branch. Each PR lists `Supersedes #<n>` for the bot PRs it covers; a later run updates the open PR of its kind. The bots close their own PRs once the updates reach the base branch; the flow never closes or merges them.
 
 ```mermaid

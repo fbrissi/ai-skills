@@ -34,6 +34,8 @@ gh pr diff <pr>
 
 Read the diff by file; for large diffs, read the files the rubric cares about first. For GitLab use `glab mr view <mr>` and `glab ci status`.
 
+**Not evaluated.** When you cannot read what the gates and the rating need (a missing or failing CLI, an authentication or API error, a PR, diff, checks, or reviews you cannot load), stop here: do not rate, do not post a HOLD, add no label, and report `NOT EVALUATED` with the reason in one line. HOLD is a decision about the PR (a failed gate or a rating above the limit) made from data you read, never a tooling problem. A calling workflow hands a not-evaluated PR to a person and decides it again later.
+
 ## 2. Gates
 
 Every gate must pass for MERGE. A failed gate means HOLD, whatever the rating.
@@ -64,7 +66,7 @@ Write one line of evidence per factor (`path:line` or check name). If you cannot
 
 ## 4. Decide
 
-MERGE only when Mode is `decide`, Auto-merge is `on`, every gate passed, and rating ≤ Max risk for the PR's base. Otherwise HOLD.
+MERGE only when Mode is `decide`, Auto-merge is `on`, every gate passed, and rating ≤ Max risk for the PR's base. Otherwise HOLD (unless step 1 stopped with `NOT EVALUATED`).
 
 ## 5. Act (`decide` mode)
 
@@ -75,9 +77,12 @@ MERGE only when Mode is `decide`, Auto-merge is `on`, every gate passed, and rat
 ## Output
 
 ```text
-PR #<n>: <MERGE | HOLD> (risk <r>/5, max <m>, auto-merge <on|off>)
-Gates: <all passed | failed: list>
+PR #<n>: <MERGE | HOLD | NOT EVALUATED> (risk <r>/5 | not rated, max <m>, auto-merge <on|off>)
+Gates: <all passed | failed: list | not evaluated: reason>
 Factors: <highest factors with evidence>
 Mitigations: <applied or none>
 Merged: <sha | no>   Comment: <url | not posted>
+merge-risk-result: <merged | held | not-evaluated>
 ```
+
+The last line is the machine-readable result for calling workflows: `merged` only when the merge succeeded, `held` for a HOLD decided from the PR's data, `not-evaluated` when step 1 stopped. Print it exactly once, as the final line, in `decide` and `report` mode.
