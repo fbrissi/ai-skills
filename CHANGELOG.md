@@ -13,6 +13,7 @@ Release order: this release first, then `fbrissi/github-actions` (its `dependenc
 - New delivery profile key `Open release for bugfixes` (default `yes`): `no` keeps the previous behaviour. Set it where `delivery-orchestration` does not run (no orchestrate workflow, or an orchestrate-on-merge workflow that ignores `bugfix/` PRs).
 - `delivery-orchestration` completing a milestone closes only the issues that are done or whose PR merged into the milestone branch; the others stay open and are reported.
 - `dependency-updates` now carries copies of `delivery-profile.md` and `work-status.md`.
+- `next-*` release versions compare by semantic-version precedence, ignore tags with a path prefix (`app-name/v1.2.3`), and keep a pre-release form, incrementing its last numeric identifier (`v0.1.0-beta.2.2.14` -> `v0.1.0-beta.2.2.15`).
 
 ## v0.9.0
 
