@@ -3,6 +3,20 @@
 All notable changes to this project are documented here. Release versions follow
 [Semantic Versioning](https://semver.org/).
 
+## v0.9.0
+
+Release order: this release first, then `fbrissi/github-actions` (which reads the new `merge-risk-result:` line and defaults `ai-skills-ref` to `v0.9.0`), then wrappers that call it.
+
+### Changed
+
+- `merge-risk` reports `NOT EVALUATED` when it cannot read what the gates and the rating need (a missing or failing CLI, an API or authentication error, a PR or diff it cannot load): it rates nothing, posts no HOLD comment or label, and says why; a merge refused for a tooling or access reason is `NOT EVALUATED` too, while one refused for the PR's state is a HOLD. Its output ends, after the merge attempt and outside the PR comment, with one machine-readable line, `merge-risk-result: merged | held | not-evaluated`, so a calling workflow can tell a real decision from a tooling failure. Before, a tooling failure was posted as a HOLD that the workflow recorded as the decision for that commit.
+- Release notes (`delivery-profile.md`, `delivery-orchestration`): the release notes branch starts the notes file (and changed version files) from the base branch's copy instead of the release branch's, without merging the base branch (that would also bring `.github/workflows/**` changes the agent's token cannot push). Sections added to the base branch after the release branch was cut are kept, the new section goes at the top, and the release PR into the base branch does not conflict in that file, whether it merges with a merge commit or a squash; other base branch changes are not brought in by the notes PR. `next-patch`, `next-minor`, and `next-major` now increment the highest version already taken: the notes on the base branch, the release tags, and other open release branches, so a release never gets a version at or below an existing tag.
+- Bugfix branches (`delivery-profile.md`, `dependency-updates`, `issue-resolver`, `docs/delivery-flow.md`) are created from their target release branch instead of the base branch, so a bugfix PR into `release/*` carries only the fix and is validated on the release; a reused dependency-update branch merges its target when behind.
+
+### Fixed
+
+- `dependency-updates` skips an update the target branch already has in its manifest and lockfile (for example from an earlier bugfix PR merged into the release while the bot PRs into the base branch stay open), so the next weekly run does not redo it.
+
 ## v0.8.1
 
 Release order: this release first, then `fbrissi/github-actions`, whose default `ai-skills-ref` moves to `v0.8.1`.

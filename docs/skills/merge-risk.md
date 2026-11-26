@@ -40,6 +40,10 @@ With 0 required approvals for the base, an empty review decision passes and only
 
 Path floors from the profile set minimums. One mitigation verified from the diff or CI (flag off by default in the code, homologation-only path, a passing staging check or deployment on the head commit) lowers the rating by one, never below a floor; claims made only in the PR text do not count. Untested behavior changes add one.
 
+## Result
+
+The run ends, after the merge attempt, with one machine-readable line, `merge-risk-result: merged | held | not-evaluated`, which is never part of the PR comment. `held` is a decision about the PR (a failed gate, a rating above the limit, or a merge the PR's state refused). When it cannot load what it needs, or the merge fails for a tooling or access reason (a missing or failing `gh`, an API, auth, or permission error), it reports `NOT EVALUATED`, posts nothing, and ends with `not-evaluated`, so a calling workflow can hand the PR to a person and decide it again instead of recording a HOLD.
+
 ## Side effects
 
 `report`: none. `decide`: a PR comment, an optional hold label, and the merge itself when allowed. It never uses admin merges or bypasses branch protection.
