@@ -3,6 +3,18 @@
 All notable changes to this project are documented here. Release versions follow
 [Semantic Versioning](https://semver.org/).
 
+## v0.10.0
+
+Release order: this release first, then `fbrissi/github-actions` (its `dependency-update` prompt rule and the orchestrate-on-merge example, which must also accept `bugfix/` PRs into release branches), then wrappers that call it.
+
+### Changed
+
+- Bugfixes with no release branch to target open one instead of waiting or blocking (`delivery-profile.md` `Opening a release for a bugfix`, `dependency-updates`, `dependency-updater`, `issue-resolver`, `delivery-orchestration`, `docs/delivery-flow.md`). When `Bugfix release branch` is unset (not `base`) and no release branch is open, the flow computes the next version with the release notes rule (`Release version`'s increment, else the next patch), creates a milestone named after it (with `<!-- ai-delivery auto-release -->` and the `requested-by` marker), creates its release branch from the base branch with `Release branch template` exactly as orchestration names it, and puts a tracking issue in the milestone (`issue-resolver`: the resolved issue; `dependency-updates`: `Dependency updates <date>` listing the packages), `in-progress` then `in-review`. The bugfix PR into the release branch carries `Closes #<issue>` and the milestone, so `delivery-orchestration`, re-run when it merges, marks the issue done, opens the draft milestone PR, writes the release notes, and marks the milestone PR ready for a human. Only one such release is open at a time: later bugfixes target it and add their own tracking issues. When the release branch cannot be created (for example a ruleset refuses the ref), dependency updates wait for a later run and issue resolution posts a blocker, as before, saying why; a concurrent run that already created the milestone or branch is reused instead. A release whose milestone PR is ready for review takes no more bugfixes (the next one opens a new release), and its release notes use the milestone's version instead of recomputing it.
+- New delivery profile key `Open release for bugfixes` (default `yes`): `no` keeps the previous behaviour. Set it where `delivery-orchestration` does not run (no orchestrate workflow, or an orchestrate-on-merge workflow that ignores `bugfix/` PRs).
+- `delivery-orchestration` completing a milestone closes only the issues that are done or whose PR merged into the milestone branch; the others stay open and are reported.
+- `dependency-updates` now carries copies of `delivery-profile.md` and `work-status.md`.
+- `next-*` release versions compare by semantic-version precedence, ignore tags with a path prefix (`app-name/v1.2.3`), keep a pre-release form, incrementing its last numeric identifier (`v0.1.0-beta.2.2.14` -> `v0.1.0-beta.2.2.15`), and take the newest tagged `release-notes-file` section as the current version line, ignoring tags created before that tag (an earlier, restarted numbering).
+
 ## v0.9.0
 
 Release order: this release first, then `fbrissi/github-actions` (which reads the new `merge-risk-result:` line and defaults `ai-skills-ref` to `v0.9.0`), then wrappers that call it.
