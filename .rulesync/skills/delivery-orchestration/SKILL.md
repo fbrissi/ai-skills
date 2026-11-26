@@ -42,7 +42,7 @@ Stop with `Unable to orchestrate: missing milestone` if there is none.
 
 ## 2. Update done
 
-With [references/work-status.md](references/work-status.md), move an issue to `done` when its task PR is merged into the milestone branch. This is the only move out of `in-review` this skill makes. Task PRs do not close their issues (they do not target the default branch); the milestone PR does.
+With [references/work-status.md](references/work-status.md), move an issue to `done` when its task PR is merged into the milestone branch. This is the only move out of `in-review` this skill makes; it also moves the issue a tracking issue's `Fix for #<n>` line names (a release opened for a bugfix, see the profile) to `done`. Task PRs do not close their issues (they do not target the default branch); the milestone PR does.
 
 ## 3. Build the graph
 
@@ -78,7 +78,7 @@ Issues that are blocked, still in refinement, or waiting for review, and release
 
 ## 6. Complete the milestone
 
-When the milestone PR is merged: move every issue of the milestone that is not `done` and not closed as not planned to `done`, close any of them still open (`gh issue close <n> --comment "Delivered in #<milestone PR>"`), and close the milestone (`gh api -X PATCH repos/{owner}/{repo}/milestones/<number> -f state=closed`). Start nothing new.
+When the milestone PR is merged: move every issue of the milestone that is not `done` and not closed as not planned to `done`, close any of them still open (`gh issue close <n> --comment "Delivered in #<milestone PR>"`) along with the issues their `Fix for #<n>` lines name, and close the milestone (`gh api -X PATCH repos/{owner}/{repo}/milestones/<number> -f state=closed`). Start nothing new.
 
 ## Output
 
