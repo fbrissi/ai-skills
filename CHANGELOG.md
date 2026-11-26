@@ -3,6 +3,12 @@
 All notable changes to this project are documented here. Release versions follow
 [Semantic Versioning](https://semver.org/).
 
+## v0.10.1
+
+### Fixed
+
+- `delivery-orchestration` checks that the milestone PR merges cleanly into the base branch before marking it ready (`gh pr view --json mergeable`). On a conflict (for example `CHANGELOG.md` when the base got a release after the milestone branch was cut) it leaves the PR in draft and stops with a blocker naming the conflicting files for a person to resolve, instead of marking a conflicting PR ready. The output reports the mergeable state.
+
 ## v0.10.0
 
 Release order: this release first, then `fbrissi/github-actions` (its `dependency-update` prompt rule and the orchestrate-on-merge example, which must also accept `bugfix/` PRs into release branches), then wrappers that call it.
