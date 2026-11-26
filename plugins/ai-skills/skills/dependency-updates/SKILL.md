@@ -64,7 +64,7 @@ When the repository's rules (its guide files, or the delivery profile's `## Rele
 
 ## 7. Pull request
 
-Open it with the `pr-create` skill (base from step 1, ticket `skip`, assignee `requested-by` when known, labels from the profile, default `dependencies`). If it is not installed: `git push -u origin <branch>` and `gh pr create --base <base> --title <title> --body-file <file>`. On a reused PR, push and replace its body (`gh pr edit <n> --body-file <file>`).
+Open it with the `pr-create` skill (base from step 1, ticket `skip`, assignee `requested-by` when known, labels from the profile, default `dependencies`, each created once if the repository lacks it). If it is not installed: `git push -u origin <branch>` and `gh pr create --base <base> --title <title> --body-file <file>`. On a reused PR, push and replace its body (`gh pr edit <n> --body-file <file>`).
 
 Title: `chore: update dependencies <date>`. The body's first line is `<!-- ai-dependency-updates -->`, then:
 
