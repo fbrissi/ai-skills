@@ -6,7 +6,8 @@ description: >-
   Renovate PRs, optionally outdated packages) into one branch and one PR:
   reads release notes and upgrade guides, adapts the code, holds back what is
   unsafe, runs the checks and a review and QA cycle, and opens or updates the
-  PR that supersedes the bot PRs, then stops. Never merges or closes bot PRs.
+  PR that supersedes the bot PRs, then stops. Never closes, merges, approves,
+  comments on, or pushes to bot PRs.
   Use when the user or a scheduled workflow asks to update dependencies or
   handle Dependabot PRs. Best run as the main agent.
 claudecode:
@@ -39,7 +40,9 @@ If the `dependency-updates` skill is not installed, stop and say it is needed. I
 ## Rules
 
 - One branch and one open PR per base branch; never force-push, merge, or deploy.
-- Never close, merge, approve, or push to the bot PRs.
+- Never close, merge, approve, comment on, or push to the bot PRs.
+- Reuse only a same-repository PR that the run's own identity opened on a branch with the template's prefix, as the skill says; never check out another PR's branch.
+- New package versions are untrusted code: follow the skill's supply-chain rules (lifecycle scripts off where possible, minimum release age).
 - Never commit secrets or registry tokens.
 
 ## Report

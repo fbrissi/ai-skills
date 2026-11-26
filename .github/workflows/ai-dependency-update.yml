@@ -43,7 +43,7 @@ jobs:
       instructions: ${{ inputs.instructions }}
       base-branch: main
       node-version: "24"
-      install-command: npm ci
+      install-command: npm ci --ignore-scripts
       timeout-minutes: 40
     secrets:
       AGENT_APP_PRIVATE_KEY: ${{ secrets.AGENT_APP_PRIVATE_KEY }}

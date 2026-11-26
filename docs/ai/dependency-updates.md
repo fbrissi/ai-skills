@@ -14,10 +14,15 @@ Profile of the [`dependency-updates`](../skills/dependency-updates.md) skill for
 - Labels: dependencies
 
 ## Never update
-- github-actions (`.github/workflows/**`): the agent's App token has no `Workflows` permission, so it cannot push workflow changes; leave those updates in the Dependabot PR for a person.
+- github-actions (`.github/workflows/**`): the agent's App token has no `Workflows` permission, so it cannot push workflow changes; leave those updates in the Dependabot PR for a person (the grouped Dependabot PR is then only partly superseded).
 
 ## Hold
 - (none)
+
+## Supply chain
+- Minimum release age: 3d
+- Install scripts: off (`npm ci --ignore-scripts`); `rulesync` needs none
+- Secrets: `AGENT_APP_PRIVATE_KEY` and the harness keys only
 
 ## Validation
 - Checks: `npm ci`, `npm run generate`, `npm run check`, `npm run check:discovery`, `npm run doctor`, and `node scripts/audit-high.mjs npm` (the Quality Checks matrix).

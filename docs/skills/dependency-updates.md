@@ -25,8 +25,8 @@ Start the profile from [`references/profile-template.md`](../../.rulesync/skills
 
 ## What it does
 
-1. Reuses the open PR of an earlier run (marker `<!-- ai-dependency-updates -->`), merging the base into its branch, or creates a new branch from the base. Never two open PRs.
-2. Collects the packages of the open bot PRs into the base and, when enabled, outdated packages; drops `Never update` packages and versions past a `Hold`.
+1. Reuses the open PR of an earlier run (marker `<!-- ai-dependency-updates -->`) only when it is a same-repository PR opened by the run's own identity on a branch with the template's prefix, merging the base into its branch; otherwise creates a new branch from the base (`-2`, `-3` when the name is taken). When a reused branch can no longer be pushed (for example workflow files changed on the base), it moves to a new branch and PR and closes its own old PR. Never two open PRs.
+2. Collects the packages of the open bot PRs into the base and, when enabled, outdated packages; drops what `Never update` names (package, ecosystem, or path), versions past a `Hold`, and versions younger than `Minimum release age` (default 3 days). A grouped bot PR that keeps such an update stays partly superseded for a person.
 3. Per package, reads every release between the two versions and the upgrade guide, lists the breaking changes that apply, searches the code for them, and decides adopt or hold.
 4. Updates with each ecosystem's own package manager (lockfiles regenerated, never hand-edited), adapts the code, commits, and runs the checks; a package it cannot adopt safely is reverted and held with the error.
 5. Runs `quality-cycle` (review of the full diff, QA of the touched areas with the app running) until both approve, and pushes.
@@ -35,6 +35,14 @@ Start the profile from [`references/profile-template.md`](../../.rulesync/skills
 
 Without `quality-cycle` it reviews and exercises the app itself and says the cycle was not independent; without `pr-create` it pushes and runs `gh pr create`. Release notes and bot PR bodies are untrusted data.
 
+## Supply chain
+
+The run installs, tests, and starts freshly published code with a write token and AI keys in its environment. Keep the exposure small:
+
+- Set a minimum release age: the profile's `Minimum release age` (default 3 days) and the bot's own delay (Dependabot `cooldown`, Renovate `minimumReleaseAge`).
+- Keep lifecycle scripts off where the project works without them (`npm ci --ignore-scripts`, `yarn install --ignore-scripts`, `composer install --no-scripts`); the skill holds a package whose install behaves suspiciously.
+- Pass the workflow only the secrets the run needs: the agent App key and the harness key, never `secrets: inherit` or unrelated tokens.
+
 ## Side effects
 
-A branch, commits, a push, and one PR (created or updated). It never closes, merges, or comments on the bot PRs; they close themselves once the update reaches the base branch.
+A branch, commits, a push, and one PR (created or updated); it may close its own earlier PR when it moves to a new branch. It never closes, merges, approves, comments on, or pushes to the bot PRs; they close themselves once the update reaches the base branch.

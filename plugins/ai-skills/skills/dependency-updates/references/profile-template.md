@@ -13,14 +13,19 @@ Copy this template to `docs/ai/dependency-updates.md` in your repository and fil
 
 ## Branch and PR
 - Base branch: <main | the delivery profile's Base branch, then the default branch>
-- Branch template: <chore/dependency-updates-{date}>
+- Branch template: <chore/dependency-updates-{date}>   # a taken name gets `-2`, `-3`; when a reused branch cannot be pushed (for example the base changed workflow files the token cannot push), the run moves to a new branch and PR and closes its own old PR
 - Labels: <dependencies>
 
 ## Never update
-- <package>: <reason, for example pinned by the hosting platform>
+- <package, ecosystem, or path>: <reason, for example `github-actions` or `.github/workflows/**` when the run's token cannot push workflow files>
 
 ## Hold
 - <package>: <version range to stay in, for example `<19`>; <reason>
+
+## Supply chain
+- Minimum release age: <3d>   # newer versions wait for a later run; also set the bot's `cooldown` (Dependabot) or `minimumReleaseAge` (Renovate)
+- Install scripts: <off | on: why the project needs them>
+- Secrets: <list only what the run needs; callers pass nothing else>
 
 ## Validation
 - Checks: <commands, or empty to use the repository's guide files and CI workflows>
