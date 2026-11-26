@@ -24,6 +24,7 @@ The plugin contains every skill too, so you do not need `npx skills add` for Cla
 | `milestone-delivery` | Orchestrator | Per milestone issue: plan, implement, review and QA cycle, PR | Branches, commits, push, PRs, issue comments |
 | `pr-shepherd` | Orchestrator | Takes an open PR to clean: review feedback, CI, review and QA cycle | Commits, push, PR replies |
 | `issue-resolver` | Orchestrator | `intake`: source items (Sentry) to deduplicated GitHub issues with severity and the resolve label; `resolve`: one issue to a hotfix or bugfix PR, then stops | Issues, labels, branches, PRs |
+| `dependency-updater` | Orchestrator | Open dependency-bot PRs (and optionally outdated packages) to one PR with release notes read, code adapted, checks, and a review and QA cycle; supersedes the bot PRs, then stops | Branch, commits, push, PR |
 | `incident-responder` | Deprecated | Alias of `issue-resolver` for one observability error; no longer merges | Issues, branches, PRs |
 | `inpi-watch` | Orchestrator | RPI analysis to tracked issues with labels, owner, and due dates | Issues, labels, comments |
 | `nfse-compliance` | Orchestrator | NFS-e technical note to estimated issues, implementation, PR, auto-fix, risk rating, optional merge | Issues, branches, PRs, merge when allowed |
@@ -41,6 +42,7 @@ flowchart LR
     MD["milestone-delivery"]
     PS["pr-shepherd"]
     IR["issue-resolver"]
+    DU["dependency-updater"]
     NC["nfse-compliance"]
     TI["task-implementer"]
     DO["delivery-orchestrator"]
@@ -56,7 +58,7 @@ flowchart LR
   DO -->|"CI: implement workflow"| TI
   MD -.->|"and watch the PRs"| PS
   NC --> PS
-  MD & IR & TI --> DEV & CR & QA
+  MD & IR & DU & TI --> DEV & CR & QA
   PS & NC --> DEV & CR & QA & CI
 ```
 
@@ -75,6 +77,7 @@ flowchart LR
     MD["milestone-delivery"]
     PS["pr-shepherd"]
     IR["issue-resolver"]
+    DU["dependency-updater"]
     NC["nfse-compliance"]
     IW["inpi-watch"]
     DEV["developer"]
@@ -99,6 +102,7 @@ flowchart LR
     sCK["pr-checks"]
     sSI["sentry-issues"]
     sOT["observability-triage"]
+    sDU["dependency-updates"]
     sTC["ticket-create"]
     sNT["nfse-technical-note-analysis"]
     sIN["inpi-trademark-watch"]
@@ -111,6 +115,7 @@ flowchart LR
   MD --> sTP & sQC & sPC
   PS --> sPF & sQC
   IR --> sSI & sOT & sTP & sQC & sPC
+  DU --> sDU & sQC & sPC
   NC --> sNT & sTC & sQC & sPC & sPF & sMR
   IW --> sIN & sTC
   DEV --> sDEV
@@ -119,7 +124,7 @@ flowchart LR
   CI --> sCK
 ```
 
-The review and QA loop that `quality-cycle` runs inside `task-implementer`, `milestone-delivery`, `pr-shepherd`, `issue-resolver`, and `nfse-compliance`:
+The review and QA loop that `quality-cycle` runs inside `task-implementer`, `milestone-delivery`, `pr-shepherd`, `issue-resolver`, `dependency-updater`, and `nfse-compliance`:
 
 ```mermaid
 flowchart TD
@@ -192,6 +197,14 @@ claude -p --agent ai-skills:issue-resolver "intake"
 claude -p --agent ai-skills:issue-resolver "resolve issue 42"
 ```
 
+### dependency-updater
+
+One run per schedule with `dependency-updates`: it collects the open Dependabot or Renovate PRs into the base branch (and outdated packages when the profile asks), reads each package's release notes and upgrade guide, adapts the code with `developer`, holds back what is unsafe with a reason, runs the checks and `quality-cycle` with `code-reviewer` and `qa-tester`, writes the release notes the repository's rules ask for, and opens one PR with `pr-create` that supersedes the bot PRs. A later run updates the PR of an earlier one while it is open. It never closes or merges bot PRs and never waits for approval: `pr-fix` and the merge decision run on later events. A separate agent rather than an `issue-resolver` mode, because there is no issue, severity, or hotfix and bugfix choice to make.
+
+```bash
+claude -p --agent ai-skills:dependency-updater "update dependencies"
+```
+
 ### incident-responder (deprecated)
 
 Kept as an alias so existing callers keep working: it runs `observability-triage` on one error and, for a high-confidence code defect, finds or creates the GitHub issue and resolves it as `issue-resolver` does. It no longer watches the PR or merges. Move callers to `issue-resolver`; the alias will be removed in a later release.
@@ -235,6 +248,7 @@ The agents read the profiles of the skills they use:
 | `milestone-delivery` | `delivery` (branch templates), plus the cycle profiles |
 | `pr-shepherd` | `quality-cycle`, `review-changes`, `qa-e2e`, `bdd-scenarios` |
 | `issue-resolver`, `incident-responder` | `delivery` (branches and `## Issue resolution`), the source skill's (`sentry-issues`), `observability-triage`, plus the cycle profiles |
+| `dependency-updater` | `dependency-updates`, `delivery` (base branch and `## Release notes`), plus the cycle profiles |
 | `inpi-watch` | `inpi-trademark-watch` (Automation section) |
 | `nfse-compliance` | `nfse-technical-note-analysis` (Automation section), `merge-risk`, plus the cycle profiles |
 | `business-analyst`, `tech-lead`, `readiness-reviewer`, `delivery-orchestrator` | `delivery` (`docs/ai/delivery.md`) |
