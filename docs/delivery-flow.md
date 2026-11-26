@@ -54,14 +54,16 @@ You need a repository with GitHub Actions, the reusable workflows from [fbrissi/
 4. **Project (optional).** With `project`, the issue's single-select Status field must already have an option for each state, by default `Needs business refinement`, `Business blocked`, `Needs technical refinement`, `Technical blocked`, `Needs review`, `Ready`, `In progress`, `In review`, `Done`. Map several states to one option with `project-status-options` (for example `business-blocked=Blocked`). The steps never create options.
 5. **Profile.** Add `docs/ai/delivery.md` from the [template](../shared/references/delivery-profile.md#profile-template): repository scope, source tracker, milestone template, base branch, branch templates, and `## Bugfix releases
 
-A bugfix needs an open release branch. When there is none (and `Bugfix release branch` is not `base`), `dependency-updates` and `issue-resolver` open one instead of waiting, and leave the rest to orchestration ([delivery-profile.md](../shared/references/delivery-profile.md#opening-a-release-for-a-bugfix)):
+A bugfix needs an open release branch. When there is none (and `Bugfix release branch` is not `base`), `dependency-updates` and `issue-resolver` open one instead of waiting, unless the profile sets `Open release for bugfixes: no`, and leave the rest to orchestration ([delivery-profile.md](../shared/references/delivery-profile.md#opening-a-release-for-a-bugfix)):
 
 1. The version is computed like the release notes version: the next one above the base branch's changelog, the release tags, and open release branches (`Release version`'s increment, else the next patch).
 2. A milestone named after the version (`v1.4.3`, with `<!-- ai-delivery auto-release -->` and the `requested-by` marker in its description) and its release branch from `Release branch template` (default `release/v1-4-3`), created from the default branch, exactly as orchestration names it.
 3. A tracking issue in the milestone, `in-progress` then `in-review`: the resolved issue itself, or `Dependency updates <date>` listing the packages. The bugfix PR into the release branch carries `Closes #<issue>` and the milestone.
 4. When the bugfix PR merges, orchestration runs for the milestone (the orchestrate-on-merge workflow must also accept `bugfix/` PRs into release branches): it moves the issue to `done`, opens the draft milestone PR, writes the release notes, and marks the milestone PR ready for a human.
 
-Only one release is opened at a time: once it exists, it is the oldest open release branch, so later bugfixes target it and add their own tracking issues. When the release branch cannot be created (for example a ruleset refuses the ref), dependency updates wait for a later run and issue resolution posts a blocker, each saying why.
+Only one auto-opened release takes fixes at a time: once it exists, it is the oldest open release branch, so later bugfixes target it and add their own tracking issues, until its milestone PR is ready for review; a bugfix after that opens a new release with the next version. The release notes use the milestone's version, and a concurrent run that finds the milestone or branch already created reuses it.
+
+Opening a release requires `delivery-orchestration` to run in the repository: an orchestrate workflow and an orchestrate-on-merge workflow that also reacts to `bugfix/` PRs into release branches. Repositories without them set `Open release for bugfixes: no` in the delivery profile (or the dependency profile) and keep the previous behaviour. When the release branch cannot be created (for example a ruleset refuses the ref), dependency updates wait for a later run and issue resolution posts a blocker, each saying why.
 
 ```mermaid
 gitGraph

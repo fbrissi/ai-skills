@@ -14,6 +14,7 @@ Copy this template to `docs/ai/dependency-updates.md` in your repository and fil
 ## Branches and PR
 Branches, the hotfix criteria labels, and the bugfix target come from the delivery profile (`docs/ai/delivery.md`): security updates (high or critical advisory, or the hotfix label) go to `hotfix/dependency-updates-{date}` into the base branch, the rest to `bugfix/dependency-updates-{date}` into the open release branch, opening a release (milestone, release branch, and tracking issue) when there is none, and wait for a later run only when that release branch cannot be created. Repeat a key here only to override it, for example in a repository without release branches or without a delivery profile:
 - Bugfix release branch: <base>   # every PR into the base branch is a release here, so bugfixes go to the base branch too
+- Open release for bugfixes: <yes | no>   # no: wait for a release branch instead of opening one; set it when delivery-orchestration does not run in this repository
 - Labels: <dependencies>
 A taken branch name gets `-2`, `-3`. When a reused branch cannot be pushed (for example the base changed workflow files the token cannot push), the run moves to a new branch and PR and closes its own old PR.
 
