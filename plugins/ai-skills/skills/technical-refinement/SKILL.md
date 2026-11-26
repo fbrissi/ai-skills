@@ -58,7 +58,14 @@ Issues in a milestone are implemented in parallel, each on its own branch from t
 
 ## 4. Revise triage
 
-With [references/triage.md](references/triage.md) and the profile's `## Triage` section, revise each planned issue's Size, Estimate, and Effort from its technical plan and similar past work. Split an issue above the largest size (step 3's split rules; each part gets its own triage). When dependencies move an issue's Start date or Target date, update them. Set any required triage field that is still empty, including on issues created by a split. Values a person set change only when this refinement changed the scope, with a comment, as `triage.md` says.
+With [references/triage.md](references/triage.md) and the profile's `## Triage` section, for each planned issue (including issues created by a split):
+
+1. Revise Size, Estimate, and Effort from its technical plan and similar past work. Split an issue above the largest size (step 3's split rules; each part gets its own triage).
+2. When dependencies move its Start date or Target date, update them.
+3. Fill empty Start and Target dates: when the profile defines them and either is still empty, set it now with the no-deadline defaults of `triage.md` and the revised Estimate, even when no dependency moved it. Readiness review sends back an issue with an empty required date.
+4. Set any other required triage field that is still empty.
+
+Values a person set change only when this refinement changed the scope, with a comment, as `triage.md` says.
 
 ## 5. Write and set status
 
