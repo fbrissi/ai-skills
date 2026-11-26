@@ -3,6 +3,12 @@
 All notable changes to this project are documented here. Release versions follow
 [Semantic Versioning](https://semver.org/).
 
+## v0.10.2
+
+### Changed
+
+- `business-refinement` links Jira attachments in the issue's `## Attachments` section with their browser URL (`<JIRA_BASE_URL>/secure/attachment/<id>/<filename>`), which opens the image for anyone signed in to Jira, and adds the source ticket link at the top of the section. Later steps still download attachments through the REST API by the id in the URL (`shared/references/tickets.md`). Images still do not render inline on the issue, since Jira requires sign-in, so each keeps its text description.
+
 ## v0.10.1
 
 ### Fixed
