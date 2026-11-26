@@ -11,6 +11,10 @@ All notable changes to this project are documented here. Release versions follow
 - `dependency-updater` agent: runs `dependency-updates` with `developer`, `code-reviewer`, and `qa-tester`, opens or updates the one PR, and stops; the PR follow-up (`pr-fix`, merge decision) takes over. A separate agent rather than an `issue-resolver` mode, because there is no issue, severity, or branch-type decision.
 - `docs/delivery-flow.md` describes the weekly dependency update path next to issue resolution.
 
+### Changed
+
+- Updated `rulesync` from 43.8.2 to 43.11.0 (supersedes Dependabot PR #11). The releases in between add targets and permission and hook fixes this repository does not use; `npm run generate` produces identical outputs.
+
 ## v0.7.0
 
 ### Added
