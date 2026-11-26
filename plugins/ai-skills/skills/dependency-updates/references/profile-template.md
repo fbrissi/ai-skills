@@ -11,10 +11,11 @@ Copy this template to `docs/ai/dependency-updates.md` in your repository and fil
 - Bots: <dependabot | dependabot, renovate | none>
 - Outdated: <none | patch | minor | major>   # also update outdated packages up to this level, not only the bot PRs
 
-## Branch and PR
-- Base branch: <main | the delivery profile's Base branch, then the default branch>
-- Branch template: <chore/dependency-updates-{date}>   # a taken name gets `-2`, `-3`; when a reused branch cannot be pushed (for example the base changed workflow files the token cannot push), the run moves to a new branch and PR and closes its own old PR
+## Branches and PR
+Branches, the hotfix criteria labels, and the bugfix target come from the delivery profile (`docs/ai/delivery.md`): security updates (high or critical advisory, or the hotfix label) go to `hotfix/dependency-updates-{date}` into the base branch, the rest to `bugfix/dependency-updates-{date}` into the open release branch, and wait for a later run when there is none. Repeat a key here only to override it, for example in a repository without release branches or without a delivery profile:
+- Bugfix release branch: <base>   # every PR into the base branch is a release here, so bugfixes go to the base branch too
 - Labels: <dependencies>
+A taken branch name gets `-2`, `-3`. When a reused branch cannot be pushed (for example the base changed workflow files the token cannot push), the run moves to a new branch and PR and closes its own old PR.
 
 ## Never update
 - <package, ecosystem, or path>: <reason, for example `github-actions` or `.github/workflows/**` when the run's token cannot push workflow files>

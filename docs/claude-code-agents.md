@@ -24,7 +24,7 @@ The plugin contains every skill too, so you do not need `npx skills add` for Cla
 | `milestone-delivery` | Orchestrator | Per milestone issue: plan, implement, review and QA cycle, PR | Branches, commits, push, PRs, issue comments |
 | `pr-shepherd` | Orchestrator | Takes an open PR to clean: review feedback, CI, review and QA cycle | Commits, push, PR replies |
 | `issue-resolver` | Orchestrator | `intake`: source items (Sentry) to deduplicated GitHub issues with severity and the resolve label; `resolve`: one issue to a hotfix or bugfix PR, then stops | Issues, labels, branches, PRs |
-| `dependency-updater` | Orchestrator | Open dependency-bot PRs (and optionally outdated packages) to one PR with release notes read, code adapted, checks, and a review and QA cycle; supersedes the bot PRs, then stops | Branch, commits, push, PR |
+| `dependency-updater` | Orchestrator | Open dependency-bot PRs (and optionally outdated packages) to a hotfix PR for security fixes and a bugfix PR into the open release branch, with release notes read, code adapted, checks, and a review and QA cycle; supersedes the bot PRs, then stops | Branches, commits, push, PRs |
 | `incident-responder` | Deprecated | Alias of `issue-resolver` for one observability error; no longer merges | Issues, branches, PRs |
 | `inpi-watch` | Orchestrator | RPI analysis to tracked issues with labels, owner, and due dates | Issues, labels, comments |
 | `nfse-compliance` | Orchestrator | NFS-e technical note to estimated issues, implementation, PR, auto-fix, risk rating, optional merge | Issues, branches, PRs, merge when allowed |
@@ -199,7 +199,7 @@ claude -p --agent ai-skills:issue-resolver "resolve issue 42"
 
 ### dependency-updater
 
-One run per schedule with `dependency-updates`: it collects the open Dependabot or Renovate PRs into the base branch (and outdated packages when the profile asks), reads each package's release notes and upgrade guide, adapts the code with `developer`, holds back what is unsafe with a reason, runs the checks and `quality-cycle` with `code-reviewer` and `qa-tester`, writes the release notes the repository's rules ask for, and opens one PR with `pr-create` that supersedes the bot PRs. A later run updates the PR of an earlier one while it is open. It never closes or merges bot PRs and never waits for approval: `pr-fix` and the merge decision run on later events. A separate agent rather than an `issue-resolver` mode, because there is no issue, severity, or hotfix and bugfix choice to make.
+One run per schedule with `dependency-updates`: it collects the open Dependabot or Renovate PRs into the base branch (and outdated packages when the profile asks) and the open advisories, reads each package's release notes and upgrade guide, adapts the code with `developer`, holds back what is unsafe with a reason, and runs the checks and `quality-cycle` with `code-reviewer` and `qa-tester`. It branches like `issue-resolver`: security updates (high or critical advisory, or the hotfix label) go to a hotfix branch into the base branch with a release section; the rest go to a bugfix branch into the open release branch, or wait for a later run when there is none (no blocker). Each PR, opened with `pr-create`, supersedes the bot PRs it covers; a later run updates the open PR of its kind. It never closes or merges bot PRs and never waits for approval: `pr-fix` and the merge decision run on later events. A separate agent rather than an `issue-resolver` mode, because there is no issue to resolve: each run gathers many packages from the bots and advisories into at most two PRs.
 
 ```bash
 claude -p --agent ai-skills:dependency-updater "update dependencies"
@@ -248,7 +248,7 @@ The agents read the profiles of the skills they use:
 | `milestone-delivery` | `delivery` (branch templates), plus the cycle profiles |
 | `pr-shepherd` | `quality-cycle`, `review-changes`, `qa-e2e`, `bdd-scenarios` |
 | `issue-resolver`, `incident-responder` | `delivery` (branches and `## Issue resolution`), the source skill's (`sentry-issues`), `observability-triage`, plus the cycle profiles |
-| `dependency-updater` | `dependency-updates`, `delivery` (base branch and `## Release notes`), plus the cycle profiles |
+| `dependency-updater` | `dependency-updates`, `delivery` (branches, `Bugfix release branch`, `## Issue resolution` labels, `## Release notes`), plus the cycle profiles |
 | `inpi-watch` | `inpi-trademark-watch` (Automation section) |
 | `nfse-compliance` | `nfse-technical-note-analysis` (Automation section), `merge-risk`, plus the cycle profiles |
 | `business-analyst`, `tech-lead`, `readiness-reviewer`, `delivery-orchestrator` | `delivery` (`docs/ai/delivery.md`) |

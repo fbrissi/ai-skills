@@ -53,7 +53,7 @@ You need a repository with GitHub Actions, the reusable workflows from [fbrissi/
    - your hold labels for merges (`merge-risk` default: `do-not-merge`, `hold`)
 4. **Project (optional).** With `project`, the issue's single-select Status field must already have an option for each state, by default `Needs business refinement`, `Business blocked`, `Needs technical refinement`, `Technical blocked`, `Needs review`, `Ready`, `In progress`, `In review`, `Done`. Map several states to one option with `project-status-options` (for example `business-blocked=Blocked`). The steps never create options.
 5. **Profile.** Add `docs/ai/delivery.md` from the [template](../shared/references/delivery-profile.md#profile-template): repository scope, source tracker, milestone template, base branch, branch templates, and `## QA in CI`. Add the `quality-cycle`, `review-changes`, `qa-e2e`, and `bdd-scenarios` profiles for the implement step.
-6. **Workflows.** Add the stage callers from the github-actions `ai-task.yml` reusable workflow (default files `ai-business-refinement.yml`, `ai-technical-refinement.yml`, `ai-readiness-review.yml`, `ai-orchestrate.yml`, `ai-implement.yml`), the PR follow-up callers (`pr-fix`, `merge-decision`) with branch prefixes that cover the branch model (`feature/ release/ hotfix/ bugfix/`, plus any older prefixes still open), and a caller of `ai-resume.yml` on `issue_comment: [created]`. For production issues, add a weekly intake caller and a resolve caller on `issues: [labeled]` for the github-actions `issue-intake` and `issue-resolve` tasks of `ai-task.yml` (default callers `ai-issue-intake.yml` and `ai-issue-resolve.yml`; see [Issue resolution](#issue-resolution)), a weekly caller for the `dependency-update` task after the dependency bots run (default `ai-dependency-update.yml`, with the branch template's prefix, for example `chore/dependency-updates-`, added to the PR follow-up callers' branch prefixes; see [Dependency updates](#dependency-updates)), and a `branch-sync.yml` caller on `push` to the default branch when you keep a `develop` mirror.
+6. **Workflows.** Add the stage callers from the github-actions `ai-task.yml` reusable workflow (default files `ai-business-refinement.yml`, `ai-technical-refinement.yml`, `ai-readiness-review.yml`, `ai-orchestrate.yml`, `ai-implement.yml`), the PR follow-up callers (`pr-fix`, `merge-decision`) with branch prefixes that cover the branch model (`feature/ release/ hotfix/ bugfix/`, plus any older prefixes still open), and a caller of `ai-resume.yml` on `issue_comment: [created]`. For production issues, add a weekly intake caller and a resolve caller on `issues: [labeled]` for the github-actions `issue-intake` and `issue-resolve` tasks of `ai-task.yml` (default callers `ai-issue-intake.yml` and `ai-issue-resolve.yml`; see [Issue resolution](#issue-resolution)), a weekly caller for the `dependency-update` task after the dependency bots run (default `ai-dependency-update.yml`; its `hotfix/` and `bugfix/` branches are already in the PR follow-up prefixes; see [Dependency updates](#dependency-updates)), and a `branch-sync.yml` caller on `push` to the default branch when you keep a `develop` mirror.
 7. **Versions.** Pin the ai-skills version the workflows install. Release this library first (merging tags `vX.Y.Z`), then github-actions, then bump the pins in your repository.
 
 ## Start and chain
@@ -234,20 +234,25 @@ Configure it in the profile's `## Issue resolution` section and the `sentry-issu
 
 ## Dependency updates
 
-Dependency bumps take the same short path, with the [`dependency-updater`](claude-code-agents.md#dependency-updater) agent and one run instead of intake plus resolve:
+Dependency bumps follow the issue resolution branch model, with the [`dependency-updater`](claude-code-agents.md#dependency-updater) agent and one run instead of intake plus resolve:
 
-1. **Update** (a weekly schedule after the dependency bots run, for example Monday 12:00 UTC for bots that run at 09:00) follows [`dependency-updates`](skills/dependency-updates.md): it collects the open Dependabot or Renovate PRs into the base branch (and outdated packages when the profile asks), reads each package's release notes and upgrade guide, adapts the code, holds back what is unsafe, runs the checks and the review and QA cycle, and opens one PR into the base branch that lists the packages, the breaking changes and their handling, the held packages, and `Supersedes #<n>` for each bot PR. A later run updates that PR while it is open instead of opening another.
-2. **Follow-up** is the usual PR follow-up: `pr-fix` on review and CI events, then the merge decision, with a human approval for a PR into the default branch. The bots close their own PRs once the updates reach the base branch; the flow never closes or merges them.
+1. **Update** (a weekly schedule after the dependency bots run, for example Monday 12:00 UTC for bots that run at 09:00) follows [`dependency-updates`](skills/dependency-updates.md): it collects the open Dependabot or Renovate PRs into the base branch (and outdated packages when the profile asks) and the open advisories, reads each package's release notes and upgrade guide, adapts the code, holds back what is unsafe, and runs the checks and the review and QA cycle.
+2. **Route.** Urgent updates (a high or critical security advisory on the version in use, or a bot PR or issue a person labeled with the `Hotfix label`; a new major alone is not urgent) go to `hotfix/dependency-updates-<date>`, PR into the base branch with its release section. The rest go to `bugfix/dependency-updates-<date>`, PR into the bugfix target (`Bugfix release branch`, else the oldest open release branch), with no release section. With no release branch to target there is no blocker: the non-urgent updates wait for a later run and the report says since when. A repository without release branches sets `Bugfix release branch: base`.
+3. **Follow-up** is the usual PR follow-up for `hotfix/` and `bugfix/` branches: `pr-fix` on review and CI events, then the merge decision, with a human approval for a PR into the default branch. Each PR lists `Supersedes #<n>` for the bot PRs it covers; a later run updates the open PR of its kind. The bots close their own PRs once the updates reach the base branch; the flow never closes or merges them.
 
 ```mermaid
 flowchart LR
-  BOT[("Dependabot / Renovate PRs")] -->|"weekly, after the bots"| DU["dependency-updater<br/>release notes → code changes<br/>→ checks → quality-cycle"]
-  DU -->|"one PR, Supersedes #n"| PR["chore/dependency-updates-{date}<br/>PR into the base branch"]
-  DU -->|"PR of an earlier run still open"| PR
-  PR --> FU["PR follow-up: pr-fix, then merge-risk<br/>human approval"]
+  BOT[("Dependabot / Renovate PRs<br/>advisories")] -->|"weekly, after the bots"| DU["dependency-updater<br/>release notes → code changes<br/>→ checks → quality-cycle"]
+  DU --> U{"high or critical advisory,<br/>or hotfix label?"}
+  U -->|yes| HF["hotfix/dependency-updates-{date}<br/>PR into the base branch, release section"]
+  U -->|no| RB{"open release branch?"}
+  RB -->|yes| BF["bugfix/dependency-updates-{date}<br/>PR into the release branch"]
+  RB -->|no| W(["wait for a later run<br/>(reported, since the oldest bot PR)"])
+  HF --> FU["PR follow-up: pr-fix, then merge-risk<br/>human approval into the base branch"]
+  BF --> FU
 ```
 
-Configure it in `docs/ai/dependency-updates.md` (ecosystems, bots, outdated level, packages never to update or to hold, extra validation); release notes follow the repository's rules and the delivery profile's `## Release notes`.
+Configure it in `docs/ai/dependency-updates.md` (ecosystems, bots, outdated level, packages never to update or to hold, supply chain, extra validation); branches, labels, and the bugfix target come from the delivery profile.
 
 ## QA in CI
 

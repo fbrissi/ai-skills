@@ -8,9 +8,9 @@ Profile of the [`dependency-updates`](../skills/dependency-updates.md) skill for
 - Bots: dependabot   # one grouped PR, branch dependabot/dependencies-*, Monday 09:00 America/Sao_Paulo
 - Outdated: none
 
-## Branch and PR
+## Branches and PR
 - Base branch: main
-- Branch template: chore/dependency-updates-{date}
+- Bugfix release branch: base   # no release branches here: every PR into main is a release, so non-urgent updates also go to main (as `bugfix/dependency-updates-<date>`), security ones as `hotfix/dependency-updates-<date>`
 - Labels: dependencies
 
 ## Never update
