@@ -3,6 +3,14 @@
 All notable changes to this project are documented here. Release versions follow
 [Semantic Versioning](https://semver.org/).
 
+## v0.8.1
+
+Release order: this release first, then `fbrissi/github-actions`, whose default `ai-skills-ref` moves to `v0.8.1`.
+
+### Fixed
+
+- Triage dates no longer stay empty when the source ticket has no due date or deadline, which made `readiness-review` send the issue back to technical refinement again and again. `triage.md` defines no-deadline defaults (Start today or after the issues it depends on; Target the Start plus the working days the Estimate implies, or 10 working days without an Estimate), `business-refinement` uses them, and `technical-refinement` has an explicit step that fills an empty Start or Target date even when no dependency moved it. `readiness-review` stays strict.
+
 ## v0.8.0
 
 ### Added
