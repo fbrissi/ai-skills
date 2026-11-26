@@ -3,6 +3,18 @@
 All notable changes to this project are documented here. Release versions follow
 [Semantic Versioning](https://semver.org/).
 
+## v0.7.0
+
+### Added
+
+- `delivery-orchestration` writes the release notes when every issue of a milestone is done: a new section at the top of the profile's `Release notes file` (heading from `Release heading`, version from `Release version`: the milestone name or the next patch, minor, or major version) that summarizes the merged task PRs, plus the `Version files`. Release branches take changes only through PRs, so the notes go in their own PR from `Release notes branch template` (default `feature/{release-slug}-release-notes`) into the release branch, which follows the task PR follow-up; the milestone PR is marked ready only after it merges. New `## Release notes` section in the delivery profile template; without `Release notes file` nothing changes.
+
+### Fixed
+
+- `delivery-orchestration` and `delivery-orchestrator` stop at a failed push, PR command, or dispatch instead of moving statuses and dispatching past it.
+- `task-implementer` runs the reviewer and QA for every change, documentation included, tells QA when the caller already started the test environment, and sets the Project status field with every status label move.
+- `docs/delivery-flow.md` describes the send-back limit (3 per milestone) next to the loop guard.
+
 ## v0.6.0
 
 ### Added

@@ -5,14 +5,14 @@ description: >-
   builds the dependency graph, creates the milestone branch and one task branch
   per issue, starts implementation for the issues whose dependencies are done
   (dispatching a workflow in CI or handing off locally) up to a parallel limit,
-  keeps a draft milestone PR that aggregates the task PRs, marks it ready when
-  every issue is done, and closes the milestone after it merges. Use when the
-  user or a workflow asks to orchestrate, start, or advance a milestone's
-  delivery.
+  keeps a draft milestone PR that aggregates the task PRs, adds the release
+  notes in their own PR when every issue is done, then marks the milestone PR
+  ready, and closes the milestone after it merges. Use when the user or a
+  workflow asks to orchestrate, start, or advance a milestone's delivery.
 ---
 # Delivery orchestration
 
-As orchestrator you never write code, review it, or merge; only in `local` mode without delegation do you play the implementer role, one task at a time, as step 4 says. Each run advances the milestone as far as it can and exits; it is re-run when a task PR merges into the milestone branch and when the milestone PR merges, so never wait for work to finish.
+As orchestrator you never write code, review it, or merge (the release notes of step 5 are the only change you write); only in `local` mode without delegation do you play the implementer role, one task at a time, as step 4 says. Each run advances the milestone as far as it can and exits; it is re-run when a task PR merges into the milestone branch and when the milestone PR merges, so never wait for work to finish.
 
 ## PR structure
 
@@ -23,9 +23,11 @@ One milestone produces many PRs, so they are stacked for review:
 
 ## Inputs
 
-Resolve every value with [references/delivery-profile.md](references/delivery-profile.md), which also defines the branch names. This skill reads `milestone` (required), `base-branch`, `release-branch-template`, `feature-branch-template`, `implement-workflow`, `max-parallel`, `status-labels`, `project`, `project-status-field`, `project-status-options`, `context`, `requested-by`, and `profile`.
+Resolve every value with [references/delivery-profile.md](references/delivery-profile.md), which also defines the branch names. This skill reads `milestone` (required), `base-branch`, `release-branch-template`, `feature-branch-template`, `implement-workflow`, `max-parallel`, `release-notes-file`, `release-heading`, `release-version`, `version-files`, `release-notes-branch-template`, `status-labels`, `project`, `project-status-field`, `project-status-options`, `context`, `requested-by`, and `profile`.
 
 Stop with `Unable to orchestrate: missing milestone` if there is none.
+
+**Git and API errors stop the run.** When a branch push, PR command, or dispatch fails, do not run the steps that depend on it: no status move, no dispatch, and no PR for that issue or the milestone. Report the command and its error, leave every issue in the state it had before the failed step, and stop with a blocker (stop-point format, stage `orchestrate`) when the error needs a person, for example a rule that rejects the push.
 
 **Mode**: `dispatch` when running in CI (`GITHUB_ACTIONS=true`) and `gh workflow view <implement-workflow>` finds the workflow; otherwise `local`.
 
@@ -64,9 +66,13 @@ Use the `pr-create` skill (if it is not installed: `gh pr create --base <base-br
 
 1. **Open it as a draft** when none is open and the milestone branch has at least one commit ahead of `base-branch` (`git rev-list --count origin/<base-branch>..origin/<milestone-branch>`), assigned to `requested-by` when known.
 2. **Keep its body current** on every run (`gh pr edit <n> --body-file <f>`): the milestone and its source, then one line per issue with its status and task PR (`- [x] Closes #<n> <title> (#<task PR>, merged)`, `- [ ] Closes #<n> <title> (<status>)`), and a short summary of the merged task PRs.
-3. **Mark it ready** when every open issue in the milestone is `done` (`gh pr ready <n>`), request review from `requested-by` when known (`gh pr edit <n> --add-reviewer <login>`), and comment once mentioning them that the milestone is ready for review. Never merge it, and never change its review requirements: it always needs a human approval.
+3. **Release notes** when every open issue in the milestone is `done` and `release-notes-file` is set, following the profile's release notes rules ([references/delivery-profile.md](references/delivery-profile.md)):
+   - Already done (the milestone branch has the section for the version): go to the next sub-step.
+   - An open release notes PR exists (head from `release-notes-branch-template`, base the milestone branch): leave the milestone PR in draft and report it as waiting for that PR.
+   - Otherwise create the release notes branch from the head of the milestone branch, write the section and the version files, commit (`docs: add release notes for <version>`), push, and open a PR into the milestone branch with the `pr-create` skill (title `docs: release notes for <version>`, body listing the task PRs it summarizes, assignee `requested-by` when known). It follows the same PR follow-up as the task PRs; its merge runs this skill again. Leave the milestone PR in draft.
+4. **Mark it ready** when every open issue in the milestone is `done` and the release notes are done or `release-notes-file` is unset (`gh pr ready <n>`), request review from `requested-by` when known (`gh pr edit <n> --add-reviewer <login>`), and comment once mentioning them that the milestone is ready for review. Never merge it, and never change its review requirements: it always needs a human approval.
 
-Issues that are blocked, still in refinement, or waiting for review keep the PR in draft; list them in the report.
+Issues that are blocked, still in refinement, or waiting for review, and release notes not merged yet, keep the PR in draft; list them in the report.
 
 ## 6. Complete the milestone
 
@@ -81,6 +87,7 @@ Milestone branch: <branch> (<created | existing>)   Base: <base-branch>
 |---|---|---|---|---|---|
 Started: <n> (<free slots> free of <max-parallel>)   Done: <n>/<total>
 Waiting: <issue: reason>
+Release notes: <version>: <merged | PR <url> | not needed>
 Milestone PR: <url> (<draft | ready for review | merged, milestone closed> | not yet: reason)
 Blocked:
 - #<issue> <state>: <summary> | questions: <comment URL>

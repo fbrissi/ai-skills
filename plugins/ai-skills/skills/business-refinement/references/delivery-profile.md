@@ -35,6 +35,11 @@ For every value: the run's input (from the request, a calling agent, or a workfl
 | `implement-workflow` | Implement workflow | `ai-implement.yml` |
 | `max-parallel` | Max parallel | `3` |
 | `requested-by` | n/a | the milestone's `requested-by` marker, else none |
+| `release-notes-file` | Release notes file | none: no release notes step |
+| `release-heading` | Release heading | `## {version}` |
+| `release-version` | Release version | `{name}` (the milestone name form), or `next-patch`, `next-minor`, `next-major` |
+| `version-files` | Version files | none (`path: what to set` lines, for example `package.json: version`) |
+| `release-notes-branch-template` | Release notes branch template | `feature/{release-slug}-release-notes` |
 | `qa-ci-setup` | QA in CI setup | none (targeted validation in CI: focused tests, the app or API headless, smoke checks) |
 | `qa-browser` | QA browser | `playwright` (`playwright` or `selenium`) |
 
@@ -58,6 +63,15 @@ Every run ends with a state a workflow can read without parsing prose:
 - Each issue in scope has exactly one status label when the run exits (`work-status.md`). Never leave an issue in a state the run moved it to only for its own work.
 - A blocked item gets one comment with the questions, in the language the skill says, whose first line is `<!-- ai-delivery blocker stage=<stage> -->` and whose second line is `Blocked: <one line: what is missing and why it blocks>`. `<stage>` is `business-refinement`, `technical-refinement`, `readiness-review`, `orchestrate`, or `implement`. Mention `requested-by` (never a bot), and, on a GitHub issue or PR, end with how to resume: ``Reply `/ai-resume` (optionally with instructions on the next lines) to continue.`` when the repository runs the resume workflow (a workflow in `.github/workflows/` handles `/ai-resume` comments), else `Answer here and run <stage> again.`; never a checkbox. On a re-run, edit that comment instead of adding another while the questions are the same.
 - The output ends with a `Blocked:` list, one line per blocked item: `- #<issue> <state>: <one to three line summary> | questions: <comment URL>` (for a question posted on the source tracker, its comment URL too). `Blocked: none` when nothing is blocked.
+
+## Release notes
+
+When `release-notes-file` is set, a release is not ready for review until its notes are on the release branch. Delivery orchestration writes them once every issue is done, in their own PR into the release branch (release branches take changes only through PRs):
+
+- **Version**: `release-version` with `{name}` replaced by the milestone name form (`v0.1.0-beta.2.3`). `next-patch`, `next-minor`, and `next-major` increment the newest version in `release-notes-file` on `base-branch`, keeping its `v` prefix when it has one. `{version}` is that value; `{bare-version}` is the same without a leading `v` (`0.1.0-beta.2.3`). When the version cannot be read or computed, stop with a blocker that asks for it.
+- **Section**: one new section at the top of `release-notes-file`, above the newest existing one, with `release-heading` filled in (`{version}`, `{bare-version}`, `{date}` as `YYYY-MM-DD`), following the style of the existing sections. Its bullets summarize the merged task PRs for the people who read the changelog: what changed and why, not file lists. Never edit older sections.
+- **Version files**: set each `version-files` entry to `{bare-version}` (for example `package.json: version` sets the `version` key). Nothing else changes.
+- **Done**: the release branch's `release-notes-file` already has a section for `{version}` that `base-branch` does not have.
 
 ## Milestone names and branches
 
@@ -138,6 +152,13 @@ Copy to `docs/ai/delivery.md` and remove the lines you do not need.
 - Hotfix label: <severity:critical>
 - Bugfix label: <severity:normal>
 - Hotfix criteria: <for example: level fatal, or at least 100 users affected in the period, or a core flow (login, checkout) fails>
+
+## Release notes
+- Release notes file: <CHANGELOG.md | none>
+- Release heading: <## {version} | ## [{bare-version}] - {date}>
+- Release version: <{name} | next-patch | next-minor | next-major>
+- Version files: <path: what to set lines, for example `package.json: version` | none>
+- Release notes branch template: <feature/{release-slug}-release-notes>
 
 ## QA in CI
 - QA in CI setup: <command that installs the browsers and starts the test environment in CI | none: targeted validation>

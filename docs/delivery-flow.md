@@ -19,7 +19,9 @@ flowchart TD
   IM -->|cycle escalated| NH(["PR labeled ai:needs-human<br/>handoff"])
   PR --> FU["PR follow-up<br/>pr-fix rounds, then merge-risk"]
   FU -->|task PR merged| OR
-  OR -->|every issue done| MP["milestone PR ready for review"]
+  OR -->|every issue done| RN["release notes PR into the release branch<br/>CHANGELOG section and version files"]
+  RN --> FU
+  OR -->|release notes merged| MP["milestone PR ready for review"]
   MP -->|human approval and merge| DONE(["issues done, milestone closed"])
   BB -.->|"/ai-resume"| BR
   TB -.->|"/ai-resume"| TR
@@ -95,7 +97,7 @@ sequenceDiagram
 
 In CI no step asks or waits: every question point either uses its non-interactive default (for example `pr-fix` in `auto` mode) or ends in a blocker comment and a handoff.
 
-A loop guard limits automatic dispatches per milestone and step (default 3); above it, the workflow hands off instead. A failed or timed-out run hands off with the run URL and moves an issue stuck in `in-progress` back to `ready`.
+A loop guard limits automatic dispatches per milestone and step (default 3); above it, the workflow hands off instead. A second guard limits send-backs, dispatches back to an earlier refinement step (readiness review back to technical refinement, for example), to 3 per milestone; past it the workflow hands off to the requester to investigate why refinement did not fix the issue. A resume resets both. A failed or timed-out run hands off with the run URL and moves an issue stuck in `in-progress` back to `ready`.
 
 This works because every step leaves a state a workflow can read: one status label per issue in scope, and for each blocked item one comment that starts with `<!-- ai-delivery blocker stage=<stage> -->` and `Blocked: <one line>`, followed by the questions. Each step's output ends with a `Blocked:` list (`- #<issue> <state>: <summary> | questions: <comment URL>`), which the handoff quotes.
 
@@ -173,8 +175,9 @@ One milestone produces many PRs, so they are stacked:
 
 1. Orchestration creates the release branch (default `release/<milestone-slug>`) from the default branch (`base-branch`) first.
 2. Each feature branch (default `feature/<milestone-slug>-<n>-<slug>`) is created from the release branch, and each task PR targets the release branch. Task PRs go through PR follow-up (`pr-fix` rounds, then `merge-risk`) and may merge on their own when the AI review approved, CI is green, and the risk is low, where the repository enables it. Only PRs the agent App opened into a release branch can skip the human approval; PRs people open, and every PR into the default branch (release and hotfix PRs), need one. `merge-risk` takes the base list and a max risk per base from its profile, so task PRs into `release/*` can use a different limit than PRs into the default branch.
-3. One milestone PR, from the release branch into the default branch, aggregates every task PR, so reviewers see one combined diff. Orchestration opens it as a draft as soon as the release branch has a commit, keeps its body current (every issue with `Closes #<n>`, its status and task PR), and marks it ready for review, requesting `requested-by` as reviewer, when every issue is done. It always needs a human approval.
-4. When the milestone PR merges, orchestration runs again, moves every issue to `done`, and closes the milestone.
+3. One milestone PR, from the release branch into the default branch, aggregates every task PR, so reviewers see one combined diff. Orchestration opens it as a draft as soon as the release branch has a commit, keeps its body current (every issue with `Closes #<n>`, its status and task PR), and marks it ready for review, requesting `requested-by` as reviewer, when every issue is done and the release notes are merged. It always needs a human approval.
+4. **Release notes.** When the profile sets `Release notes file`, orchestration writes them once every issue is done: a new section at the top of that file (heading from `Release heading`, version from `Release version`: the milestone name, or the next patch, minor, or major version) that summarizes the merged task PRs, plus the `Version files`. Release branches take changes only through PRs, so the notes go in their own PR from `Release notes branch template` (default `feature/<milestone-slug>-release-notes`) into the release branch; it follows the same PR follow-up as a task PR, and its merge runs orchestration again, which then marks the milestone PR ready. Without `Release notes file` the step is skipped.
+5. When the milestone PR merges, orchestration runs again, moves every issue to `done`, and closes the milestone.
 
 The task PR follow-up is event-driven: each review or CI event starts the next run, and nothing polls.
 
