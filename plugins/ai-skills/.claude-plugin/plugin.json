@@ -1,6 +1,6 @@
 {
   "name": "ai-skills",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "description": "Reusable skills and agents for delivery, review, QA, incidents, and Brazilian compliance (INPI, NFS-e).",
   "author": {
     "name": "Filipe Bojikian Rissi"

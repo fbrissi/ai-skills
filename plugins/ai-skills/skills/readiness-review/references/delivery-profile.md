@@ -17,7 +17,7 @@ For every value: the run's input (from the request, a calling agent, or a workfl
 | `feature-branch-template` | Feature branch template | `feature/{release-slug}-{n}-{slug}` |
 | `hotfix-branch-template` | Hotfix branch template | `hotfix/{slug}` |
 | `bugfix-branch-template` | Bugfix branch template | `bugfix/{slug}` |
-| `bugfix-release` | Bugfix release branch | none: the oldest open release branch; `base`: the base branch, for repositories without release branches |
+| `bugfix-release` | Bugfix release branch | none: the oldest open release branch, opening one when none is open; `base`: the base branch, for repositories without release branches |
 | `issue-sources` | Issue sources | `sentry` (source skills the `issue-resolver` intake reads) |
 | `resolve-label` | Resolve label | `ai:resolve` |
 | `hotfix-label` | Hotfix label | `severity:critical` |
@@ -88,14 +88,25 @@ When `release-notes-file` is set, a release is not ready for review until its no
 | release (`release-branch-template`) | `base-branch` | `base-branch` | A release being prepared. In the delivery flow the milestone branch is the release branch. |
 | feature (`feature-branch-template`) | its release branch | that release branch | New work: one task of the milestone. |
 | hotfix (`hotfix-branch-template`) | `base-branch` | `base-branch` | Urgent production fix. |
-| bugfix (`bugfix-branch-template`) | the bugfix target (the open release branch) | the bugfix target | Non-urgent production bug. Branching from the target keeps `base-branch` changes the release does not have out of the PR. |
+| bugfix (`bugfix-branch-template`) | the bugfix target (the open release branch, opened for it when none is open) | the bugfix target | Non-urgent production bug. Branching from the target keeps `base-branch` changes the release does not have out of the PR. |
 
 - Template placeholders: `{slug}` is the milestone slug in the release template and the issue slug in the others; `{name}` is the milestone name form; `{release-slug}` and `{release-name}` are the release's milestone slug and name form; `{n}` is the issue number. For example `release/{name}` gives `release/v0.1.0-beta.2.3`, and `feature/{release-name}-{n}-{slug}` gives `feature/v0.1.0-beta.2.3-12-login-timeout`.
-- Bugfix target: `bugfix-release` when the run or profile names it; else the oldest open release branch (the release branch with the oldest open PR into `base-branch`, else the release branch of the oldest open milestone that exists on the remote). If there is none, do not guess: stop with a blocker that asks which release the fix goes into.
+- Bugfix target: `bugfix-release` when the run or profile names it; else the oldest open release branch (the release branch with the oldest open PR into `base-branch`, else the release branch of the oldest open milestone that exists on the remote). If there is none, open one as [Opening a release for a bugfix](#opening-a-release-for-a-bugfix) says; only when that fails, the flow falls back (it waits or stops with a blocker, as its skill or agent says) and says why.
 - Never create refs under another branch's name (`release/<x>/...` when `release/<x>` exists): Git cannot hold both.
 - Existing branches are never renamed. When the milestone or task already has a branch or PR under an older name (for example `feat/<milestone-slug>`), keep using it until that work is merged.
 - A `develop` branch, when the repository keeps one, only mirrors `base-branch`; nothing branches from or merges into it.
 - Severity picks the branch for a production issue: one that meets `hotfix-criteria` (or carries `hotfix-label`) gets a hotfix branch into `base-branch`; anything else gets a bugfix branch into the bugfix target.
+
+### Opening a release for a bugfix
+
+When a bugfix (`dependency-updates`, `issue-resolver`) has no release branch to target and `bugfix-release` is not `base`, it opens a release that `delivery-orchestration` then completes like any milestone. There is never more than one auto-opened release at a time: once it exists, it is the oldest open release branch, and later bugfixes target it. Look for the target again right before step 1, since another run may have opened one.
+
+1. **Version**: the next version as [Release notes](#release-notes) computes it, above the highest of the versions in `release-notes-file` on `base-branch`, the release tags, and the open release branches. Increment with `release-version` when it is `next-patch`, `next-minor`, or `next-major`, else `next-patch`.
+2. **Milestone**: title `{version}` (for example `v1.4.3`), so the default `release-version` (`{name}`) gives the same version when orchestration writes the notes. Reuse an open milestone with that title (an earlier run that could not create the branch). Otherwise create it (`gh api repos/{owner}/{repo}/milestones -f title=<version> -f description=<text>`) with a description of one line saying it was opened automatically for a bugfix because no release branch was open, the line `<!-- ai-delivery auto-release -->`, and the `requested-by` marker when known ([Requested-by and assignees](#requested-by-and-assignees)).
+3. **Release branch**: the milestone branch exactly as orchestration resolves it: `release-branch-template` with the milestone's slug and name form (`release/{slug}` gives `release/v1-4-3`, `release/{name}` gives `release/v1.4.3`), created from the head of `base-branch` (`git fetch origin <base-branch>`, then `git push origin origin/<base-branch>:refs/heads/<release-branch>`). It is the bugfix target.
+4. **Tracking issue** in the milestone, so orchestration counts the fix: the flow's own issue moved into it (`gh issue edit <n> --milestone <title>`), or a new one when the flow has none. Its status is `in-progress` while the fix is made and `in-review` once its PR is open (`work-status.md`). The bugfix PR into the release branch has `Closes #<issue>` in its body (orchestration matches PRs into the milestone branch to issues by that link) and the milestone set (`gh pr create --milestone <title>`), which tells an orchestrate-on-merge workflow which milestone to run. Any later bugfix into a release with the `auto-release` marker adds its tracking issue the same way.
+5. **Fallback**: when the version cannot be computed or the branch cannot be created (a ruleset or permission refuses the ref, or the push fails), create no issue and no PR: the flow falls back to its behaviour without a target and reports the error. Leave the milestone; a later run reuses it.
+6. **Hand-off**: no milestone PR is opened here: the release branch has no commit ahead of `base-branch` until the bugfix PR merges, and orchestration opens the draft milestone PR then. When the bugfix PR merges into the release branch, `delivery-orchestration` for the milestone (re-run by the repository's orchestrate-on-merge workflow when it reacts to `bugfix/` PRs into release branches; otherwise run it for the milestone) moves the issue to `done`, opens the draft milestone PR, writes the release notes in their own PR, marks the milestone PR ready for a human once they merge, and closes the milestone after the milestone PR merges.
 
 ## Profile template
 
@@ -143,7 +154,7 @@ Copy to `docs/ai/delivery.md` and remove the lines you do not need.
 - Feature branch template: <feature/{release-slug}-{n}-{slug}>
 - Hotfix branch template: <hotfix/{slug}>
 - Bugfix branch template: <bugfix/{slug}>
-- Bugfix release branch: <release branch name | none: the oldest open release branch>
+- Bugfix release branch: <release branch name | base | none: the oldest open release branch, opened when none is open>
 - Implement workflow: <ai-implement.yml>
 - Max parallel: <3>
 

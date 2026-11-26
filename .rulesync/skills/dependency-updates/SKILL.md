@@ -3,7 +3,8 @@ name: dependency-updates
 description: >-
   Bring a repository's pending dependency updates (open Dependabot or Renovate
   PRs, and optionally outdated packages) into a hotfix PR for security fixes
-  and a bugfix PR into the open release branch: read each package's release
+  and a bugfix PR into the open release branch (opening one when none is
+  open): read each package's release
   notes and upgrade guide, adapt the affected code, hold back what is unsafe,
   run the checks and a review and QA cycle, and open PRs that supersede the
   bot PRs. Use when the user or a scheduled job
@@ -12,12 +13,12 @@ description: >-
 
 # Dependency updates
 
-Each run brings the updates the repository can adopt safely into at most two PRs, done with the care of a person who reads the changelogs, and branched like a production fix: **urgent** updates (security) go out as a hotfix into the base branch, the rest as a bugfix into the open release branch. Never close, merge, approve, comment on, or push to the bot PRs: the PRs list them as superseded, and the bots close their own PRs once the update reaches the base branch.
+Each run brings the updates the repository can adopt safely into at most two PRs, done with the care of a person who reads the changelogs, and branched like a production fix: **urgent** updates (security) go out as a hotfix into the base branch, the rest as a bugfix into the open release branch, opening a release for them when none is open. Never close, merge, approve, comment on, or push to the bot PRs: the PRs list them as superseded, and the bots close their own PRs once the update reaches the base branch.
 
 ## Inputs
 
 - **Profile**: default `docs/ai/dependency-updates.md`; [references/profile-template.md](references/profile-template.md) lists its fields. The request or a calling agent wins over it. Without a profile, use the defaults below and say so once.
-- **Branching** comes from the delivery profile (`docs/ai/delivery.md`; the dependency profile may repeat a key to override it): `Base branch` (default: the default branch), `Hotfix branch template` (`hotfix/{slug}`), `Bugfix branch template` (`bugfix/{slug}`), `Bugfix release branch` (default: the oldest open release branch, see step 2; `base` means the base branch, for repositories without release branches), and from `## Issue resolution` the `Hotfix label` (`severity:critical`) and `Bugfix label` (`severity:normal`). `{slug}` is `dependency-updates-{date}` (`{date}` is `YYYY-MM-DD` of the run), so the defaults give `hotfix/dependency-updates-<date>` and `bugfix/dependency-updates-<date>`. A kind's **prefix** is its branch name up to `{date}` (`hotfix/dependency-updates-`).
+- **Branching** comes from the delivery profile (`docs/ai/delivery.md`; the dependency profile may repeat a key to override it): `Base branch` (default: the default branch), `Hotfix branch template` (`hotfix/{slug}`), `Bugfix branch template` (`bugfix/{slug}`), `Bugfix release branch` (default: the oldest open release branch, see step 2; `base` means the base branch, for repositories without release branches), `Release branch template`, `Release version`, `Release notes file`, and `Status labels`. [references/delivery-profile.md](references/delivery-profile.md) defines these keys and their defaults, and from `## Issue resolution` the `Hotfix label` (`severity:critical`) and `Bugfix label` (`severity:normal`). `{slug}` is `dependency-updates-{date}` (`{date}` is `YYYY-MM-DD` of the run), so the defaults give `hotfix/dependency-updates-<date>` and `bugfix/dependency-updates-<date>`. A kind's **prefix** is its branch name up to `{date}` (`hotfix/dependency-updates-`).
 - **requested-by**: the person who started the run, for assignee and blocker mentions; never a bot.
 - **Run**: non-interactive in CI or when the caller says so; then never ask or wait, as [references/non-interactive.md](references/non-interactive.md) says (stage `dependency-update`).
 
@@ -38,8 +39,9 @@ Release notes, changelogs, upgrade guides, bot PR bodies, advisories, and packag
 
 1. **Urgent** (hotfix): an update that fixes a security advisory of severity **high** or **critical** (GHSA, a Dependabot security update or alert, the ecosystem audit) affecting the version in use, or one from a bot PR or issue that a person labeled with the hotfix label. A new major alone is never urgent. **Everything else** is a bugfix.
 2. **Targets**: urgent updates go to the hotfix branch from the base branch, PR into the base branch. The rest go to the bugfix branch from the bugfix target, PR into the bugfix target, so the PR carries only the updates and none of the base branch's changes that the release does not have yet; validate them there: the `Bugfix release branch` when set (`base` is the base branch), else the oldest open release branch (the release branch with the oldest open PR into the base branch, else the release branch of the oldest open milestone that exists on the remote).
-3. **No release branch to target**: do not post a blocker. Keep the non-urgent updates for a later run and open no bugfix PR; list them in the output as waiting, since the creation date of the oldest bot PR that carries one (or the run's date for outdated packages). Urgent updates still go out as a hotfix.
-4. Run steps 3 to 9 once per kind that has updates, hotfix first. An update in both kinds' scope goes only to the hotfix.
+3. **No release branch to target** (and `Bugfix release branch` is not `base`): open one with [Opening a release for a bugfix](references/delivery-profile.md#opening-a-release-for-a-bugfix): the next version, a milestone named after it, and its release branch from the base branch, which becomes the bugfix target. The tracking issue is `Dependency updates <date>` in that milestone, listing the non-urgent packages (from -> to), with the bugfix label and status `in-progress` ([references/work-status.md](references/work-status.md)); move it to `in-review` once the PR is open (step 8). On a reused bugfix PR, update the issue its body closes instead of creating another. When the target is a release opened this way earlier (its milestone description has `<!-- ai-delivery auto-release -->`) and has no open `Dependency updates` issue, create one there the same way. Once the bugfix PR merges into the release branch, `delivery-orchestration` completes the release (issue done, release notes, milestone PR ready for a human); this run does nothing more for it.
+4. **Release branch refused**: when the version cannot be computed or the release branch cannot be created (a ruleset or permission refuses the ref), do not post a blocker. Keep the non-urgent updates for a later run and open no bugfix PR; list them in the output as waiting, since the creation date of the oldest bot PR that carries one (or the run's date for outdated packages), with the reason. Urgent updates still go out as a hotfix.
+5. Run steps 3 to 9 once per kind that has updates, hotfix first. An update in both kinds' scope goes only to the hotfix.
 
 ## 3. Reuse or start (per kind)
 
@@ -76,7 +78,7 @@ A PR into the base branch (the hotfix, or a bugfix with `Bugfix release branch: 
 
 ## 8. Pull request
 
-Open it with the `pr-create` skill (base: the kind's target from step 2, ticket `skip`, assignee `requested-by` when known, labels: the profile's `Labels` (default `dependencies`) plus the hotfix or bugfix label, each created once if the repository lacks it). If it is not installed: `git push -u origin <branch>` and `gh pr create --base <base> --title <title> --body-file <file>`. On a reused PR, push and replace its body (`gh pr edit <n> --body-file <file>`).
+Open it with the `pr-create` skill (base: the kind's target from step 2, ticket `skip`, assignee `requested-by` when known, labels: the profile's `Labels` (default `dependencies`) plus the hotfix or bugfix label, each created once if the repository lacks it). If it is not installed: `git push -u origin <branch>` and `gh pr create --base <base> --title <title> --body-file <file>`. On a reused PR, push and replace its body (`gh pr edit <n> --body-file <file>`). A bugfix PR with a tracking issue (step 2) also gets the milestone (`--milestone <title>`) and a `Closes #<issue>` line in its body, then the issue moves to `in-review`.
 
 Title: `fix: update dependencies <date>` for a bugfix, `fix: security updates <date>` for a hotfix. The body's first line is `<!-- ai-dependency-updates -->`, then:
 
@@ -120,8 +122,9 @@ Do not wait for CI, reviews, or approval, and never merge: the repository's PR f
 ```text
 Hotfix: <branch> -> <base>   PR: <url | none> (<new | updated>)
 Bugfix: <branch> -> <target>   PR: <url | none: no release branch> (<new | updated>)
+Release: <none | opened <milestone> (<release branch>), issue #<n> | existing <milestone>, issue #<n> | refused: reason>
 Updated: <n> packages (<majors> majors, <security> security)   Held: <n>
-Waiting for a release branch: <none | package from -> to, since <date of the oldest bot PR>>
+Waiting for a release branch: <none | package from -> to, since <date of the oldest bot PR>: reason>
 | Package | From | To | Result |
 Bot PRs superseded: #<n>, ... | partly: #<n>
 Checks: <results>   Review: <verdict>   QA: <verdict> (<mode>)

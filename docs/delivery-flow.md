@@ -52,7 +52,32 @@ You need a repository with GitHub Actions, the reusable workflows from [fbrissi/
    - `ai:resolve`, `severity:critical`, and `severity:normal` (issue resolution, or the names in the profile)
    - your hold labels for merges (`merge-risk` default: `do-not-merge`, `hold`)
 4. **Project (optional).** With `project`, the issue's single-select Status field must already have an option for each state, by default `Needs business refinement`, `Business blocked`, `Needs technical refinement`, `Technical blocked`, `Needs review`, `Ready`, `In progress`, `In review`, `Done`. Map several states to one option with `project-status-options` (for example `business-blocked=Blocked`). The steps never create options.
-5. **Profile.** Add `docs/ai/delivery.md` from the [template](../shared/references/delivery-profile.md#profile-template): repository scope, source tracker, milestone template, base branch, branch templates, and `## QA in CI`. Add the `quality-cycle`, `review-changes`, `qa-e2e`, and `bdd-scenarios` profiles for the implement step.
+5. **Profile.** Add `docs/ai/delivery.md` from the [template](../shared/references/delivery-profile.md#profile-template): repository scope, source tracker, milestone template, base branch, branch templates, and `## Bugfix releases
+
+A bugfix needs an open release branch. When there is none (and `Bugfix release branch` is not `base`), `dependency-updates` and `issue-resolver` open one instead of waiting, and leave the rest to orchestration ([delivery-profile.md](../shared/references/delivery-profile.md#opening-a-release-for-a-bugfix)):
+
+1. The version is computed like the release notes version: the next one above the base branch's changelog, the release tags, and open release branches (`Release version`'s increment, else the next patch).
+2. A milestone named after the version (`v1.4.3`, with `<!-- ai-delivery auto-release -->` and the `requested-by` marker in its description) and its release branch from `Release branch template` (default `release/v1-4-3`), created from the default branch, exactly as orchestration names it.
+3. A tracking issue in the milestone, `in-progress` then `in-review`: the resolved issue itself, or `Dependency updates <date>` listing the packages. The bugfix PR into the release branch carries `Closes #<issue>` and the milestone.
+4. When the bugfix PR merges, orchestration runs for the milestone (the orchestrate-on-merge workflow must also accept `bugfix/` PRs into release branches): it moves the issue to `done`, opens the draft milestone PR, writes the release notes, and marks the milestone PR ready for a human.
+
+Only one release is opened at a time: once it exists, it is the oldest open release branch, so later bugfixes target it and add their own tracking issues. When the release branch cannot be created (for example a ruleset refuses the ref), dependency updates wait for a later run and issue resolution posts a blocker, each saying why.
+
+```mermaid
+gitGraph
+  commit id: "v1.4.2"
+  branch release/v1-4-3
+  checkout release/v1-4-3
+  branch bugfix/dependency-updates-2026-11-30
+  commit id: "updates"
+  checkout release/v1-4-3
+  merge bugfix/dependency-updates-2026-11-30 id: "bugfix PR"
+  commit id: "release notes PR"
+  checkout main
+  merge release/v1-4-3 id: "milestone PR"
+```
+
+## QA in CI`. Add the `quality-cycle`, `review-changes`, `qa-e2e`, and `bdd-scenarios` profiles for the implement step.
 6. **Workflows.** Add the stage callers from the github-actions `ai-task.yml` reusable workflow (default files `ai-business-refinement.yml`, `ai-technical-refinement.yml`, `ai-readiness-review.yml`, `ai-orchestrate.yml`, `ai-implement.yml`), the PR follow-up callers (`pr-fix`, `merge-decision`) with branch prefixes that cover the branch model (`feature/ release/ hotfix/ bugfix/`, plus any older prefixes still open), and a caller of `ai-resume.yml` on `issue_comment: [created]`. For production issues, add a weekly intake caller and a resolve caller on `issues: [labeled]` for the github-actions `issue-intake` and `issue-resolve` tasks of `ai-task.yml` (default callers `ai-issue-intake.yml` and `ai-issue-resolve.yml`; see [Issue resolution](#issue-resolution)), a weekly caller for the `dependency-update` task after the dependency bots run (default `ai-dependency-update.yml`; its `hotfix/` and `bugfix/` branches are already in the PR follow-up prefixes; see [Dependency updates](#dependency-updates)), and a `branch-sync.yml` caller on `push` to the default branch when you keep a `develop` mirror.
 7. **Versions.** Pin the ai-skills version the workflows install. Release this library first (merging tags `vX.Y.Z`), then github-actions, then bump the pins in your repository.
 
@@ -143,7 +168,7 @@ The branch model has four kinds of branch, named by templates in the profile (de
 | release | `Release branch template` (`release/{slug}`) | default branch | default branch |
 | feature | `Feature branch template` (`feature/{release-slug}-{n}-{slug}`) | its release branch | that release branch |
 | hotfix | `Hotfix branch template` (`hotfix/{slug}`) | default branch | default branch |
-| bugfix | `Bugfix branch template` (`bugfix/{slug}`) | its target, the open release branch (so the PR carries only the fix, not the default branch's newer changes) | the open release branch (`Bugfix release branch`, else the oldest open one; with none, a handoff asks which) |
+| bugfix | `Bugfix branch template` (`bugfix/{slug}`) | its target, the open release branch (so the PR carries only the fix, not the default branch's newer changes) | the open release branch (`Bugfix release branch`, else the oldest open one; with none, the flow opens one, see [Bugfix releases](#bugfix-releases)) |
 
 ```mermaid
 gitGraph
@@ -212,7 +237,7 @@ sequenceDiagram
 Production problems take a shorter path than milestones, with the [`issue-resolver`](claude-code-agents.md#issue-resolver) agent:
 
 1. **Intake** (for example a weekly schedule) reads the source with [`sentry-issues`](skills/sentry-issues.md) and keeps one GitHub issue per Sentry issue (marker `<!-- ai-issue source=sentry id=<id> -->`, so it never duplicates), with a severity label decided by the profile's `Hotfix criteria` and the `Resolve label` (`ai:resolve`).
-2. **Resolve** runs when an issue gets the resolve label (people can label any issue). Critical issues get a hotfix branch into the default branch; the rest get a bugfix branch into the open release branch. It diagnoses with `observability-triage`, writes a failing test first, runs the review and QA cycle, opens the PR, and stops.
+2. **Resolve** runs when an issue gets the resolve label (people can label any issue). Critical issues get a hotfix branch into the default branch; the rest get a bugfix branch into the open release branch, opening a release when none is open ([Bugfix releases](#bugfix-releases)). It diagnoses with `observability-triage`, writes a failing test first, runs the review and QA cycle, opens the PR, and stops.
 3. **Follow-up** is the usual PR follow-up: `pr-fix` on review and CI events, then the merge decision. Hotfix PRs into the default branch need a human approval.
 
 ```mermaid
@@ -225,7 +250,7 @@ flowchart LR
   HC -->|"issues: labeled"| RES["resolve: issue-resolver<br/>observability-triage → failing test<br/>→ quality-cycle → pr-create"]
   NC -->|"issues: labeled"| RES
   RES -->|critical| HF["hotfix branch, PR into the default branch<br/>needs a human approval"]
-  RES -->|normal| BF["bugfix branch, PR into the open release branch"]
+  RES -->|normal| BF["bugfix branch, PR into the open release branch<br/>(opened for it when none is open)"]
   RES -->|not a clear code defect| BLK(["blocker comment for requested-by"])
   HF --> FU["PR follow-up: pr-fix, then merge-risk"]
   BF --> FU
@@ -238,7 +263,7 @@ Configure it in the profile's `## Issue resolution` section and the `sentry-issu
 Dependency bumps follow the issue resolution branch model, with the [`dependency-updater`](claude-code-agents.md#dependency-updater) agent and one run instead of intake plus resolve:
 
 1. **Update** (a weekly schedule after the dependency bots run, for example Monday 12:00 UTC for bots that run at 09:00) follows [`dependency-updates`](skills/dependency-updates.md): it collects the open Dependabot or Renovate PRs into the base branch (and outdated packages when the profile asks) and the open advisories, reads each package's release notes and upgrade guide, adapts the code, holds back what is unsafe, and runs the checks and the review and QA cycle.
-2. **Route.** Urgent updates (a high or critical security advisory on the version in use, or a bot PR or issue a person labeled with the `Hotfix label`; a new major alone is not urgent) go to `hotfix/dependency-updates-<date>`, PR into the base branch with its release section. The rest go to `bugfix/dependency-updates-<date>`, branched from and PR'd into the bugfix target (`Bugfix release branch`, else the oldest open release branch), with no release section. Updates the target already has (for example from an earlier bugfix PR while the bot PRs into the base branch stay open) are skipped, not redone. With no release branch to target there is no blocker: the non-urgent updates wait for a later run and the report says since when. A repository without release branches sets `Bugfix release branch: base`.
+2. **Route.** Urgent updates (a high or critical security advisory on the version in use, or a bot PR or issue a person labeled with the `Hotfix label`; a new major alone is not urgent) go to `hotfix/dependency-updates-<date>`, PR into the base branch with its release section. The rest go to `bugfix/dependency-updates-<date>`, branched from and PR'd into the bugfix target (`Bugfix release branch`, else the oldest open release branch), with no release section. Updates the target already has (for example from an earlier bugfix PR while the bot PRs into the base branch stay open) are skipped, not redone. With no release branch to target, the run opens one ([Bugfix releases](#bugfix-releases)) with a `Dependency updates <date>` tracking issue; only when that release branch cannot be created do the non-urgent updates wait for a later run (no blocker; the report says since when and why). A repository without release branches sets `Bugfix release branch: base`.
 3. **Follow-up** is the usual PR follow-up for `hotfix/` and `bugfix/` branches: `pr-fix` on review and CI events, then the merge decision, with a human approval for a PR into the default branch. Each PR lists `Supersedes #<n>` for the bot PRs it covers; a later run updates the open PR of its kind. The bots close their own PRs once the updates reach the base branch; the flow never closes or merges them.
 
 ```mermaid
@@ -248,7 +273,9 @@ flowchart LR
   U -->|yes| HF["hotfix/dependency-updates-{date}<br/>PR into the base branch, release section"]
   U -->|no| RB{"open release branch?"}
   RB -->|yes| BF["bugfix/dependency-updates-{date}<br/>PR into the release branch"]
-  RB -->|no| W(["wait for a later run<br/>(reported, since the oldest bot PR)"])
+  RB -->|no| OP["open a release: milestone vX.Y.Z,<br/>release branch, tracking issue"]
+  OP -->|created| BF
+  OP -->|refused| W(["wait for a later run<br/>(reported, since the oldest bot PR)"])
   HF --> FU["PR follow-up: pr-fix, then merge-risk<br/>human approval into the base branch"]
   BF --> FU
 ```
