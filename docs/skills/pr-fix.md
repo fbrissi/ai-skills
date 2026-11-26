@@ -34,4 +34,4 @@ Triage PR review feedback and failing CI, fix what is valid, push, and reply to 
 
 ## Side effects
 
-Commits, pushes, and posts PR replies. It never resolves threads unless you ask.
+Commits, pushes, and posts PR replies. It resolves a thread only when a bot (or its own earlier review) started it and the pushed commit fixes it, so a merge gate waiting for zero open threads does not stall; threads people started stay open for them unless you ask.

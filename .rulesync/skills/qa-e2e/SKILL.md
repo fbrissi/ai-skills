@@ -18,6 +18,7 @@ Act as a careful QA engineer using the app like a real user. Evidence over opini
 - **Scope**: scenario files or tags (`@smoke`, `@p1`), a capability, a branch or diff (run the scenarios that cover it plus their regression neighbours), or `all`. Default: the scenarios covering the current branch against its base, otherwise `@smoke`.
 - **Environment**: `local` (default), a staging URL the user names in the request, or `ci` (detected from `CI=true`; see CI runs).
 - **Profile**: default `docs/ai/qa-e2e.md`, or a path given in the request.
+- **Ticket**: the issue or ticket the change implements, when there is one (from the request, the PR, or the branch).
 - **Focus**: any remaining text sets priorities (for example "mobile only", "checkout").
 
 ## Safety rules (never relax)
@@ -49,6 +50,7 @@ Judge the verdict from that evidence as in step 5, with the mode `targeted valid
 1. Confirm the stack is running (open the base URL; check the mail catcher if any scenario is `@email`). If it is down, start it with the profile's command, or stop and ask (non-interactive: see CI below).
 2. Load the scenarios in scope. If there are none, hand off to the `bdd-scenarios` skill for the scope; if it is not installed, derive a short checklist of behaviors from the diff and the app's routes, state that it is unscripted, and continue.
 3. Note the data each scenario needs. Reset or seed only with the profile's commands, and only on the test environment.
+4. For a ticket, load it with its attachments following [references/tickets.md](references/tickets.md) and open every image yourself (mockups, screenshots, flows), as [Images in every stage](references/tickets.md#images-in-every-stage) says. Keep them for step 3.
 
 ## 2. Execute functional scenarios
 
@@ -64,7 +66,7 @@ For each scenario, at the default desktop viewport (profile, default 1440x900):
 
 ## 3. UX/UI pass across viewports
 
-Do not repeat every scenario at every viewport. Instead, during the run, switch to the mobile viewport (profile, default 375x812) on each distinct screen the scenarios visit, every `@mobile` scenario, and every screen the diff changed, then switch back. Check each with [references/ux-checklist.md](references/ux-checklist.md): alignment, overflow and horizontal scroll, clipped or overlapping components, touch target size, focus order and keyboard use, readable contrast, loading/empty/error states, and text that breaks layout.
+Do not repeat every scenario at every viewport. Instead, during the run, switch to the mobile viewport (profile, default 375x812) on each distinct screen the scenarios visit, every `@mobile` scenario, and every screen the diff changed, then switch back. Compare each changed screen against the ticket's original images (layout, copy, states, order of elements), not against their transcription in the issue or plan, and report each difference that the ticket does not explain as a finding with both screenshots. Check each with [references/ux-checklist.md](references/ux-checklist.md): alignment, overflow and horizontal scroll, clipped or overlapping components, touch target size, focus order and keyboard use, readable contrast, loading/empty/error states, and text that breaks layout.
 
 If the `web-design-reviewer` skill is installed, you may use it for this pass, keeping its findings in this report's format. Report only; do not edit code.
 

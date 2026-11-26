@@ -20,7 +20,7 @@ Stop with `Unable to refine: missing source` if there is no `source`.
 
 ## 1. Load the source
 
-1. Load the source with its comments, attachments, and inline images following [references/tickets.md](references/tickets.md) (for Jira, with `renderedFields` so each inline image maps to its attachment). For a GitHub milestone, the source is its existing issues, not its description (which may be empty): load every open issue in it the same way, with comments and attachments. If no access works, stop and say which access is needed.
+1. Load the source with its comments, attachments, and inline images following [references/tickets.md](references/tickets.md) (for Jira, with `renderedFields` so each inline image maps to its attachment). For a GitHub milestone, the source is its existing issues, not its description (which may be empty): load every open issue in it the same way, with comments and attachments. Open every image yourself, as [Images in every stage](references/tickets.md#images-in-every-stage) says. If no access works, stop and say which access is needed.
 2. Load the existing state so a re-run updates instead of duplicating: the milestone titled from `milestone-template` (`gh api repos/{owner}/{repo}/milestones?state=all`), and its issues with their labels and bodies.
 3. Read the repository's guidance (`AGENTS.md`, `CLAUDE.md`, `README`, the profile's Repository scope) and only as much code as you need to tell which parts of the request this repository owns.
 

@@ -3,10 +3,15 @@
 All notable changes to this project are documented here. Release versions follow
 [Semantic Versioning](https://semver.org/).
 
-## v0.10.2
+## v0.11.0
 
 ### Changed
 
+- Every stage that works from an issue opens its images itself: `business-refinement`, `technical-refinement`, `readiness-review`, `delivery-orchestration` (when it reads issues), `dev` and the `task-implementer` agent, `quality-cycle` (each role gets the ticket reference), `qa-e2e`, `review-changes`, and `pr-fix` (when feedback points at an image) download and open every image attachment and inline image, from the tracker and the issue's `## Attachments`, instead of relying on another stage's transcription. `qa-e2e` compares the implemented UI against the original images. When an image cannot be downloaded the stage says so, and stops with a question when the image is needed to decide. The rule is in the new `Images in every stage` section of `shared/references/tickets.md`, now also copied into `quality-cycle`, `qa-e2e`, and `pr-fix`.
+- `pr-fix` resolves a review thread a bot (or its own review) started once the pushed commit fixes it, and `review-changes` resolves its own earlier threads whose finding the current head fixes, so a merge gate that waits for zero open threads no longer stalls on fixed findings. Threads people started stay open for them. `pr-context.sh` now returns each thread's `threadId`.
+- `delivery-orchestration` waits for the milestone PR's required checks after the mergeable check and before marking it ready; a failing check leaves it in draft with a blocker naming the check.
+- The release version counts only release branches with an open PR into the base branch (or an open auto-release milestone), so stale `release/*` branches no longer inflate it.
+- Release notes are not needed when every change in the milestone touches only documentation, agent configuration, or CI (`*.md` including README, `AGENTS.md`, `CLAUDE.md`, `docs/**`, `.ai/**`, `.github/**`): no notes PR and no version.
 - `business-refinement` links Jira attachments in the issue's `## Attachments` section with their browser URL (`<JIRA_BASE_URL>/secure/attachment/<id>/<filename>`), which opens the image for anyone signed in to Jira, and adds the source ticket link at the top of the section. Later steps still download attachments through the REST API by the id in the URL (`shared/references/tickets.md`). Images still do not render inline on the issue, since Jira requires sign-in, so each keeps its text description.
 
 ## v0.10.1

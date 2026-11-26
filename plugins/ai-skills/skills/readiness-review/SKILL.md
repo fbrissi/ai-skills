@@ -19,7 +19,7 @@ Stop with `Unable to review: missing milestone or issue` if neither is given.
 
 ## 1. Load
 
-Load the target with comments following [references/tickets.md](references/tickets.md). In scope: issues in `needs-review`. For a milestone, also load the other issues to check dependencies and overlaps.
+Load the target with comments and attachments following [references/tickets.md](references/tickets.md), and open every image of the issue and its source yourself, as [Images in every stage](references/tickets.md#images-in-every-stage) says, to check that the stories, criteria, and plan match them. In scope: issues in `needs-review`. For a milestone, also load the other issues to check dependencies and overlaps.
 
 ## 2. Check each issue
 

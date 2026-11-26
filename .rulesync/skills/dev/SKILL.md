@@ -20,7 +20,7 @@ Stop with `Missing implementation request` if there is no source.
 
 ## 1. Orient
 
-1. For a ticket, load the body and comments following `references/tickets.md`. Keep the ticket URL for the PR. If no access can load it, stop and say which tool, MCP server, or CLI is needed.
+1. For a ticket, load the body, comments, and attachments following `references/tickets.md`, and open every image yourself (its `Images in every stage` section): implement the UI and rules the images show, not their description. Keep the ticket URL for the PR. If no access can load it, stop and say which tool, MCP server, or CLI is needed.
 2. Write a 2-4 line brief: goal, constraints, acceptance criteria. If the source already contains a plan (for example from `ticket-plan`), use it.
 3. Survey before editing: find the code paths, existing patterns, and tests that the change touches. Read the nearest `AGENTS.md`/`CLAUDE.md`.
 4. If the request is ambiguous in a way that changes the implementation, ask once; in a non-interactive run (CI, or a caller that says so), follow [references/non-interactive.md](references/non-interactive.md) instead: a blocker comment on the ticket, then stop. Otherwise state your assumption and proceed.
