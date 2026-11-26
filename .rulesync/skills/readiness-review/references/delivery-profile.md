@@ -1,6 +1,6 @@
 # Delivery inputs and profile
 
-One profile serves the whole delivery flow: `business-refinement`, `technical-refinement`, `readiness-review`, and `delivery-orchestration`, and the agents that create branches (`issue-resolver`, `milestone-delivery`).
+One profile serves the whole delivery flow: `business-refinement`, `technical-refinement`, `readiness-review`, and `delivery-orchestration`, and the agents and skills that create branches (`issue-resolver`, `milestone-delivery`, `dependency-updates`).
 
 ## Resolving values
 
@@ -17,7 +17,7 @@ For every value: the run's input (from the request, a calling agent, or a workfl
 | `feature-branch-template` | Feature branch template | `feature/{release-slug}-{n}-{slug}` |
 | `hotfix-branch-template` | Hotfix branch template | `hotfix/{slug}` |
 | `bugfix-branch-template` | Bugfix branch template | `bugfix/{slug}` |
-| `bugfix-release` | Bugfix release branch | none: the oldest open release branch |
+| `bugfix-release` | Bugfix release branch | none: the oldest open release branch; `base`: the base branch, for repositories without release branches |
 | `issue-sources` | Issue sources | `sentry` (source skills the `issue-resolver` intake reads) |
 | `resolve-label` | Resolve label | `ai:resolve` |
 | `hotfix-label` | Hotfix label | `severity:critical` |
