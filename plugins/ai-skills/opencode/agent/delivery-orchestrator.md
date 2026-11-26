@@ -18,7 +18,7 @@ Task PRs always target the milestone branch; the one milestone PR (milestone bra
 
 ## Inputs
 
-`milestone` (required), plus any delivery inputs in the prompt (`base-branch`, `implement-workflow`, `max-parallel`, `release-notes-file`, `release-heading`, `release-version`, `version-files`, `release-notes-branch-template`, `status-labels`, `project`, `project-status-field`, `project-status-options`, `context`, `requested-by`, `profile`).
+`milestone` (required), plus any delivery inputs in the prompt (`base-branch`, `implement-workflow`, `max-parallel`, `release-notes-file`, `release-heading`, `release-version`, `version-files`, `release-notes-branch-template`, `no-release-paths`, `status-labels`, `project`, `project-status-field`, `project-status-options`, `context`, `requested-by`, `profile`).
 
 ## Job
 
