@@ -68,7 +68,7 @@ What happens next depends on the skill's purpose:
 
 A GitHub issue can have a parent issue and sub-issues. The refinement stages add each issue split from another as its sub-issue, so the parent holds the background the split issues build on (research, data, decisions, the original request).
 
-- **Load them** with the issue, in every skill that works from it: `gh api graphql -f query='query($o:String!,$r:String!,$n:Int!){repository(owner:$o,name:$r){issue(number:$n){parent{number title body} subIssues(first:50){nodes{number title state}}}}}' -F o=<owner> -F r=<repo> -F n=<n>`. When it has a parent, read the parent's body, and its comments when the issue refers to them.
+- **Load them** with the issue, in every skill that works from it: `gh api graphql -f query='query($o:String!,$r:String!,$n:Int!){repository(owner:$o,name:$r){issue(number:$n){parent{number title body} subIssues(first:50){nodes{number title state}}}}}' -f o=<owner> -f r=<repo> -F n=<n>`. When it has a parent, read the parent's body, and its comments when the issue refers to them.
 - **The parent is context, not scope.** The issue's own body, acceptance criteria, and comments are the contract. Use the parent to understand why and for whom, and to reuse its research, but never take on a requirement the issue does not state, and never do a sibling's work.
 - **Sub-issues are scope already split out.** When the issue has sub-issues, do not implement or refine their work in it; refer to them instead.
 - **Add a sub-issue** with the REST id of the child (not its number): `gh api -X POST repos/<owner>/<repo>/issues/<parent>/sub_issues -F sub_issue_id="$(gh api repos/<owner>/<repo>/issues/<child> --jq .id)"`. An issue has at most one parent.

@@ -65,8 +65,9 @@ Merge both finding lists, drop duplicates, and classify each:
 | Class | Action |
 | --- | --- |
 | blocker, critical, high, medium | Fix in this cycle |
-| an acceptance criterion of the ticket the branch does not meet, at any severity a role gave it | Fix in this cycle (it counts as at least medium), never a follow-up; only the user can drop or defer a criterion |
-| a scenario the branch adds or changes that the project's default or CI selection never runs (for example a feature tag the config always excludes) | Fix in this cycle: move or retag it so it runs, or record the owner decision the project requires for an excluded tag |
+| an acceptance criterion of the ticket the branch does not meet, at any severity a role gave it | Fix in this cycle (it counts as at least medium), never a follow-up; only the user can drop or defer a criterion. A criterion only a person can satisfy (a sign-off before merge) is not a finding: the PR carries `ai:needs-approval` for it |
+| a scenario the branch adds or changes with a tag the project's E2E config always excludes, so no tag selection runs it (for example `@email` on the `Feature:` line), unless the scenario needs that tag and carries the owner decision the project requires for it | Fix in this cycle: move or retag it so it runs |
+| an environment finding (QA could not run a scenario because a file, service, or account the run needs is missing or unreadable) | Fix it in this cycle when it is in the repository (for example the setup script); otherwise report it as open in the output and the PR body. It never blocks approval and is never reported as covered by other tests |
 | low, in touched code, cheap (minutes) | Fix in this cycle |
 | low elsewhere, or pre-existing (never an acceptance criterion) | Follow-up ticket (with the `ticket-create` skill if installed, otherwise a list in the cycle log for the user) |
 | disputed | Record the evidence; the role that raised it decides next round, or the user decides |
