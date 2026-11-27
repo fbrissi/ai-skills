@@ -11,7 +11,7 @@ import { readFileSync } from "node:fs";
 import { basename, dirname, resolve } from "node:path";
 import { GraphClient, GraphError, graphEnv } from "./graph.mjs";
 import { putObject, s3Config } from "./s3.mjs";
-import { composeText, finalCall, isDone, isMain, loadManifest, recordState, resolveMediaPath, saveManifest, UncertainError, validateManifest, zoneOffset } from "./social-manifest.mjs";
+import { composeText, finalCall, isAiGenerated, isDone, isMain, loadManifest, recordState, resolveMediaPath, saveManifest, UncertainError, validateManifest, zoneOffset } from "./social-manifest.mjs";
 
 export const DEFAULT_PREFIX = "marketing/instagram/{date}/{id}/";
 const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
@@ -46,13 +46,17 @@ export function mediaKey(prefix, item, path) {
   return `${folder.endsWith("/") ? folder : `${folder}/`}${basename(path)}`;
 }
 
+/** Meta's AI label: is_ai_generated when the item has AI narration or realistic AI footage (carousel: parent only). */
+export const aiFlag = (item) => (isAiGenerated(item) ? { is_ai_generated: "true" } : {});
+const altText = (media) => (media.alt ? { alt_text: media.alt } : {});
+
 export function containerFields(item, urls, caption) {
   const [first] = item.media;
-  if (item.type === "photo") return [{ image_url: urls[0], caption }];
-  if (item.type === "story") return [first.kind === "video" ? { media_type: "STORIES", video_url: urls[0] } : { media_type: "STORIES", image_url: urls[0] }];
-  if (item.type === "reel") return [{ media_type: "REELS", video_url: urls[0], caption, share_to_feed: String(item.options?.share_to_feed ?? true) }];
+  if (item.type === "photo") return [{ image_url: urls[0], caption, ...altText(first), ...aiFlag(item) }];
+  if (item.type === "story") return [first.kind === "video" ? { media_type: "STORIES", video_url: urls[0], ...aiFlag(item) } : { media_type: "STORIES", image_url: urls[0], ...aiFlag(item) }];
+  if (item.type === "reel") return [{ media_type: "REELS", video_url: urls[0], caption, share_to_feed: String(item.options?.share_to_feed ?? true), ...aiFlag(item) }];
   if (item.type === "carousel") {
-    return item.media.map((media, index) => (media.kind === "video" ? { media_type: "VIDEO", video_url: urls[index], is_carousel_item: "true" } : { image_url: urls[index], is_carousel_item: "true" }));
+    return item.media.map((media, index) => (media.kind === "video" ? { media_type: "VIDEO", video_url: urls[index], is_carousel_item: "true" } : { image_url: urls[index], is_carousel_item: "true", ...altText(media) }));
   }
   throw new PublishError(`${item.id}: unsupported type ${item.type}`);
 }
@@ -116,7 +120,7 @@ async function publishOne(item, { client, igUserId, s3, prefix, manifestDir, fet
       await waitReady(client, created.id, { pollMs, timeoutMs });
       children.push(created.id);
     }
-    creationId = (await client.post(`${igUserId}/media`, { media_type: "CAROUSEL", children: children.join(","), caption })).id;
+    creationId = (await client.post(`${igUserId}/media`, { media_type: "CAROUSEL", children: children.join(","), caption, ...aiFlag(item) })).id;
   } else {
     creationId = (await client.post(`${igUserId}/media`, fields[0])).id;
   }

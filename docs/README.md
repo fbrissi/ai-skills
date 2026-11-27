@@ -38,6 +38,7 @@
 | Social | [`facebook-publish`](skills/facebook-publish.md) | Deterministic Graph API scheduler for approved posts, photos, and Reels | Scheduled Page posts |
 | Social | [`instagram-publish`](skills/instagram-publish.md) | Deterministic Instagram publisher, one due item per run, media in a public bucket | Instagram posts, bucket objects |
 | Social | [`youtube-publish`](skills/youtube-publish.md) | Deterministic YouTube uploader with `publishAt` scheduling | YouTube videos |
+| Social | [`linkedin-publish`](skills/linkedin-publish.md) | Deterministic LinkedIn Page publisher, one due item per run, read-back duplicate check | LinkedIn posts |
 | Media | [`flow-video-ad`](skills/flow-video-ad.md) | Plans a Google Flow ad with real screen footage and assembles the video | Writes files in the ads folder |
 
 How they fit together:
@@ -61,7 +62,7 @@ dependency-updates ──► dev (breaking changes) ──► quality-cycle ─�
 
 business-refinement ──► technical-refinement ──► readiness-review ──► delivery-orchestration ──► dev ──► quality-cycle ──► pr-create
 
-social-content-plan ──► image-cards / video-shorts ──► copy-guard ──► social-review ──► (approval) ──► facebook-publish / instagram-publish / youtube-publish
+social-content-plan ──► image-cards / video-shorts ──► copy-guard ──► social-review ──► (approval) ──► facebook-publish / instagram-publish / youtube-publish / linkedin-publish
 ```
 
 The delivery skills, their agents, statuses, and CI use are described once in [delivery-flow.md](delivery-flow.md).

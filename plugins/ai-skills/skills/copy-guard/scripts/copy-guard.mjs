@@ -4,7 +4,8 @@
 // extendable from the profile. Exits 1 when any error-level rule matches.
 // Usage:
 //   copy-guard.mjs --manifest <manifest.json> [--profile <profile.md>] [--lang pt-BR] [--json]
-//   copy-guard.mjs --text <file|-> [--profile <profile.md>] [--lang en] [--json]
+//   copy-guard.mjs --text <file|-> [--profile <profile.md>] [--lang en] [--platform <name>] [--json]
+// copy_guard.max_hashtags in the profile is a number or a per-platform map ({"instagram": 5, "default": 5}).
 import { readFileSync } from "node:fs";
 import { composeText, isMain, readProfileConfig } from "./social-manifest.mjs";
 
@@ -26,6 +27,8 @@ export const RULES = [
   { id: "isca-de-engajamento", langs: "pt", level: "error", pattern: "\\b(?:coment[ea] (?:aqui|abaixo|ai|aí|sim|eu quero|\"[^\"]+\")|deix[ea] (?:nos comentários|seu comentário|um comentário|seu like)|marqu[ea] (?:um|uma|alguém|aquele|aquela|o seu|a sua|quem)|compartilh[ea] (?:com|se|esse|este)|curta se|d[êe] (?:um )?like|digit[ea] \\S+ nos comentários|manda (?:pra|para) (?:quem|aquele|aquela)|concorda\\?)", reason: "isca de engajamento (pedido de comentário, marcação, curtida ou compartilhamento)" },
   { id: "prova-social", langs: "pt", level: "error", pattern: "\\b(?:(?:milhares|centenas|milhões|dezenas) de (?:notas|clientes|usuários|empresas|pessoas|escritórios|contadores)|escritórios já usam|clientes confiam|depoimentos?|o mais (?:usado|vendido|completo|confiável)|líder (?:de|do|no) mercado|n[º°o]\\s?1\\b|número 1|o melhor (?:do|da) (?:brasil|mercado)|recomendado por especialistas)", reason: "prova social sem evidência" },
   { id: "promessa-fiscal", langs: "pt", level: "error", pattern: "\\b(?:nota sem erro|zero rejei[çc][ãa]o|sem (?:risco de )?multas?|nunca mais (?:erre|errar|multa|pague)|economi[az]\\w* (?:de |no |na |em )?(?:impostos?|tributos?)|pague menos (?:impostos?|tributos?)|reduz\\w* (?:seus |os |o )?(?:impostos?|tributos?)|garant\\w* (?:de )?(?:aprovação|resultado|economia|lucro)|100% (?:seguro|garantido|sem erro))", reason: "promessa de resultado fiscal ou de economia" },
+  { id: "medo-urgencia", langs: "pt", level: "error", pattern: "\\b(?:evite (?:a |uma |as )?multas?|(?:pode|podem|vai|vão) (?:ser multad[oa]s?|levar (?:uma )?multas?|pagar (?:uma )?multas?)|prazo final (?:está )?(?:chegando|acabando|se aproxima(?:ndo)?)|últimos dias (?:para|pra) (?:aproveitar|garantir|assinar|contratar|evitar)|última chance|não perca o prazo|corra(?:!|,| antes)|(?:aprovad[oa]|credenciad[oa]|certificad[oa]|homologad[oa]|autorizad[oa]) (?:pela|pelo) (?:receita(?: federal)?|sefin|sefaz|prefeitura|gov\\.br|governo)|conformidade garantida|100% em conformidade)", reason: "medo, urgência ou aval oficial sem fonte: informe o fato e a data com a fonte oficial" },
+  { id: "obrigacao-geral", langs: "pt", level: "warn", pattern: "(?<!nem )\\btodas as empresas (?:são|estão) obrigadas", reason: "obrigação generalizada: confirme na fonte oficial a quem se aplica (MEI, Simples, municípios) e cite-a" },
   { id: "atribuicao-vaga", langs: "pt", level: "error", pattern: "\\b(?:especialistas (?:dizem|afirmam|acreditam|recomendam)|estudos (?:mostram|comprovam|apontam|indicam)|pesquisas (?:mostram|comprovam|indicam)|segundo especialistas)\\b", reason: "atribuição vaga: cite a fonte ou corte" },
   { id: "rastro-de-chatbot", langs: "pt", level: "error", pattern: "(?:espero ter ajudado|^claro!|^com certeza!|ótima pergunta|como (?:uma|um) (?:ia|modelo de linguagem))", flags: "gimu", reason: "rastro de conversa com chatbot" },
   { id: "unico", langs: "pt", level: "warn", pattern: "\\b(?:únic[oa]s?|exclusiv[oa]s?)\\b", reason: "\"único\"/\"exclusivo\" pede evidência" },
@@ -93,6 +96,17 @@ export function profileRules(config) {
   return { extra, disabled: new Set(guard.disable ?? []), maxHashtags: guard.max_hashtags ?? null, maxEmoji: guard.max_emoji ?? 3 };
 }
 
+/** Platform caps that apply whatever the profile says (Instagram allows 5 hashtags since December 2025). */
+export const PLATFORM_MAX_HASHTAGS = { instagram: 5 };
+
+/** Effective hashtag cap: the profile's number, or its per-platform map, never above the platform's own cap. */
+export function hashtagCap(maxHashtags, platform) {
+  const fromProfile = maxHashtags !== null && typeof maxHashtags === "object" ? maxHashtags[platform] ?? maxHashtags.default ?? null : maxHashtags;
+  const fromPlatform = PLATFORM_MAX_HASHTAGS[platform] ?? null;
+  if (fromProfile === null || fromProfile === undefined) return fromPlatform;
+  return fromPlatform === null ? fromProfile : Math.min(fromProfile, fromPlatform);
+}
+
 export function checkText(text, { lang = "pt-BR", extra = [], disabled = new Set(), maxHashtags = null, maxEmoji = 3, where = "text" } = {}) {
   const group = languageGroup(lang);
   const findings = [];
@@ -115,11 +129,11 @@ export function checkText(text, { lang = "pt-BR", extra = [], disabled = new Set
 export function checkManifest(manifest, options = {}) {
   const findings = [];
   for (const item of manifest.items) {
-    const fields = [["text", composeText(item, manifest.platform)], ["title", item.title ?? ""], ["first_comment", item.options?.first_comment ?? ""]];
+    const fields = [["text", composeText(item, manifest.platform, manifest.language)], ["title", item.title ?? ""], ["first_comment", item.options?.first_comment ?? ""]];
     for (const media of item.media ?? []) if (media.alt) fields.push([`alt:${media.path}`, media.alt]);
     for (const [field, text] of fields) {
       if (!text) continue;
-      const scoped = { ...options, lang: options.lang ?? manifest.language, where: `${item.id}.${field}` };
+      const scoped = { ...options, lang: options.lang ?? manifest.language, where: `${item.id}.${field}`, maxHashtags: hashtagCap(options.maxHashtags ?? null, manifest.platform) };
       findings.push(...checkText(text, field === "text" ? scoped : { ...scoped, maxHashtags: null }).filter((f) => field === "text" || f.rule !== "broetry"));
     }
   }
@@ -143,7 +157,7 @@ export function main(argv, { out = process.stdout, readStdin = () => readFileSyn
   const options = { lang: value("lang") ?? config?.language, extra, disabled, maxHashtags, maxEmoji };
   let findings;
   if (value("manifest")) findings = checkManifest(JSON.parse(readFileSync(value("manifest"), "utf8")), options);
-  else if (value("text")) findings = checkText(value("text") === "-" ? readStdin() : readFileSync(value("text"), "utf8"), { ...options, lang: options.lang ?? "pt-BR" });
+  else if (value("text")) findings = checkText(value("text") === "-" ? readStdin() : readFileSync(value("text"), "utf8"), { ...options, lang: options.lang ?? "pt-BR", maxHashtags: hashtagCap(maxHashtags, value("platform") ?? null) });
   else {
     process.stderr.write("usage: copy-guard.mjs (--manifest <file> | --text <file|->) [--profile <md>] [--lang <code>] [--json]\n");
     return 2;

@@ -36,6 +36,7 @@ The plugin contains every skill too, so you do not need `npx skills add` for Cla
 | `facebook-content` | Social | `generate`: plans, writes, renders, guards, and opens the review issue for a Facebook batch; `adjust <issue>`: redoes what `/adjust` comments ask for. Never publishes | Drive files, review issue, comments |
 | `instagram-content` | Social | Same for Instagram: JPEG cards, carousels, Stories, Reels; items wait for the publisher's cron | Drive files, review issue, comments |
 | `youtube-content` | Social | Same for YouTube Shorts: narrated videos with credits, thumbnails, synthetic media flag | Drive files, review issue, comments |
+| `linkedin-content` | Social | Same for a LinkedIn company Page: cards, multi-image posts, videos; items wait for the publisher's cron | Drive files, review issue, comments |
 
 How the agents delegate to each other:
 
@@ -65,7 +66,7 @@ flowchart LR
   PS & NC --> DEV & CR & QA & CI
 ```
 
-`inpi-watch`, the delivery agents `business-analyst`, `tech-lead`, and `readiness-reviewer`, and the social agents `facebook-content`, `instagram-content`, and `youtube-content` work alone.
+`inpi-watch`, the delivery agents `business-analyst`, `tech-lead`, and `readiness-reviewer`, and the social agents `facebook-content`, `instagram-content`, `youtube-content`, and `linkedin-content` work alone.
 
 Which skills each agent follows (an agent that delegates uses the skills through its workers):
 
@@ -83,7 +84,7 @@ flowchart LR
     DU["dependency-updater"]
     NC["nfse-compliance"]
     IW["inpi-watch"]
-    SC["facebook-content<br/>instagram-content<br/>youtube-content"]
+    SC["facebook-content<br/>instagram-content<br/>youtube-content<br/>linkedin-content"]
     DEV["developer"]
     CR["code-reviewer"]
     QA["qa-tester"]
@@ -229,7 +230,7 @@ In `scan` mode it finds notes with no issue yet. For each note: `nfse-technical-
 
 ### Social content
 
-`facebook-content`, `instagram-content`, and `youtube-content` each run one platform of the [social content flow](social-content.md). `generate` follows `social-content-plan`, writes the copy, renders media with `image-cards` and `video-shorts`, passes `copy-guard`, validates the manifest, and opens the review issue with `social-review`. `adjust <issue>` restores the batch from the issue, applies only the `/adjust` comments of people with write access, and posts a revision. They are headless, never ask, never approve, and never publish: the publishers (`facebook-publish`, `instagram-publish`, `youtube-publish`) run in a separate deterministic workflow after a person comments `/aprove`.
+`facebook-content`, `instagram-content`, `youtube-content`, and `linkedin-content` each run one platform of the [social content flow](social-content.md). `generate` follows `social-content-plan`, writes the copy, renders media with `image-cards` and `video-shorts`, passes `copy-guard`, validates the manifest, and opens the review issue with `social-review`. `adjust <issue>` restores the batch from the issue, applies only the `/adjust` comments of people with write access, and posts a revision. They are headless, never ask, never approve, and never publish: the publishers (`facebook-publish`, `instagram-publish`, `youtube-publish`, `linkedin-publish`) run in a separate deterministic workflow after a person comments `/aprove`.
 
 ```bash
 claude -p --agent ai-skills:youtube-content "generate"
@@ -271,4 +272,4 @@ The agents read the profiles of the skills they use:
 | `nfse-compliance` | `nfse-technical-note-analysis` (Automation section), `merge-risk`, plus the cycle profiles |
 | `business-analyst`, `tech-lead`, `readiness-reviewer`, `delivery-orchestrator` | `delivery` (`docs/ai/delivery.md`) |
 | `task-implementer` | `delivery`, plus the cycle profiles |
-| `facebook-content`, `instagram-content`, `youtube-content` | `social-content` (`docs/ai/social-content.md`) |
+| `facebook-content`, `instagram-content`, `youtube-content`, `linkedin-content` | `social-content` (`docs/ai/social-content.md`) |

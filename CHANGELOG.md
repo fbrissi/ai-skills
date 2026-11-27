@@ -3,6 +3,23 @@
 All notable changes to this project are documented here. Release versions follow
 [Semantic Versioning](https://semver.org/).
 
+## v0.13.0
+
+### Added
+
+- LinkedIn: the `linkedin-content` agent (generate and adjust, like the other social agents) and the deterministic `linkedin-publish` skill. It posts as a company Page with the Community Management API: text and link posts, single images, multi-image posts, and videos uploaded through the Images and Videos APIs. A cron publishes one due item per run. A read-back of the Page's posts resolves lost responses without posting twice, a call budget enforced on every request (media polling included) keeps within the Development tier's 500 calls per day, a failed item stops blocking the queue after 3 attempts, and a plain-text AI disclosure is added when narration or footage is synthetic. Env: `LINKEDIN_ORGANIZATION_ID`, `LINKEDIN_CLIENT_ID`, `LINKEDIN_CLIENT_SECRET`, `LINKEDIN_REFRESH_TOKEN`.
+- Manifest: `linkedin` platform, item fields `ai_audio` (TTS narration) and `music` (track with `license_url`, Drive `evidence`, `sha256`), options `paid_product_placement` (YouTube) and `ai_disclosure` (LinkedIn). `image-cards` formats `li-landscape` (1200x627) and `li-square` (1200x1200).
+
+### Changed
+
+- Meta AI label: Facebook Reels and Instagram containers send `is_ai_generated=true` when an item has `ai_audio` or `synthetic_media` (Instagram carousels: parent only). `video-shorts` reports `ai_audio` whenever narration was generated. YouTube's `containsSyntheticMedia` stays tied to realistic AI visuals.
+- YouTube uploads always declare `paidProductPlacementDetails.hasPaidProductPlacement` (default false), since an omitted field now means "not declared". A thumbnail that fails before processing finishes is retried on later runs (`state.<id>.extra.pending_thumbnail`, at most 5 attempts) instead of being dropped.
+- Music license evidence: every track in `video.music.tracks` needs `license_url`, `evidence` and `sha256`; `video-shorts` refuses music without them or whose file hash differs, and the review issue links the evidence. YouTube Shorts with music must be at most 60 s. Facebook Reels record their copyright check in `state.<id>.extra`.
+- Instagram allows at most 5 hashtags; `copy-guard` takes a per-platform `max_hashtags` map and never allows Instagram more than 5. Instagram image posts send `alt_text` from `media.alt`.
+- Facebook Reels schedule at most 29 days ahead (feed posts stay at 30).
+- `copy-guard` flags pt-BR fear, urgency, and official-endorsement claims ("evite multa", "podem ser multadas", "prazo final chegando", "última chance", "não perca o prazo", "aprovado pela Receita", "conformidade garantida"), and warns on "todas as empresas são obrigadas" (not "nem todas…"), which needs the official source. Neutral fiscal wording ("o prazo final para entrega é…", "nos últimos dias") passes.
+- Docs: Google OAuth "Testing" refresh tokens expire after 7 days (`invalid_grant`); Meta apps need Live mode, App Review, Page Publishing Authorization for Instagram, and a system-user Page token; YouTube asks only for `youtube.upload` unless playlists or captions are used; Instagram API Stories have no link sticker.
+
 ## v0.12.0
 
 ### Added

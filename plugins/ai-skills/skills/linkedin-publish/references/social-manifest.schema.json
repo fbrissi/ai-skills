@@ -1,0 +1,563 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/fbrissi/ai-skills/social-manifest.schema.json",
+  "title": "Social content batch manifest",
+  "description": "One batch of social media content for one platform, shared by the content agents, the review step, and the publishers. Paths are relative to the manifest's directory.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "platform",
+    "batch_id",
+    "publication_date",
+    "timezone",
+    "language",
+    "items",
+    "approval",
+    "state"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "platform": {
+      "enum": [
+        "facebook",
+        "instagram",
+        "youtube",
+        "linkedin"
+      ]
+    },
+    "batch_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]{2,80}$"
+    },
+    "publication_date": {
+      "type": "string",
+      "format": "date",
+      "description": "First planned date of the batch (YYYY-MM-DD)."
+    },
+    "timezone": {
+      "type": "string",
+      "minLength": 1,
+      "description": "IANA time zone of the planned times, for example America/Sao_Paulo."
+    },
+    "language": {
+      "type": "string",
+      "pattern": "^[a-z]{2}(-[A-Z]{2})?$"
+    },
+    "profile": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "created_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "generator": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "items": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 100,
+      "items": {
+        "$ref": "#/$defs/item"
+      }
+    },
+    "approval": {
+      "$ref": "#/$defs/approval"
+    },
+    "review": {
+      "$ref": "#/$defs/review"
+    },
+    "state": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/itemState"
+      }
+    }
+  },
+  "$defs": {
+    "item": {
+      "type": "object",
+      "required": [
+        "id",
+        "type",
+        "date",
+        "publish_at",
+        "scheduled",
+        "visibility",
+        "media",
+        "synthetic_media"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]{0,80}$"
+        },
+        "type": {
+          "enum": [
+            "post",
+            "photo",
+            "carousel",
+            "reel",
+            "story",
+            "short",
+            "video"
+          ]
+        },
+        "date": {
+          "type": "string",
+          "format": "date",
+          "description": "Planned publication date (YYYY-MM-DD); names the Drive and bucket folders."
+        },
+        "publish_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time-offset",
+          "description": "ISO 8601 with offset, or null for the next publisher run (Instagram)."
+        },
+        "scheduled": {
+          "type": "boolean",
+          "description": "true: the platform schedules it at publish_at; false: published when the publisher runs."
+        },
+        "visibility": {
+          "enum": [
+            "public",
+            "private",
+            "unlisted"
+          ]
+        },
+        "title": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 100
+        },
+        "caption": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "description": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "hashtags": {
+          "type": "array",
+          "maxItems": 30,
+          "items": {
+            "type": "string",
+            "pattern": "^#[\\p{L}\\p{N}_]+$"
+          }
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "link": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^https?://"
+        },
+        "media": {
+          "type": "array",
+          "maxItems": 20,
+          "items": {
+            "$ref": "#/$defs/media"
+          }
+        },
+        "thumbnail": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "credits": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "synthetic_media": {
+          "type": "boolean",
+          "description": "true when realistic AI-generated footage (for example Veo) is used."
+        },
+        "ai_audio": {
+          "type": "boolean",
+          "description": "true when the narration is AI-generated (TTS). Meta posts get is_ai_generated; LinkedIn gets a text disclosure. YouTube's containsSyntheticMedia stays tied to synthetic_media."
+        },
+        "music": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "required": [
+            "title",
+            "license",
+            "license_url",
+            "evidence",
+            "sha256"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "file": {
+              "type": "string"
+            },
+            "title": {
+              "type": "string",
+              "minLength": 1
+            },
+            "author": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "source": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "license": {
+              "type": "string",
+              "minLength": 1
+            },
+            "license_url": {
+              "type": "string",
+              "pattern": "^https?://"
+            },
+            "evidence": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Google Drive file id of the license evidence (download page or receipt)."
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          },
+          "description": "Music track used in the video, with its license evidence; shown in the review issue."
+        },
+        "sources": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "spec": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Generation spec of this item (cards or video JSON) relative to the manifest, so adjust mode can regenerate it."
+        },
+        "with_stories": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Instagram: ids of story items published in the same run as this feed item."
+        },
+        "options": {
+          "$ref": "#/$defs/options"
+        },
+        "notes": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "drive": {
+          "$ref": "#/$defs/drive"
+        }
+      }
+    },
+    "media": {
+      "type": "object",
+      "required": [
+        "path",
+        "kind"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "enum": [
+            "image",
+            "video"
+          ]
+        },
+        "width": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "height": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "duration": {
+          "type": "number",
+          "minimum": 0
+        },
+        "alt": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "options": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "playlist_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "category_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "made_for_kids": {
+          "type": "boolean"
+        },
+        "default_language": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "captions": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "YouTube: caption file (.srt or .vtt) relative to the manifest."
+        },
+        "captions_language": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "share_to_feed": {
+          "type": "boolean",
+          "description": "Instagram Reels: also show in the feed (default true)."
+        },
+        "first_comment": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "paid_product_placement": {
+          "type": "boolean",
+          "description": "YouTube: paidProductPlacementDetails.hasPaidProductPlacement (default false; omitting it means not declared)."
+        },
+        "ai_disclosure": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "LinkedIn: disclosure line added to the text when ai_audio or synthetic_media is true (default per language)."
+        }
+      }
+    },
+    "drive": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "folder_id": {
+          "type": "string"
+        },
+        "folder_url": {
+          "type": "string"
+        },
+        "files": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "required": [
+              "id"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "url": {
+                "type": "string"
+              },
+              "md5": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "approval": {
+      "type": "object",
+      "required": [
+        "status"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "enum": [
+            "pending",
+            "approved",
+            "rejected"
+          ]
+        },
+        "by": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "revision": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        }
+      }
+    },
+    "review": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "issue_number": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "issue_url": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "drive_root_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "history": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        }
+      }
+    },
+    "itemState": {
+      "type": "object",
+      "required": [
+        "status",
+        "at"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "enum": [
+            "scheduled",
+            "published",
+            "failed",
+            "unknown",
+            "skipped"
+          ],
+          "description": "unknown: the final publish call got no response, so the item may be live; publishers never retry it on their own (Instagram checks its container)."
+        },
+        "remote_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "url": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "publish_at": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "attempts": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "error": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "media_urls": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "extra": {
+          "type": "object"
+        }
+      }
+    }
+  }
+}

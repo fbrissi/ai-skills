@@ -6,7 +6,8 @@ import { sceneTiming } from "../../.rulesync/skills/video-shorts/scripts/timing.
 import { sceneKey, voiceSettings } from "../../.rulesync/skills/video-shorts/scripts/voice.mjs";
 import { tempDir } from "./helpers.mjs";
 
-const config = { language: "pt-BR", video: { music: { tracks: [{ file: "city-sunshine.mp3", title: "City Sunshine", author: "Kevin MacLeod", source: "FreePD", license: "CC0" }] } } };
+const config = { language: "pt-BR", video: { music: { tracks: [{ file: "city-sunshine.mp3", title: "City Sunshine", author: "Kevin MacLeod", source: "FreePD", license: "CC0", license_url: "https://freepd.com/", evidence: "DRIVEID", sha256: "d".repeat(64) }] } } };
+const noEvidence = { video: { music: { tracks: [{ file: "city-sunshine.mp3", title: "City Sunshine", author: "Kevin MacLeod", source: "FreePD", license: "CC0" }] } } };
 
 test("timing: minimums, voice lead and tail, CTA hold, footage at most 2x", () => {
   assert.deepEqual(sceneTiming({ id: "h", kind: "hook", voice: "" }), { durationInFrames: 72, voiceFrom: 3, voiceFrames: 0, playbackRate: 1 });
@@ -44,4 +45,15 @@ test("voice settings come from spec, profile, then defaults; the cache key chang
   assert.deepEqual(voiceSettings({}, null, {}), { voice: "pt_BR-faber-medium", lengthScale: "0.92" });
   assert.deepEqual(voiceSettings({ length_scale: 1 }, { video: { voice: "en_US-x" } }, {}), { voice: "en_US-x", lengthScale: "1" });
   assert.notEqual(sceneKey("a", { voice: "v", lengthScale: "1" }), sceneKey("a", { voice: "v", lengthScale: "0.9" }));
+});
+
+test("music needs license evidence and must match its recorded sha256", async () => {
+  const { musicEntry, sha256File } = await import("../../.rulesync/skills/video-shorts/scripts/credits.mjs");
+  const { join } = await import("node:path");
+  const root = tempDir({ "city-sunshine.mp3": "mp3-bytes" });
+  const file = join(root, "city-sunshine.mp3");
+  const track = { file: "city-sunshine.mp3", title: "City Sunshine", author: "Kevin MacLeod", source: "FreePD", license: "CC0", license_url: "https://freepd.com/", evidence: "DRIVEID", sha256: sha256File(file) };
+  assert.deepEqual(musicEntry({ video: { music: { tracks: [track] } } }, file), track);
+  assert.throws(() => musicEntry({ video: { music: { tracks: [{ ...track, sha256: "b".repeat(64) }] } } }, file), /does not match the sha256/);
+  assert.throws(() => musicEntry(noEvidence, file), /needs license_url, evidence, sha256/);
 });

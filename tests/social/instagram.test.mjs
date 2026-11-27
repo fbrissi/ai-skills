@@ -183,3 +183,20 @@ test("an HTTP error from media_publish after the container is saved keeps it unk
   await assert.rejects(run(setupResult, failing), /server error/);
   assert.equal(JSON.parse(readFileSync(setupResult.path, "utf8")).state.p1.status, "unknown");
 });
+
+test("Instagram containers carry alt text and the AI label (carousel: parent only)", async () => {
+  const alt = { path: "media/a.jpg", kind: "image", width: 1080, height: 1350, alt: "Tela de recorrências" };
+  assert.deepEqual(containerFields(ig("p", "2026-11-27", { ai_audio: true, media: [alt] }), ["u"], "c"), [{ image_url: "u", caption: "c", alt_text: "Tela de recorrências", is_ai_generated: "true" }]);
+  assert.deepEqual(containerFields(ig("p", "2026-11-27", { media: [img] }), ["u"], "c"), [{ image_url: "u", caption: "c" }]);
+  const reelItem = ig("r", "2026-11-27", { type: "reel", synthetic_media: true, media: [{ path: "media/r.mp4", kind: "video" }] });
+  assert.equal(containerFields(reelItem, ["u"], "c")[0].is_ai_generated, "true");
+  const carousel = ig("c", "2026-11-27", { type: "carousel", ai_audio: true, media: [alt, img] });
+  const children = containerFields(carousel, ["u1", "u2"], "c");
+  assert.ok(children.every((child) => !("is_ai_generated" in child)));
+  assert.equal(children[0].alt_text, "Tela de recorrências");
+  const fetchImpl = graph();
+  await run(setup([carousel]), fetchImpl);
+  const parent = fetchImpl.calls.filter((call) => call.url.endsWith("/ig1/media")).at(-1);
+  assert.equal(parent.body.get("media_type"), "CAROUSEL");
+  assert.equal(parent.body.get("is_ai_generated"), "true");
+});

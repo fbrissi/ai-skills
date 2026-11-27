@@ -9,10 +9,10 @@ references/triage.md       ticket-create ticket-plan business-refinement technic
 references/work-status.md  business-refinement technical-refinement readiness-review delivery-orchestration dev dependency-updates
 references/delivery-profile.md  business-refinement technical-refinement readiness-review delivery-orchestration dependency-updates
 references/non-interactive.md  dev pr-create qa-e2e ticket-plan pr-fix quality-cycle ship todo work-cleanup observability-triage sentry-issues dependency-updates
-scripts/social-manifest.mjs  social-content-plan copy-guard image-cards video-shorts social-review facebook-publish instagram-publish youtube-publish
-references/social-manifest.schema.json  social-content-plan copy-guard image-cards video-shorts social-review facebook-publish instagram-publish youtube-publish
-references/social-manifest.md  social-content-plan copy-guard image-cards video-shorts social-review facebook-publish instagram-publish youtube-publish
-references/social-profile-template.md  social-content-plan copy-guard image-cards video-shorts social-review facebook-publish instagram-publish youtube-publish
+scripts/social-manifest.mjs  social-content-plan copy-guard image-cards video-shorts social-review facebook-publish instagram-publish youtube-publish linkedin-publish
+references/social-manifest.schema.json  social-content-plan copy-guard image-cards video-shorts social-review facebook-publish instagram-publish youtube-publish linkedin-publish
+references/social-manifest.md  social-content-plan copy-guard image-cards video-shorts social-review facebook-publish instagram-publish youtube-publish linkedin-publish
+references/social-profile-template.md  social-content-plan copy-guard image-cards video-shorts social-review facebook-publish instagram-publish youtube-publish linkedin-publish
 scripts/google-auth.mjs  social-review video-shorts youtube-publish
 scripts/drive.mjs  social-review video-shorts
 scripts/graph.mjs  facebook-publish instagram-publish

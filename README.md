@@ -14,7 +14,7 @@ Personal library of reusable AI agent skills. Plain [Agent Skills](https://agent
 | Quality | [`bdd-scenarios`](docs/skills/bdd-scenarios.md), [`qa-e2e`](docs/skills/qa-e2e.md), [`quality-cycle`](docs/skills/quality-cycle.md) |
 | Operations | [`observability-triage`](docs/skills/observability-triage.md), [`sentry-issues`](docs/skills/sentry-issues.md), [`dependency-updates`](docs/skills/dependency-updates.md), [`merge-risk`](docs/skills/merge-risk.md) |
 | Brazil | [`inpi-trademark-watch`](docs/skills/inpi-trademark-watch.md), [`nfse-technical-note-analysis`](docs/skills/nfse-technical-note-analysis.md) |
-| Social | [`social-content-plan`](docs/skills/social-content-plan.md), [`copy-guard`](docs/skills/copy-guard.md), [`image-cards`](docs/skills/image-cards.md), [`video-shorts`](docs/skills/video-shorts.md), [`social-review`](docs/skills/social-review.md), [`facebook-publish`](docs/skills/facebook-publish.md), [`instagram-publish`](docs/skills/instagram-publish.md), [`youtube-publish`](docs/skills/youtube-publish.md) ([flow](docs/social-content.md)) |
+| Social | [`social-content-plan`](docs/skills/social-content-plan.md), [`copy-guard`](docs/skills/copy-guard.md), [`image-cards`](docs/skills/image-cards.md), [`video-shorts`](docs/skills/video-shorts.md), [`social-review`](docs/skills/social-review.md), [`facebook-publish`](docs/skills/facebook-publish.md), [`instagram-publish`](docs/skills/instagram-publish.md), [`youtube-publish`](docs/skills/youtube-publish.md), [`linkedin-publish`](docs/skills/linkedin-publish.md) ([flow](docs/social-content.md)) |
 | Media | [`flow-video-ad`](docs/skills/flow-video-ad.md) |
 
 Full catalog and per-harness usage: [docs/](docs/README.md).
@@ -26,7 +26,7 @@ Full catalog and per-harness usage: [docs/](docs/README.md).
 | Workers | `code-reviewer`, `qa-tester`, `developer`, `ci-investigator` |
 | Orchestrators | `milestone-delivery`, `pr-shepherd`, `issue-resolver`, `dependency-updater`, `inpi-watch`, `nfse-compliance` (`incident-responder` is a deprecated alias of `issue-resolver`) |
 | Delivery flow | `business-analyst`, `tech-lead`, `readiness-reviewer`, `delivery-orchestrator`, `task-implementer` ([flow](docs/delivery-flow.md)) |
-| Social content | `facebook-content`, `instagram-content`, `youtube-content` ([flow](docs/social-content.md)) |
+| Social content | `facebook-content`, `instagram-content`, `youtube-content`, `linkedin-content` ([flow](docs/social-content.md)) |
 
 They ship with every skill as the `ai-skills` Claude Code plugin:
 

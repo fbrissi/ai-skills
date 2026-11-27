@@ -60,9 +60,31 @@ test("a failed thumbnail is a warning, not a failure, and the video is never upl
   const out = sink();
   await run(s, youtube({ failThumb: true }), { out });
   assert.match(out.text(), /warnings: thumbnail: thumbnails.set 403: channel not verified/);
+  assert.equal(JSON.parse(readFileSync(s.path, "utf8")).state.a.extra.pending_thumbnail, true);
   const again = youtube();
-  await run({ ...s, data: JSON.parse(readFileSync(s.path, "utf8")) }, again);
-  assert.equal(again.calls.length, 0);
+  const out2 = sink();
+  await run({ ...s, data: JSON.parse(readFileSync(s.path, "utf8")) }, again, { out: out2 });
+  assert.deepEqual(again.calls.map((call) => new URL(call.url).pathname), ["/upload/youtube/v3/thumbnails/set"], "only the pending thumbnail is retried; the video is not uploaded again");
+  assert.match(out2.text(), /thumbnail set: a/);
+  const saved = JSON.parse(readFileSync(s.path, "utf8")).state.a.extra;
+  assert.equal(saved.pending_thumbnail, false);
+  assert.deepEqual(saved.warnings, []);
+  const third = youtube();
+  await run({ ...s, data: JSON.parse(readFileSync(s.path, "utf8")) }, third);
+  assert.equal(third.calls.length, 0);
+});
+
+test("paid product placement is always declared", () => {
+  assert.deepEqual(videoResource(short("a")).paidProductPlacementDetails, { hasPaidProductPlacement: false });
+  assert.deepEqual(videoResource(short("b", { options: { paid_product_placement: true } })).paidProductPlacementDetails, { hasPaidProductPlacement: true });
+});
+
+test("the insert asks for the paidProductPlacementDetails part", async () => {
+  const s = setup([short("a")]);
+  const fetchImpl = youtube();
+  await run(s, fetchImpl);
+  assert.match(fetchImpl.calls[0].url, /part=snippet,status,paidProductPlacementDetails/);
+  assert.equal(JSON.parse(fetchImpl.calls[0].body).paidProductPlacementDetails.hasPaidProductPlacement, false);
 });
 
 test("the daily upload limit leaves the rest for the next run", async () => {
@@ -115,4 +137,16 @@ test("an upload without a response is unknown and never re-uploaded without --re
   await run({ ...s, data: saved }, again, { out });
   assert.equal(again.calls.length, 0);
   assert.match(out.text(), /needs a manual check: a/);
+});
+
+test("a pending thumbnail gives up after 5 attempts with a warning", async () => {
+  const { retryThumbnails } = await import("../../.rulesync/skills/youtube-publish/scripts/publish-youtube.mjs");
+  const s = setup([short("a", { thumbnail: "media/t.jpg" })]);
+  s.data.state.a = { status: "scheduled", remote_id: "vid1", at: NOW.toISOString(), extra: { pending_thumbnail: true, thumbnail_attempts: 4, warnings: ["thumbnail: x"] } };
+  const out = sink();
+  await retryThumbnails(s.data, { manifestDir: s.dir, manifestPath: s.path, api: { fetchImpl: youtube({ failThumb: true }), token: "t" }, out });
+  const extra = JSON.parse(readFileSync(s.path, "utf8")).state.a.extra;
+  assert.equal(extra.pending_thumbnail, false);
+  assert.match(extra.warnings[0], /gave up after 5 attempts/);
+  assert.match(out.text(), /thumbnail gave up: a/);
 });

@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 // Turns a platform's Parameters (days, times, time zone, frequency, blackout dates, calendar hooks) into the dated
 // publication slots of the next batch, and optionally writes a skeleton manifest for the agent to fill.
-// Usage: plan-slots.mjs --profile <profile.md> --platform <facebook|instagram|youtube> [--start YYYY-MM-DD]
+// Usage: plan-slots.mjs --profile <profile.md> --platform <facebook|instagram|youtube|linkedin> [--start YYYY-MM-DD]
 //        [--days N] [--now ISO] [--init <batch-dir>]
 // Default start: the Monday after --now in the profile's time zone; default window: 7 days.
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { isMain, localIso, readProfileConfig, zoneOffset } from "./social-manifest.mjs";
+import { isMain, localIso, readProfileConfig, UNSCHEDULED_PLATFORMS, zoneOffset } from "./social-manifest.mjs";
 
 const WEEKDAYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
 
@@ -41,7 +41,7 @@ export function platformSettings(config, platform) {
     days: (settings.days ?? ["mon", "wed", "fri"]).map((day) => day.toLowerCase().slice(0, 3)),
     times: settings.times ?? ["12:00"],
     perBatch: settings.per_batch ?? null,
-    scheduled: platform === "instagram" ? false : settings.scheduled ?? true,
+    scheduled: UNSCHEDULED_PLATFORMS.includes(platform) ? false : settings.scheduled ?? true,
     visibility: settings.visibility ?? "public",
     formats: settings.formats ?? (platform === "youtube" ? ["short"] : ["photo"]),
     images: settings.images ?? platform !== "youtube",
@@ -72,7 +72,7 @@ export function planSlots(config, platform, { now = new Date(), start = null, da
         skipped.push({ date, reason: `${time} is less than 10 minutes from now` });
         continue;
       }
-      slots.push({ date, weekday, time, publish_at: platform === "instagram" ? null : publishAt });
+      slots.push({ date, weekday, time, publish_at: UNSCHEDULED_PLATFORMS.includes(platform) ? null : publishAt });
     }
   }
   const limited = settings.perBatch ? slots.slice(0, settings.perBatch) : slots;

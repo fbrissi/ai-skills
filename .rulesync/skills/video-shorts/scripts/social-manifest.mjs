@@ -19,13 +19,36 @@ export const PLATFORM_TYPES = {
   facebook: ["post", "photo", "carousel", "reel"],
   instagram: ["photo", "carousel", "reel", "story"],
   youtube: ["short", "video"],
+  linkedin: ["post", "photo", "carousel", "video"],
 };
 
+/** Platforms without a scheduling API: a cron runs the publisher and publish_at is null. */
+export const UNSCHEDULED_PLATFORMS = ["instagram", "linkedin"];
+
 export const LIMITS = {
-  facebook: { minLeadSeconds: 10 * 60, maxLeadSeconds: 30 * 24 * 3600, messageLength: 63206, reelMin: 3, reelMax: 90, reelsPerDay: 30, carouselMax: 10 },
-  instagram: { captionLength: 2200, hashtags: 30, mentions: 20, carouselMin: 2, carouselMax: 20, reelMin: 3, reelMax: 900, storyVideoMax: 60, ratioMin: 4 / 5, ratioMax: 1.91 },
-  youtube: { titleLength: 100, descriptionBytes: 5000, tagsLength: 500, shortMax: 180, minLeadSeconds: 15 * 60 },
+  facebook: { minLeadSeconds: 10 * 60, maxLeadSeconds: 30 * 24 * 3600, reelMaxLeadSeconds: 29 * 24 * 3600, messageLength: 63206, reelMin: 3, reelMax: 90, reelsPerDay: 30, carouselMax: 10 },
+  instagram: { captionLength: 2200, hashtags: 5, mentions: 20, carouselMin: 2, carouselMax: 20, reelMin: 3, reelMax: 900, storyVideoMax: 60, ratioMin: 4 / 5, ratioMax: 1.91 },
+  youtube: { titleLength: 100, descriptionBytes: 5000, tagsLength: 500, shortMax: 180, musicShortMax: 60, minLeadSeconds: 15 * 60 },
+  linkedin: { commentaryLength: 3000, carouselMin: 2, carouselMax: 20, videoMin: 3, videoMax: 30 * 60 },
 };
+
+/** LinkedIn has no AI flag in its API: a plain-text disclosure goes in the post when AI audio or footage is used. */
+export const AI_DISCLOSURE = {
+  pt: { audio: "Narração com voz sintética (Piper TTS).", visual: "Contém imagens geradas por IA." },
+  en: { audio: "Narrated with a synthetic voice (Piper TTS).", visual: "Contains AI-generated footage." },
+};
+
+export function aiDisclosure(item, language = "pt-BR") {
+  if (!item.ai_audio && !item.synthetic_media) return null;
+  if (item.options?.ai_disclosure) return item.options.ai_disclosure;
+  const texts = AI_DISCLOSURE[String(language).toLowerCase().startsWith("pt") ? "pt" : "en"];
+  return [item.ai_audio ? texts.audio : null, item.synthetic_media ? texts.visual : null].filter(Boolean).join(" ");
+}
+
+/** Meta's AI label (is_ai_generated) applies to realistic AI visuals and to AI-generated narration. */
+export function isAiGenerated(item) {
+  return Boolean(item.synthetic_media || item.ai_audio);
+}
 
 const IMAGE_EXT = new Set([".jpg", ".jpeg", ".png"]);
 const VIDEO_EXT = new Set([".mp4", ".mov"]);
@@ -114,13 +137,18 @@ export function manifestSchema() {
 
 // ---------- text composition ----------
 
-/** The exact text a publisher sends: body, link (when not already in it), credits, then hashtags. */
-export function composeText(item, platform) {
+/**
+ * The exact text a publisher sends: body, link (when not already in it), the LinkedIn AI disclosure, credits, then
+ * hashtags.
+ */
+export function composeText(item, platform, language = "pt-BR") {
   const body = (platform === "youtube" ? item.description : item.caption) ?? "";
   const parts = [body.trim()];
   const includesLink = item.link && body.includes(item.link);
-  const linkSentApart = platform === "facebook" && item.type === "post";
+  const linkSentApart = (platform === "facebook" || platform === "linkedin") && item.type === "post";
   if (item.link && !includesLink && !linkSentApart && platform !== "instagram") parts.push(item.link);
+  const disclosure = platform === "linkedin" ? aiDisclosure(item, language) : null;
+  if (disclosure && !body.includes(disclosure)) parts.push(disclosure);
   if (item.credits && !body.includes(item.credits.trim())) parts.push(item.credits.trim());
   const tags = (item.hashtags ?? []).filter((tag) => !new RegExp(`(^|\\s)${escapeRegExp(tag)}(?![\\p{L}\\p{N}_])`, "u").test(body));
   if (tags.length) parts.push(tags.join(" "));
@@ -199,7 +227,7 @@ export function probeManifest(manifest, manifestDir) {
 const ratio = (media) => (media.width && media.height ? media.width / media.height : null);
 const isVertical916 = (media) => ratio(media) !== null && Math.abs(ratio(media) - 9 / 16) < 0.01;
 
-function itemRuleErrors(item, platform, { manifestDir, checkFiles, now, forPublish }) {
+function itemRuleErrors(item, platform, { manifestDir, checkFiles, now, forPublish, language }) {
   const errors = [];
   const add = (message) => errors.push(`${item.id}: ${message}`);
   if (!PLATFORM_TYPES[platform].includes(item.type)) add(`type ${item.type} is not supported on ${platform} (${PLATFORM_TYPES[platform].join(", ")})`);
@@ -225,8 +253,9 @@ function itemRuleErrors(item, platform, { manifestDir, checkFiles, now, forPubli
     if (!text.trim()) add("caption is empty");
     if (text.length > LIMITS.facebook.messageLength) add(`caption longer than ${LIMITS.facebook.messageLength} characters`);
     if (item.visibility !== "public") add("Facebook Page posts are public; set visibility public");
-    if (item.scheduled && forPublish && lead !== null && (lead < LIMITS.facebook.minLeadSeconds || lead > LIMITS.facebook.maxLeadSeconds)) {
-      add("publish_at must be between 10 minutes and 30 days from now");
+    const maxLead = item.type === "reel" ? LIMITS.facebook.reelMaxLeadSeconds : LIMITS.facebook.maxLeadSeconds;
+    if (item.scheduled && forPublish && lead !== null && (lead < LIMITS.facebook.minLeadSeconds || lead > maxLead)) {
+      add(`publish_at must be between 10 minutes and ${maxLead / 86400} days from now`);
     }
     if (item.type === "post" && item.media.length) add("type post has no media (use photo or carousel)");
     if (item.type === "photo" && (images.length !== 1 || videos.length)) add("type photo needs exactly one image");
@@ -271,9 +300,26 @@ function itemRuleErrors(item, platform, { manifestDir, checkFiles, now, forPubli
     if (item.type === "short") {
       const video = videos[0];
       if (video?.duration !== undefined && video.duration > LIMITS.youtube.shortMax) add(`Shorts are at most ${LIMITS.youtube.shortMax} s`);
+      if (item.music && video?.duration !== undefined && video.duration > LIMITS.youtube.musicShortMax) add(`Shorts with music must be at most ${LIMITS.youtube.musicShortMax} s (a longer Short with a Content ID claim is blocked worldwide); cut it or drop the music`);
       if (video && ratio(video) !== null && ratio(video) > 1) add("Shorts must be vertical or square");
     }
     if (item.thumbnail && !/\.(jpe?g|png)$/i.test(item.thumbnail)) add("thumbnail must be JPEG or PNG");
+  }
+
+  if (platform === "linkedin") {
+    const text = composeText(item, platform, language);
+    if (item.scheduled) add("LinkedIn has no scheduling API; set scheduled false (the publisher's cron posts it)");
+    if (item.visibility !== "public") add("LinkedIn Page posts are public; set visibility public");
+    if (!text.trim()) add("caption is empty");
+    if ([...text].length > LIMITS.linkedin.commentaryLength) add(`caption longer than ${LIMITS.linkedin.commentaryLength} characters`);
+    if (item.type === "post" && item.media.length) add("type post has no media (use photo, carousel or video)");
+    if (item.type === "photo" && (images.length !== 1 || videos.length)) add("type photo needs exactly one image");
+    if (item.type === "carousel" && (images.length < LIMITS.linkedin.carouselMin || images.length > LIMITS.linkedin.carouselMax || videos.length)) add(`type carousel needs ${LIMITS.linkedin.carouselMin} to ${LIMITS.linkedin.carouselMax} images`);
+    if (item.type === "video") {
+      if (videos.length !== 1 || images.length) add("type video needs exactly one video");
+      else if (!/\.mp4$/i.test(videos[0].path)) add("LinkedIn videos must be MP4");
+      else if (videos[0].duration !== undefined && (videos[0].duration < LIMITS.linkedin.videoMin || videos[0].duration > LIMITS.linkedin.videoMax)) add(`video duration ${videos[0].duration} s is outside ${LIMITS.linkedin.videoMin} s to 30 min`);
+    }
   }
   return errors;
 }
@@ -300,7 +346,7 @@ export function validateManifest(manifest, { manifestDir = ".", checkFiles = tru
   const ids = new Map();
   for (const item of manifest.items) ids.set(item.id, (ids.get(item.id) ?? 0) + 1);
   for (const [id, count] of ids) if (count > 1) errors.push(`duplicate item id: ${id}`);
-  for (const item of manifest.items) errors.push(...itemRuleErrors(item, platform, { manifestDir, checkFiles, now, forPublish }));
+  for (const item of manifest.items) errors.push(...itemRuleErrors(item, platform, { manifestDir, checkFiles, now, forPublish, language: manifest.language }));
   for (const item of manifest.items) {
     for (const story of item.with_stories ?? []) {
       const target = manifest.items.find((candidate) => candidate.id === story);
@@ -326,7 +372,7 @@ export function utmErrors(manifest, config) {
   const expect = (template) => new RegExp(`^${escapeRegExp(template).replaceAll("\\{platform\\}", manifest.platform).replaceAll("\\{theme\\}", "[a-z0-9-]+")}$`);
   const errors = [];
   for (const item of manifest.items) {
-    const text = [composeText(item, manifest.platform), item.link ?? ""].join("\n");
+    const text = [composeText(item, manifest.platform, manifest.language), item.link ?? ""].join("\n");
     for (const raw of text.match(/https?:\/\/[^\s)<>"]+/g) ?? []) {
       let url;
       try {
@@ -496,7 +542,7 @@ export function main(argv, { out = process.stdout, err = process.stderr } = {}) 
     if (command === "text") {
       for (const item of manifest.items) {
         if (flags.item && item.id !== flags.item) continue;
-        out.write(`## ${item.id}\n${item.title ? `${item.title}\n\n` : ""}${composeText(item, manifest.platform)}\n\n`);
+        out.write(`## ${item.id}\n${item.title ? `${item.title}\n\n` : ""}${composeText(item, manifest.platform, manifest.language)}\n\n`);
       }
       return 0;
     }

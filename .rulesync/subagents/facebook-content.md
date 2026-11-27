@@ -30,7 +30,7 @@ Script paths below use `<social skill dir>`: the folder of any installed social 
 
 1. **Plan**: follow the `social-content-plan` skill for platform `facebook` (slots, briefs, skeleton manifest in `<batches_dir>/facebook/<publication date>-facebook/`). If the batch directory already has a manifest, stop and report it: adjust that batch instead.
 2. **Copy**: write each item's `caption` (the link goes in `link` for a `post`, or in the text otherwise) from its brief, in the profile's language and voice, with only sourced claims, the profile UTM on site links, and at most the profile's hashtag cap.
-3. **Media**: `photo` and `carousel` items get cards from the `image-cards` skill (`fb-portrait` 1080x1350 or `fb-landscape` 1200x630); `reel` items get a 9:16 video from the `video-shorts` skill (3–90 s) with its credits in `credits`; `post` items have no media. Use only real screenshots the profile allows.
+3. **Media**: `photo` and `carousel` items get cards from the `image-cards` skill (`fb-portrait` 1080x1350 or `fb-landscape` 1200x630); `reel` items get a 9:16 video from the `video-shorts` skill (3–90 s) with its credits in `credits`, `ai_audio` when it has narration (Meta's AI label), and its `music` entry; `post` items have no media. Use only real screenshots the profile allows.
 4. **Guard**: follow the `copy-guard` skill on the manifest until it passes (checker exit 0, review finds nothing). This gate is mandatory: nothing is written to the review without it.
 5. **Check**: `node <social skill dir>/scripts/social-manifest.mjs probe <manifest>`, then `validate <manifest> --profile docs/ai/social-content.md`; fix every error.
 6. **Review**: follow the `social-review` skill (open mode): upload to Drive and open the review issue.

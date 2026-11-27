@@ -18,7 +18,7 @@ Every path in the manifest is relative to its directory and must stay inside it.
 | Field | Meaning |
 |---|---|
 | `schema_version` | `1` |
-| `platform` | `facebook`, `instagram`, or `youtube` |
+| `platform` | `facebook`, `instagram`, `youtube`, or `linkedin` |
 | `batch_id` | `<publication_date>-<platform>`, kebab-case |
 | `publication_date` | first planned date (`YYYY-MM-DD`) |
 | `timezone`, `language` | IANA zone and `pt-BR`/`en`-style language of the copy |
@@ -32,7 +32,7 @@ Every path in the manifest is relative to its directory and must stay inside it.
 | Field | Meaning |
 |---|---|
 | `id` | kebab-case, unique in the batch, usually `<date>-<slug>` |
-| `type` | `post`, `photo`, `carousel`, `reel` (Facebook); `photo`, `carousel`, `reel`, `story` (Instagram); `short`, `video` (YouTube) |
+| `type` | `post`, `photo`, `carousel`, `reel` (Facebook); `photo`, `carousel`, `reel`, `story` (Instagram); `short`, `video` (YouTube); `post`, `photo`, `carousel`, `video` (LinkedIn) |
 | `date` | planned date; names the Drive and bucket folders |
 | `publish_at` | ISO 8601 with offset, or `null` for "the next publisher run" (Instagram) |
 | `scheduled` | `true`: the platform schedules it at `publish_at`; `false`: published when the publisher runs |
@@ -46,11 +46,13 @@ Every path in the manifest is relative to its directory and must stay inside it.
 | `media` | `[{path, kind: image|video, width, height, duration, alt}]`; `social-manifest.mjs probe` fills sizes and durations |
 | `thumbnail` | YouTube custom thumbnail (JPEG or PNG) |
 | `credits` | credit lines appended to the text (voice and music licenses) |
+| `ai_audio` | `true` when the narration is AI-generated (TTS); Meta posts get `is_ai_generated`, LinkedIn a text disclosure |
+| `music` | the track used, with `title`, `author`, `source`, `license`, `license_url`, `evidence` (Drive file id of the license evidence), `sha256`; shown in the review issue |
 | `synthetic_media` | `true` when realistic AI-generated footage is used; YouTube gets `containsSyntheticMedia` |
 | `sources` | where each claim came from (profile sources only) |
 | `spec` | generation spec of the item, for adjust mode |
 | `with_stories` | Instagram: story item ids published in the same run as this item |
-| `options` | `playlist_id`, `category_id`, `made_for_kids`, `default_language`, `captions` (file), `captions_language`, `share_to_feed`, `first_comment` |
+| `options` | `playlist_id`, `category_id`, `made_for_kids`, `default_language`, `captions` (file), `captions_language`, `share_to_feed`, `first_comment`, `paid_product_placement` (YouTube, default false), `ai_disclosure` (LinkedIn) |
 | `notes` | note for the reviewer |
 | `drive` | `{folder_id, folder_url, files: {<path>: {id, url, md5}}}`, written by `social-review` |
 
@@ -60,9 +62,10 @@ The text a publisher sends is `composeText(item, platform)`: the caption (or des
 
 | Platform | Rules |
 |---|---|
-| Facebook | `post` has no media; `photo` has one image; `carousel` 2 to 10 images; `reel` one MP4, 9:16, 3 to 90 s, at most 30 per day. Scheduled items need `publish_at` between 10 minutes and 30 days ahead when published. |
-| Instagram | No scheduling: `scheduled: false`, `publish_at: null` (or a time it must not go out before). JPEG images only, aspect 4:5 to 1.91:1 (stories excepted); `carousel` 2 to 20 items; `reel` one MP4, 9:16, 3 s to 15 min; `story` one image or video (60 s); caption 2,200 characters, 30 hashtags, 20 mentions. Media must be at a public URL: the publisher uploads it to the bucket. The account's 24-hour publishing limit applies. |
-| YouTube | One video per item; `short` is vertical or square and at most 180 s. Scheduled items upload as private with `publishAt` and must have `visibility: public` and at least 15 minutes of lead. 100 uploads per day by default. |
+| Facebook | `post` has no media; `photo` has one image; `carousel` 2 to 10 images; `reel` one MP4, 9:16, 3 to 90 s, at most 30 per day. Scheduled items need `publish_at` at least 10 minutes and at most 30 days ahead (Reels: 29 days) when published. AI audio or footage sends `is_ai_generated` on Reels. |
+| Instagram | No scheduling: `scheduled: false`, `publish_at: null` (or a time it must not go out before). JPEG images only, aspect 4:5 to 1.91:1 (stories excepted); `carousel` 2 to 20 items; `reel` one MP4, 9:16, 3 s to 15 min; `story` one image or video (60 s); caption 2,200 characters, 5 hashtags, 20 mentions. AI audio or footage sends `is_ai_generated`; images send `alt_text` from `media.alt`. Media must be at a public URL: the publisher uploads it to the bucket. The account's 24-hour publishing limit applies. |
+| YouTube | One video per item; `short` is vertical or square and at most 180 s. Scheduled items upload as private with `publishAt` and must have `visibility: public` and at least 15 minutes of lead. 100 uploads per day by default. A Short with `music` is at most 60 s. Every upload declares paid product placement. |
+| LinkedIn | No scheduling: `scheduled: false`, `publish_at: null`, `visibility: public`. Text up to 3,000 characters; `post` (a `link` becomes a link card), `photo` (one image), `carousel` (2 to 20 images), `video` (one MP4, 3 s to 30 min). Media goes through LinkedIn's Images and Videos APIs. AI audio or footage adds a plain-text disclosure. |
 
 ## Lifecycle
 

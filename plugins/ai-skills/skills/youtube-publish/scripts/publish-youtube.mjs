@@ -32,7 +32,9 @@ export function videoResource(item, { language } = {}) {
     containsSyntheticMedia: Boolean(item.synthetic_media),
   };
   if (item.scheduled) status.publishAt = new Date(item.publish_at).toISOString();
-  return { snippet, status };
+  // Since the 2026-11-16 Data API revision an omitted declaration means "not declared", so always send it.
+  const paidProductPlacementDetails = { hasPaidProductPlacement: item.options?.paid_product_placement ?? false };
+  return { snippet, status, paidProductPlacementDetails };
 }
 
 export function uploadsInLast24h(manifest, now) {
@@ -62,7 +64,7 @@ async function resumableUpload(fetchImpl, token, url, metadata, bytes, contentTy
 }
 
 export async function insertVideo({ fetchImpl, token }, item, videoPath, language) {
-  return resumableUpload(fetchImpl, token, `${UPLOAD}/videos?uploadType=resumable&part=snippet,status`, videoResource(item, { language }), readFileSync(videoPath), "video/*");
+  return resumableUpload(fetchImpl, token, `${UPLOAD}/videos?uploadType=resumable&part=snippet,status,paidProductPlacementDetails`, videoResource(item, { language }), readFileSync(videoPath), "video/*");
 }
 
 export async function setThumbnail({ fetchImpl, token }, videoId, path) {
@@ -93,6 +95,34 @@ export async function insertCaptions({ fetchImpl, token }, videoId, path, langua
   }
 }
 
+/**
+ * thumbnails.set works only after YouTube finishes processing the upload (Data API revision of 2026-11-03), so a
+ * thumbnail that failed right after the upload is retried on later runs until it is set.
+ */
+export const MAX_THUMBNAIL_ATTEMPTS = 5;
+
+export async function retryThumbnails(manifest, { manifestDir, manifestPath, api, out }) {
+  for (const item of manifest.items) {
+    const state = manifest.state?.[item.id];
+    if (!state?.extra?.pending_thumbnail || !item.thumbnail || !state.remote_id) continue;
+    try {
+      await setThumbnail(api, state.remote_id, resolveMediaPath(manifestDir, item.thumbnail));
+      state.extra = { ...state.extra, pending_thumbnail: false, warnings: (state.extra.warnings ?? []).filter((warning) => !warning.startsWith("thumbnail:")) };
+      out.write(`thumbnail set: ${item.id}\n`);
+    } catch (error) {
+      const attempts = (state.extra.thumbnail_attempts ?? 1) + 1;
+      if (attempts >= MAX_THUMBNAIL_ATTEMPTS) {
+        state.extra = { ...state.extra, pending_thumbnail: false, thumbnail_attempts: attempts, warnings: [...(state.extra.warnings ?? []).filter((warning) => !warning.startsWith("thumbnail:")), `thumbnail: gave up after ${attempts} attempts (${error.message}); set it in YouTube Studio`] };
+        out.write(`thumbnail gave up: ${item.id} after ${attempts} attempts (${error.message})\n`);
+      } else {
+        state.extra = { ...state.extra, thumbnail_attempts: attempts };
+        out.write(`thumbnail still pending: ${item.id} (${error.message})\n`);
+      }
+    }
+    saveManifest(manifestPath, manifest);
+  }
+}
+
 export async function publish(manifest, { manifestDir, manifestPath, api, execute, now = new Date(), only = null, retry = [], dailyLimit = DEFAULT_DAILY_LIMIT, out = process.stdout }) {
   const { ready: pending, stale } = splitStale(pendingItems(manifest, { only, retry }), { now, minLeadSeconds: LIMITS.youtube.minLeadSeconds, execute });
   const errors = validateManifest(manifest, { manifestDir, forPublish: execute, now }).filter((error) => !manifest.items.some((entry) => error.startsWith(`${entry.id}:`) && !pending.includes(entry)));
@@ -102,6 +132,7 @@ export async function publish(manifest, { manifestDir, manifestPath, api, execut
 
   for (const item of manifest.items) if (isDone(manifest, item.id)) out.write(`already ${manifest.state[item.id].status}: ${item.id} (${manifest.state[item.id].remote_id})\n`);
   reportBlocked(manifest, out, retry);
+  if (execute) await retryThumbnails(manifest, { manifestDir, manifestPath, api, out });
   let used = uploadsInLast24h(manifest, now);
   for (const item of pending) {
     const when = item.scheduled ? `private until ${item.publish_at}` : item.visibility;
@@ -131,8 +162,12 @@ export async function publish(manifest, { manifestDir, manifestPath, api, execut
     recordState(manifest, item.id, { status: item.scheduled ? "scheduled" : "published", remote_id: inserted.id, url, publish_at: item.publish_at, error: null }, now);
     saveManifest(manifestPath, manifest);
     const warnings = [];
+    let pendingThumbnail = false;
     const extras = [
-      [item.thumbnail, () => setThumbnail(api, inserted.id, resolveMediaPath(manifestDir, item.thumbnail)), "thumbnail"],
+      [item.thumbnail, () => setThumbnail(api, inserted.id, resolveMediaPath(manifestDir, item.thumbnail)).catch((error) => {
+        pendingThumbnail = true;
+        throw new GoogleError(`${error.message} (retried on the next run, after YouTube finishes processing)`, error.status);
+      }), "thumbnail"],
       [item.options?.playlist_id, () => addToPlaylist(api, inserted.id, item.options.playlist_id), "playlist"],
       [item.options?.captions, () => insertCaptions(api, inserted.id, resolveMediaPath(manifestDir, item.options.captions), item.options?.captions_language ?? manifest.language), "captions"],
     ];
@@ -145,7 +180,7 @@ export async function publish(manifest, { manifestDir, manifestPath, api, execut
       }
     }
     if (warnings.length) {
-      manifest.state[item.id].extra = { warnings };
+      manifest.state[item.id].extra = { warnings, ...(pendingThumbnail ? { pending_thumbnail: true } : {}) };
       saveManifest(manifestPath, manifest);
     }
     out.write(`${item.scheduled ? "scheduled" : "published"}: ${item.id} ${when} ${url}${warnings.length ? ` (warnings: ${warnings.join("; ")})` : ""}\n`);

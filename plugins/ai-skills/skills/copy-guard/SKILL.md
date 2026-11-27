@@ -23,10 +23,10 @@ Copy passes when the checker reports no errors and the review finds no pattern l
 
 ```bash
 node <skill-dir>/scripts/copy-guard.mjs --manifest <batch-dir>/manifest.json --profile docs/ai/social-content.md
-node <skill-dir>/scripts/copy-guard.mjs --text <file|-> --lang pt-BR [--json]
+node <skill-dir>/scripts/copy-guard.mjs --text <file|-> --lang pt-BR [--platform <name>] [--json]
 ```
 
-Exit 1 means at least one `ERROR`. Rules (ids in the output): em dash and spaced en dash, emoji or symbol bullets, broetry (three or more one-line sentences in a row), "não é X, é Y" and "not X but Y" contrasts, dramatic hooks and staged reveals, engagement bait (asking for comments, tags, likes, shares), unsupported social proof, fiscal, tax, or savings promises, vague attribution ("especialistas", "studies show"), chatbot traces, and the AI vocabulary lists. `WARN` lines (AI-typical vocabulary, "único", curly quotes, markdown bold, filler) need a decision: rewrite, or keep when the word is the plain right one.
+Exit 1 means at least one `ERROR`. Rules (ids in the output): em dash and spaced en dash, emoji or symbol bullets, broetry (three or more one-line sentences in a row), "não é X, é Y" and "not X but Y" contrasts, dramatic hooks and staged reveals, engagement bait (asking for comments, tags, likes, shares), unsupported social proof, fiscal, tax, or savings promises, fear, urgency, or official-endorsement claims ("evite multa", "prazo final", "aprovado pela Receita", "conformidade garantida"), vague attribution ("especialistas", "studies show"), chatbot traces, and the AI vocabulary lists. Hashtags: the profile's `copy_guard.max_hashtags` is a number or a per-platform map (`{"instagram": 5, "default": 3}`); Instagram never allows more than 5. `WARN` lines (AI-typical vocabulary, "único", curly quotes, markdown bold, filler) need a decision: rewrite, or keep when the word is the plain right one.
 
 ## 2. Detect-only review
 
