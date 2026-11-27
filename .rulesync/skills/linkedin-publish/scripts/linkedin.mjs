@@ -65,7 +65,7 @@ export class LinkedInClient {
     // The budget is checked on every call, media status polls included, before anything is sent.
     if (this.maxCalls !== undefined && this.calls >= this.maxCalls) {
       const error = new LinkedInError(`call budget exhausted after ${this.calls} calls; the item waits for the next run`);
-      error.definite = true;
+      error.budget = true;
       throw error;
     }
     this.calls += 1;

@@ -159,16 +159,61 @@ test("the call budget is enforced on every request, media polling included", asy
   let polls = 0;
   const base = api();
   const slow = async (url, init) => (/\/rest\/images\/urn/.test(String(url)) ? (polls += 1, json({ status: "PROCESSING" })) : base(url, init));
-  await assert.rejects(publish(s.data, { manifestDir: s.dir, manifestPath: s.path, client: client(slow), execute: true, now: NOW, pollMs: 0, timeoutMs: 60000, callBudget: 12, out: sink() }), /call budget exhausted after 12 calls/);
+  const out = sink();
+  assert.deepEqual(await publish(s.data, { manifestDir: s.dir, manifestPath: s.path, client: client(slow), execute: true, now: NOW, pollMs: 0, timeoutMs: 60000, callBudget: 12, out }), []);
+  assert.match(out.text(), /call budget reached during a: it waits for the next run/);
   assert.ok(polls < 12);
   const state = JSON.parse(readFileSync(s.path, "utf8")).state.a;
   assert.equal(state.status, "failed");
   assert.equal(state.extra.api_calls, 12);
+  assert.equal(state.extra.failed_attempts, undefined, "a budget stop is not a failed attempt");
+  assert.deepEqual(state.extra.media_urns, ["urn:li:image:I1"], "the uploaded image is kept for the next run");
+  const next = api();
+  await run({ ...s, data: JSON.parse(readFileSync(s.path, "utf8")) }, next);
+  assert.ok(!next.calls.some((call) => call.url.includes("initializeUpload")), "the next run reuses the uploaded media");
+});
+
+test("a budget stop on an unknown item keeps it unknown, so the read-back still decides", async () => {
+  const s = setup([li("a", "2026-11-27")], { state: { a: { status: "unknown", at: NOW.toISOString(), extra: { media_urns: ["urn:li:image:I1"], sent_at: NOW.toISOString() } } } });
+  const base = api({ posts: [] });
+  const slow = async (url, init) => (/\/rest\/images\/urn/.test(String(url)) ? json({ status: "PROCESSING" }) : base(url, init));
+  const out = sink();
+  await publish(s.data, { manifestDir: s.dir, manifestPath: s.path, client: client(slow), execute: true, now: NOW, pollMs: 0, timeoutMs: 60000, callBudget: 6, out });
+  assert.match(out.text(), /call budget reached during a/);
+  const state = JSON.parse(readFileSync(s.path, "utf8")).state.a;
+  assert.equal(state.status, "unknown");
+  assert.equal(state.extra.sent_at, NOW.toISOString());
+  assert.ok(!base.calls.some((call) => call.url.endsWith("/rest/posts") && call.method === "POST"));
+});
+
+test("the read-back window starts at the first post, not at the latest unknown run", async () => {
+  const s = setup([li("a", "2026-11-27")]);
+  const first = api({ postFails: "network" });
+  await assert.rejects(run(s, first), /network error/);
+  const afterFirst = JSON.parse(readFileSync(s.path, "utf8")).state.a;
+  const sentAt = afterFirst.extra.sent_at;
+  assert.ok(sentAt);
+  const later = new Date(NOW.getTime() + 24 * 3600 * 1000);
+  const outage = fakeFetch([[() => true, () => { throw new Error("ECONNRESET"); }]]);
+  await assert.rejects(publish(afterFirst ? JSON.parse(readFileSync(s.path, "utf8")) : null, { manifestDir: s.dir, manifestPath: s.path, client: client(outage), execute: true, now: later, pollMs: 1, timeoutMs: 1000, out: sink() }), /network error/);
+  const afterSecond = JSON.parse(readFileSync(s.path, "utf8")).state.a;
+  assert.equal(afterSecond.status, "unknown");
+  assert.equal(afterSecond.extra.sent_at, sentAt, "sent_at never moves");
+  const third = api({ posts: [{ id: "urn:li:share:77", commentary: "Fechou o mês? {hashtag|\\#|NFSe}", createdAt: Date.parse(sentAt) + 1000, content: { media: { id: "urn:li:image:I1" } } }] });
+  await publish(JSON.parse(readFileSync(s.path, "utf8")), { manifestDir: s.dir, manifestPath: s.path, client: client(third), execute: true, now: new Date(later.getTime() + 24 * 3600 * 1000), pollMs: 1, timeoutMs: 1000, out: sink() });
+  assert.equal(JSON.parse(readFileSync(s.path, "utf8")).state.a.remote_id, "urn:li:share:77");
+  assert.ok(!third.calls.some((call) => call.url.endsWith("/rest/posts") && call.method === "POST"));
+});
+
+test("one run with a refused post counts as one failed attempt", async () => {
+  const s = setup([li("a", "2026-11-27")]);
+  await assert.rejects(run(s, api({ postFails: "Invalid" })), /422/);
+  assert.equal(JSON.parse(readFileSync(s.path, "utf8")).state.a.extra.failed_attempts, 1);
 });
 
 test("a failed item stops being retried by cron after 3 attempts, so later items go out", async () => {
   const s = setup([li("a", "2026-11-26"), li("b", "2026-11-27")]);
-  s.data.state.a = { status: "failed", at: NOW.toISOString(), attempts: 3, error: "422 bad media" };
+  s.data.state.a = { status: "failed", at: NOW.toISOString(), attempts: 6, error: "422 bad media", extra: { failed_attempts: 3 } };
   const out = sink();
   assert.deepEqual(await run(s, api(), { out }), ["b"]);
   assert.match(out.text(), /gave up after 3 failed attempts: a \(422 bad media\); fix it and run with --item a/);
