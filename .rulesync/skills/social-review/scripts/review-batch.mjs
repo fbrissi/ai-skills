@@ -27,8 +27,8 @@ export const MAX_BODY = 65000;
 export class ReviewError extends Error {}
 
 const LABELS = {
-  pt: { music: "Música", license: "licença", evidence: "evidência", ai: (item) => `IA: ${[item.ai_audio ? "narração sintética" : null, item.synthetic_media ? "imagens geradas por IA" : null].filter(Boolean).join(" e ")} (rótulo de IA na Meta${item.synthetic_media ? ", containsSyntheticMedia no YouTube" : ""}, aviso no texto do LinkedIn)`, title: (p, d, n) => `${p}: lote de ${d} (${n} ${n === 1 ? "item" : "itens"})`, date: "Data", type: "Tipo", text: "Texto", drive: "Drive", folder: "pasta", how: "Como revisar", howText: (adjust, approve) => `Comente \`${adjust} <id>: <o que mudar>\` (um ou mais itens) para refazer só o que pedir, ou \`${approve}\` para aprovar e publicar o lote. Só comentários de quem tem permissão de escrita contam.`, full: "Textos completos", sources: "Fontes", credits: "Créditos", next: "próxima execução", revision: (n) => `Revisão ${n}`, changed: "Itens refeitos", synthetic: "contém mídia sintética (IA)", link: "Link", sent: { preview: "prévia do link", text: "no fim do texto", inText: "no texto", none: "não enviado: o Instagram não tem link clicável; use o link na bio" }, noUtm: "nenhuma" },
-  en: { music: "Music", license: "license", evidence: "evidence", ai: (item) => `AI: ${[item.ai_audio ? "synthetic narration" : null, item.synthetic_media ? "AI-generated footage" : null].filter(Boolean).join(" and ")} (Meta AI label${item.synthetic_media ? ", YouTube containsSyntheticMedia" : ""}, LinkedIn text disclosure)`, title: (p, d, n) => `${p}: batch of ${d} (${n} ${n === 1 ? "item" : "items"})`, date: "Date", type: "Type", text: "Text", drive: "Drive", folder: "folder", how: "How to review", howText: (adjust, approve) => `Comment \`${adjust} <id>: <what to change>\` (one or more items) to redo only what you ask for, or \`${approve}\` to approve and publish the batch. Only comments from people with write access count.`, full: "Full copy", sources: "Sources", credits: "Credits", next: "next run", revision: (n) => `Revision ${n}`, changed: "Items redone", synthetic: "contains synthetic (AI) media", link: "Link", sent: { preview: "link preview", text: "at the end of the text", inText: "in the text", none: "not sent: Instagram links are not clickable; use the link in bio" }, noUtm: "none" },
+  pt: { music: "Música", license: "licença", evidence: "evidência", ai: (item) => `IA: ${[item.ai_audio ? "narração sintética" : null, item.synthetic_media ? "imagens geradas por IA" : null].filter(Boolean).join(" e ")} (rótulo de IA na Meta${item.synthetic_media ? ", containsSyntheticMedia no YouTube" : ""}, aviso no texto do LinkedIn)`, title: (p, d, n) => `${p}: lote de ${d} (${n} ${n === 1 ? "item" : "itens"})`, date: "Data", type: "Tipo", text: "Texto", drive: "Drive", folder: "pasta", how: "Como revisar", howText: (adjust, approve) => `Comente \`${adjust} <id>: <o que mudar>\` (um ou mais itens) para refazer só o que pedir, ou \`${approve}\` para aprovar e publicar o lote. Só comentários de quem tem permissão de escrita contam.`, full: "Textos completos", sources: "Fontes", credits: "Créditos", next: "próxima execução", revision: (n) => `Revisão ${n}`, changed: "Itens refeitos", synthetic: "contém mídia sintética (IA)", link: "Link", sent: { preview: "prévia do link", text: "no fim do texto", inText: "no texto", none: "não enviado: o Instagram não tem link clicável; use o link na bio" }, noUtm: "nenhuma", inMedia: "Texto na mídia (do spec; revise como a legenda)", fields: { kicker: "Chamada", headline: "Título", title: "Título", lead: "Texto", body: "Texto", badge: "Selo", voice: "Narração" } },
+  en: { music: "Music", license: "license", evidence: "evidence", ai: (item) => `AI: ${[item.ai_audio ? "synthetic narration" : null, item.synthetic_media ? "AI-generated footage" : null].filter(Boolean).join(" and ")} (Meta AI label${item.synthetic_media ? ", YouTube containsSyntheticMedia" : ""}, LinkedIn text disclosure)`, title: (p, d, n) => `${p}: batch of ${d} (${n} ${n === 1 ? "item" : "items"})`, date: "Date", type: "Type", text: "Text", drive: "Drive", folder: "folder", how: "How to review", howText: (adjust, approve) => `Comment \`${adjust} <id>: <what to change>\` (one or more items) to redo only what you ask for, or \`${approve}\` to approve and publish the batch. Only comments from people with write access count.`, full: "Full copy", sources: "Sources", credits: "Credits", next: "next run", revision: (n) => `Revision ${n}`, changed: "Items redone", synthetic: "contains synthetic (AI) media", link: "Link", sent: { preview: "link preview", text: "at the end of the text", inText: "in the text", none: "not sent: Instagram links are not clickable; use the link in bio" }, noUtm: "none", inMedia: "Text in the media (from the spec; review it like the caption)", fields: { kicker: "Kicker", headline: "Headline", title: "Title", lead: "Lead", body: "Body", badge: "Badge", voice: "Narration" } },
 };
 
 const labelsFor = (manifest) => (String(manifest.language).toLowerCase().startsWith("pt") ? LABELS.pt : LABELS.en);
@@ -86,7 +86,31 @@ export function linkLines(item, platform, labels) {
   return [`${labels.link} (${labels.sent[sent]}): ${item.link}`, "", `UTM: ${utm.length ? utm.join(" · ") : labels.noUtm}`];
 }
 
-export function issueBody(manifest, { review = {} } = {}) {
+const CARD_FIELDS = ["kicker", "headline", "lead", "badge"];
+const SCENE_FIELDS = ["title", "headline", "body", "voice"];
+
+/**
+ * Text drawn in an item's media, from its generation spec: the kicker, headline, lead, and badge of every card
+ * (stories, carousel slides, feed images) and the on-screen text and narration of every video scene. Stories and
+ * slides carry their copy only in the image, so the reviewer reads it here. Returns [{id, lines: [[field, text]]}].
+ */
+export function mediaTexts(spec) {
+  const pick = (entry, fields) => fields.filter((field) => typeof entry[field] === "string" && entry[field].trim()).map((field) => [field, entry[field].replace(/\s+/g, " ").trim()]);
+  const entries = Array.isArray(spec?.cards)
+    ? spec.cards.map((card) => ({ id: `${card.id}${card.index ? ` (${card.index}${card.total ? `/${card.total}` : ""})` : ""}`, lines: pick(card, CARD_FIELDS) }))
+    : Array.isArray(spec?.scenes)
+      ? spec.scenes.map((scene) => ({ id: `${scene.id} (${scene.kind})`, lines: pick(scene, SCENE_FIELDS) }))
+      : [];
+  return entries.filter((entry) => entry.lines.length);
+}
+
+function mediaTextBlock(entries, labels) {
+  const text = entries.map((entry) => [entry.id, ...entry.lines.map(([field, value]) => `${labels.fields[field]}: ${value}`)].join("\n")).join("\n\n");
+  const mark = fence(text);
+  return [`${labels.inMedia}:`, "", `${mark}text`, text, mark];
+}
+
+export function issueBody(manifest, { review = {}, readSpec = () => null } = {}) {
   const labels = labelsFor(manifest);
   const platform = PLATFORM_NAMES[manifest.platform];
   const { adjust, approve } = commands(review);
@@ -110,7 +134,9 @@ export function issueBody(manifest, { review = {} } = {}) {
     const mark = fence(text);
     lines.push("", `#### \`${item.id}\` (${item.type}, ${when(item, labels)}, ${item.visibility}${item.synthetic_media ? `, ${labels.synthetic}` : ""})`, "");
     if (item.title) lines.push(`**${cell(item.title)}**`, "");
-    lines.push(`${mark}text`, text, mark);
+    const inMedia = item.spec ? mediaTexts(readSpec(item.spec)) : [];
+    if (text.trim() || !inMedia.length) lines.push(`${mark}text`, text, mark, ...(inMedia.length ? [""] : []));
+    if (inMedia.length) lines.push(...mediaTextBlock(inMedia, labels));
     if (item.link) lines.push("", ...linkLines(item, manifest.platform, labels));
     if (item.sources?.length) lines.push("", `${labels.sources}: ${item.sources.map(cell).join("; ")}`);
     if (item.music) lines.push("", musicLine(item.music, labels));
@@ -315,7 +341,16 @@ export async function main(argv, { env = process.env, fetchImpl = fetch, out = p
   const manifest = loadManifest(target);
   const manifestDir = dirname(resolve(target));
   const changed = String(flags.changed ?? "").split(",").map((id) => id.trim()).filter(Boolean);
-  if (command === "issue-body") return void out.write(issueBody(manifest, { review }));
+  const readSpec = (path) => {
+    const full = resolveMediaPath(manifestDir, path);
+    if (!full || !existsSync(full)) return null;
+    try {
+      return JSON.parse(readFileSync(full, "utf8"));
+    } catch {
+      return null;
+    }
+  };
+  if (command === "issue-body") return void out.write(issueBody(manifest, { review, readSpec }));
   if (command === "revision-comment") return void out.write(revisionComment(manifest, changed, { review, note: flags.note ?? null }));
   if (command === "set-issue") {
     if (!/^\d+$/.test(String(flags.issue ?? ""))) throw new ReviewError("set-issue needs --issue <number>");
