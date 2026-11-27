@@ -34,6 +34,31 @@ Dated events worth a post, each with its source (they also go in Parameters):
 ## Voice and style
 <tone, person (você/tu, we/I), words to prefer and avoid, pronunciation notes for narration ("say" spellings)>
 
+## Brand
+The creative context for copy and images (`social-content-plan`'s creative method). Ground every line in the product and the audience; claims still come only from Allowed claims.
+
+### Positioning
+<one or two sentences: for whom, what job the product does in their month, and how it differs from the alternative they use today, without unsupported comparisons>
+
+### Personality
+<three to five traits with what each means in copy, for example "direct: one idea per post, plain verbs">
+
+### Audience pains in their words
+- <a sentence a reader would actually say about a recurring moment ("todo fim de mês eu emito as mesmas notas"), with the segment>
+
+### Messaging pillars
+- <pillar>: <what it says, the allowed claims behind it>
+
+### Copy examples
+Good (imitate the moves, never reuse the sentences):
+- <example caption or headline, with why it works>
+
+Bad (never write like this):
+- <example, with what is wrong: product-description sentence, feature list, generic benefit, repeated template>
+
+### Visual direction
+<how cards and videos look: which screens to show and how to crop them, what a story without a screen carries, composition rules>
+
 ## Parameters
 
 ```json

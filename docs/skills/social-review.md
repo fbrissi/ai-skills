@@ -23,7 +23,7 @@ Puts a batch up for human review: uploads its media to Google Drive under `<root
 ## What it does
 
 1. Uploads media, thumbnails, captions, and specs (replacing files in place so links survive) and shares each date folder by link.
-2. Opens the issue (label `marketing-content` by default) with the table, the exact text each platform will receive, each item's link with how it is sent and its UTM, and `<!-- social-content-manifest:v1:… -->`.
+2. Opens the issue (label `marketing-content` by default) with the table, the exact text each platform will receive, the text drawn in each item's cards or video scenes (from its spec), each item's link with how it is sent and its UTM, and `<!-- social-content-manifest:v1:… -->`.
 3. Adjust: restores the batch from the marker and Drive, lists `/adjust` requests from writers only, bumps the revision, re-uploads, updates the body, and comments.
 
 ## Side effects

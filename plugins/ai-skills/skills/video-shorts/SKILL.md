@@ -23,7 +23,7 @@ Load [references/video-spec.md](references/video-spec.md) now for the spec forma
 
 ## 1. Script
 
-Write `<batch-dir>/specs/<item-id>.video.json`: a 1.5–2.5 s `hook`, two to four `screen` or `footage` scenes, an optional `statement`, and a `cta`. One short spoken sentence per scene (`voice`, shown as captions; `say` rewrites words only for pronunciation). Give each `screen` a `focus` box (and `pan_to`) with the frame's 1000:720 aspect that keeps whole UI elements inside, with a margin around any text: never put a box edge through a label, sidebar item, or button. Crop `footage` to 1000:720 too. Total 15–45 s; Facebook Reels must stay within 3–90 s, YouTube Shorts within 180 s. Run the `copy-guard` checker on the voice lines (`--text -`). If `copy-guard` is not installed, check them by hand for its rules: no em dashes, no "não é X, é Y" or "not X but Y", no engagement bait, no unsupported social proof, no result or savings promises.
+Write `<batch-dir>/specs/<item-id>.video.json`: a 1.5–2.5 s `hook`, two to four `screen` or `footage` scenes, an optional `statement`, and a `cta`. One short spoken sentence per scene (`voice`, shown as captions; `say` rewrites words only for pronunciation). Prefer screenshots captured or cropped to the useful area (the panel or list the scene talks about, at the frame's 1000:720 aspect) over zooming into a full-page capture. Give each `screen` a `focus` box (and `pan_to`) with the frame's 1000:720 aspect that either spans the full screenshot width or puts every edge on empty background with a margin from any text or control: never put a box edge through a label, filter, sidebar item, or button. Crop `footage` to 1000:720 too. Total 15–45 s; Facebook Reels must stay within 3–90 s, YouTube Shorts within 180 s. Run the `copy-guard` checker on the voice lines (`--text -`). If `copy-guard` is not installed, check them by hand for its rules: no em dashes, no "não é X, é Y" or "not X but Y", no engagement bait, no unsupported social proof, no result or savings promises.
 
 ## 2. Music
 
@@ -42,9 +42,15 @@ node <skill-dir>/scripts/voice.mjs --spec <spec> --profile docs/ai/social-conten
 node <skill-dir>/scripts/render.mjs --spec <spec> --profile docs/ai/social-content.md --out <batch-dir>/media/<item-id>.mp4
 ```
 
-`voice.mjs` downloads the Piper voice (default `pt_BR-faber-medium`) into `.cache/video-shorts/models`, writes one WAV per scene (silence trimmed, EQ, loudnorm −16 LUFS), and skips unchanged lines. `render.mjs` copies the studio template to `.cache/video-shorts/studio` (installing it once with `npm ci --ignore-scripts` from the bundled lockfile), renders 1080x1920 at 30 fps (H.264), normalizes the mix to −16 LUFS, and prints `{path, width, height, duration, synthetic_media, music}`. It draws `video.screen_disclaimer` under every `screen` scene and every `footage` scene that is not `synthetic`, and refuses to render when one lacks it, when the disclaimer does not fit one line, when a `focus` or `pan_to` box cannot be shown whole (the frame would cut its edges), or when footage is not cropped to the frame aspect. Add `.cache/` to `.gitignore`.
+`voice.mjs` downloads the Piper voice (default `pt_BR-faber-medium`) into `.cache/video-shorts/models`, writes one WAV per scene (silence trimmed, EQ, loudnorm −16 LUFS), and skips unchanged lines. `render.mjs` copies the studio template to `.cache/video-shorts/studio` (installing it once with `npm ci --ignore-scripts` from the bundled lockfile), renders 1080x1920 at 30 fps (H.264), normalizes the mix to −16 LUFS, and prints `{path, width, height, duration, synthetic_media, music}`. It draws `video.screen_disclaimer` under every `screen` scene and every `footage` scene that is not `synthetic`, and refuses to render when one lacks it, when the disclaimer does not fit one line, when a `focus` or `pan_to` box cannot be shown whole (the frame would cut its edges), when a frame edge slices UI content (it scans the screenshot's pixels along each edge inside the image and names the edge and the rows or columns it cuts; `--allow-cut-edges` skips the scan for a frame you checked by eye), or when footage is not cropped to the frame aspect. Add `.cache/` to `.gitignore`.
 
-Watch the video, or at least extract a frame per scene (`ffmpeg -ss <t> -i <mp4> -frames:v 1 <png>`) and look at each: captions inside the safe area, the right screen in focus, the screen disclaimer under every product screen, and no text of the UI cut at the frame edges (labels, sidebar items, buttons). Fix the spec and render again.
+Then extract the first settled and the last frame of every screen and footage scene, full and cropped to the screen window:
+
+```bash
+node <skill-dir>/scripts/frames.mjs --video <batch-dir>/media/<item-id>.mp4 --props .cache/video-shorts/<spec id>.props.json --out .cache/video-shorts/frames/<spec id>
+```
+
+Open every `*-screen.png` and read its four edges: no word, filter, sidebar item, or button may be cut (a "Perí" where the screen says "Período" is a cut). The pixel scan checks only the start and end boxes and can miss low-contrast text, so this look is required. Also check captions inside the safe area, the right screen in focus, and the screen disclaimer under every product screen. Fix the spec (or recapture the screenshot cropped to the useful area) and render again.
 
 ## 4. Credits and manifest
 

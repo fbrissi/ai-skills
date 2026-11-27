@@ -23,9 +23,10 @@ Makes vertical 9:16 Shorts and Reels with Remotion: Piper narration normalized t
 
 ## What it does
 
-1. Writes a scene spec (hook, screen, footage, statement, CTA); `render.mjs` refuses fake product UIs, missing files, zoom boxes or footage the 1000:720 screen frame would cut, and a product screen without the profile's `video.screen_disclaimer` when the profile sets it (it draws the line under every product screen; without the key it warns).
+1. Writes a scene spec (hook, screen, footage, statement, CTA); `render.mjs` refuses fake product UIs, missing files, zoom boxes or footage the 1000:720 screen frame would cut, boxes whose frame edges slice UI text (a pixel scan of the screenshot), and a product screen without the profile's `video.screen_disclaimer` when the profile sets it (it draws the line under every product screen; without the key it warns).
 2. `voice.mjs` generates one WAV per line with Piper (silence trim, EQ, loudnorm); `render.mjs` renders 1080x1920 H.264 with the bundled studio and normalizes the mix to −16 LUFS.
-3. `credits.mjs` writes the Piper license chain (CC0 dataset, CC BY 4.0 base model) and the music credit for the description; `synthetic_media` is set when supplied AI footage (Veo) is used.
+3. `frames.mjs` extracts the first and last frame of every screen scene, full and cropped to the screen window, to check the edges by eye.
+4. `credits.mjs` writes the Piper license chain (CC0 dataset, CC BY 4.0 base model) and the music credit for the description; `synthetic_media` is set when supplied AI footage (Veo) is used.
 
 ## Side effects
 

@@ -3,6 +3,22 @@
 All notable changes to this project are documented here. Release versions follow
 [Semantic Versioning](https://semver.org/).
 
+## v0.14.0
+
+### Added
+
+- `social-content-plan` gains a creative method (`references/creative-method.md`): before any copy, each item gets a creative brief (who and when, the insight in the audience's words, a single-minded message, the pillar, the angle, a concrete scene, the proof from the allowed claims, the call to action), then the copy is written from it and the batch is read side by side so no two items share a skeleton, opening, or closing. It uses the `copywriting` and `social` skills when installed. The `facebook-content`, `instagram-content`, `youtube-content`, and `linkedin-content` agents write from the creative brief.
+- The shared social profile template gains a `## Brand` section: positioning, personality, audience pains in their words, messaging pillars, good and bad copy examples, and visual direction.
+- `copy-guard` warns (`repeated-template`) when the same sentence of four words or more, or the same three-word opening, appears in the text of three or more items of a batch, and its review patterns cover shared skeletons, product-description sentences, and off-brand copy.
+- `image-cards` supports `image_focus` (`{x, y, w, h}`) to show only a region of a screenshot, drawn at the region's size so its UI text stays legible.
+- `video-shorts` gains `frames.mjs`, which extracts the first settled and last frame of every screen and footage scene, full and cropped to the screen window, to inspect the frame edges.
+- `social-review` prints the text drawn in an item's media (each card's kicker, headline, lead, and badge; each video scene's title, headline, body, and narration) from its spec in the review issue, so stories and carousel slides can be reviewed; a story with no caption no longer shows an empty text block.
+
+### Changed
+
+- `image-cards`: a card without an image (statements, stories, carousel covers) is centered vertically with larger type instead of leaving the bottom of the card blank. The render warns when one blank stretch takes more than 35% of the safe area's height, and when a screenshot is drawn below 60% of its source width (UI text unreadable on a phone).
+- `video-shorts`: `render.mjs` scans the screenshot along every frame edge inside the image (start and end views) and refuses a `focus` or `pan_to` box whose edge slices text or a control, naming the edge and the range it cuts (`--allow-cut-edges` skips the scan). The skill prefers screenshots cropped to the useful area at capture time, and boxes that span the full width or keep a margin from content, and requires looking at every scene's frame edges.
+
 ## v0.13.2
 
 ### Fixed

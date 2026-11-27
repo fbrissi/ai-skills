@@ -240,6 +240,42 @@ function itemSpecFields(item, manifestDir) {
   return specFields(JSON.parse(readFileSync(path, "utf8")));
 }
 
+const fold4 = (text) => text.toLowerCase().normalize("NFD").replace(/\p{M}/gu, "").replace(/[^\p{L}\p{N}/]+/gu, " ").trim();
+
+/**
+ * Batch-level template check: the same sentence (four words or more) or the same three-word opening in the text of
+ * three or more items reads as one template filled in many times. Warnings: vary them, or keep a deliberate one.
+ */
+export function repeatedTemplates(manifest, { lang = manifest.language, minItems = 3 } = {}) {
+  const pt = languageGroup(lang) === "pt";
+  const sentences = new Map();
+  const openings = new Map();
+  for (const item of manifest.items ?? []) {
+    let text = composeText(item, manifest.platform, manifest.language);
+    if (item.credits) text = text.replace(item.credits, "");
+    const parts = text.split(/(?<=[.!?])\s+|\n+/).map((part) => part.trim()).filter((part) => part && !/^#/.test(part) && !/^https?:\/\//.test(part));
+    for (const part of new Set(parts)) {
+      const key = fold4(part);
+      if (key.split(" ").length < 4) continue;
+      if (!sentences.has(key)) sentences.set(key, { text: part, ids: new Set() });
+      sentences.get(key).ids.add(item.id);
+    }
+    const opening = fold4(parts[0] ?? "").split(" ").slice(0, 3).join(" ");
+    if (opening.split(" ").length === 3) {
+      if (!openings.has(opening)) openings.set(opening, { text: (parts[0] ?? "").split(/\s+/).slice(0, 3).join(" "), ids: new Set() });
+      openings.get(opening).ids.add(item.id);
+    }
+  }
+  const findings = [];
+  for (const { text, ids } of sentences.values()) {
+    if (ids.size >= minItems) findings.push({ where: "batch", rule: "repeated-template", level: "warn", reason: pt ? `a mesma frase em ${ids.size} itens (${[...ids].join(", ")}): varie a estrutura e o fechamento entre os posts, ou mantenha em um só` : `the same sentence in ${ids.size} items (${[...ids].join(", ")}): vary structure and closing across posts, or keep it in one`, excerpt: text });
+  }
+  for (const { text, ids } of openings.values()) {
+    if (ids.size >= minItems) findings.push({ where: "batch", rule: "repeated-template", level: "warn", reason: pt ? `${ids.size} itens abrem do mesmo jeito (${[...ids].join(", ")}): varie o gancho` : `${ids.size} items open the same way (${[...ids].join(", ")}): vary the hook`, excerpt: text });
+  }
+  return findings;
+}
+
 export function checkManifest(manifest, options = {}) {
   const findings = [];
   const { manifestDir = null, ...rest } = options;
@@ -257,6 +293,7 @@ export function checkManifest(manifest, options = {}) {
       findings.push(...checkText(text, field === "text" ? scoped : { ...scoped, maxHashtags: null }).filter((f) => field === "text" || f.rule !== "broetry"));
     }
   }
+  if (!options.disabled?.has("repeated-template")) findings.push(...repeatedTemplates(manifest, { lang: options.lang ?? manifest.language }));
   return findings;
 }
 

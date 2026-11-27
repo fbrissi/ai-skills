@@ -48,6 +48,10 @@ node <skill-dir>/scripts/review-batch.mjs issue-body <manifest> --profile <profi
 
 Every item with a `link` shows it under its text, with how it is sent (link preview for a Facebook or LinkedIn `post`, at the end of the text, already in the text, or not sent on Instagram) and its UTM parameters, so the reviewer checks a link that is not part of the text.
 
+## Text in the media
+
+Stories, carousel slides, feed cards, and video scenes carry copy that is drawn in the image or video, not in the caption. For every item with a `spec`, `issue-body` reads it (relative to the manifest) and prints that copy under the caption as "Text in the media": each card's kicker, headline, lead, and badge (with the slide counter), and each video scene's title, headline, body, and narration. An item with no caption (a story) shows only this block, never an empty one. Keep `spec` set on every item whose media has text, or the reviewer cannot read it.
+
 ## Music and AI in the issue
 
 Items with a `music` entry show the track, its license, the license URL, and a link to the license evidence in Drive, so the reviewer checks the license before approving. Items with `ai_audio` or `synthetic_media` say so, with the labels each platform gets.

@@ -23,7 +23,7 @@ Renders social image cards from HTML/CSS templates to PNG or JPEG with Chromium 
 ## What it does
 
 1. Writes a cards spec (`templates`: headline, statement, slide, thumbnail).
-2. Renders 1080x1350, 1080x1080, 1080x1920, 1200x630, and 1280x720 offline, JPEG for Instagram and thumbnails; flags overflow, safe-area, and font problems.
+2. Renders 1080x1350, 1080x1080, 1080x1920, 1200x630, and 1280x720 offline, JPEG for Instagram and thumbnails; centers cards without an image with larger type; crops screenshots to a region with `image_focus`; flags overflow, safe-area, font problems, a mostly blank safe area, and screenshots drawn too small to read.
 3. Checks each image and records it in the manifest with alt text.
 
 ## Side effects

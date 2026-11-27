@@ -212,3 +212,26 @@ test("issue body shows each item's link and its UTM, even when the link is sent 
   const ig = manifest("instagram", [item({ publish_at: null, scheduled: false, link })], { approval: { status: "pending", by: null, at: null, revision: null } });
   assert.match(issueBody(ig), /Link \(não enviado: o Instagram não tem link clicável; use o link na bio\): https:\/\/example\.com/);
 });
+
+test("text drawn in the media (story and carousel cards, video scenes) is shown from the spec", async () => {
+  const { main, mediaTexts } = await import("../../.rulesync/skills/social-review/scripts/review-batch.mjs");
+  const { sink } = await import("./helpers.mjs");
+  const story = { cards: [{ id: "nt009-story", template: "statement", formats: ["story"], kicker: "NFS-e Nacional", headline: "Em 07/12/2026, o layout nacional muda", lead: "Releases 1 a 3 entram em produção.\nLink na bio.", alt: "não aparece" }] };
+  const carousel = { cards: [{ id: "lote-1", template: "slide", index: 1, total: 2, formats: ["ig-portrait"], headline: "No fechamento, emita o lote" }, { id: "lote-2", template: "slide", index: 2, total: 2, formats: ["ig-portrait"], headline: "Teste grátis", badge: "Beta grátis até 31/03/2027" }] };
+  const reel = { id: "r", scenes: [{ id: "hook", kind: "hook", title: "Notas do recesso já programadas", voice: "Deixe as notas programadas." }, { id: "tela", kind: "screen", headline: "No dia programado", image: "x.png" }] };
+  assert.deepEqual(mediaTexts(carousel), [{ id: "lote-1 (1/2)", lines: [["headline", "No fechamento, emita o lote"]] }, { id: "lote-2 (2/2)", lines: [["headline", "Teste grátis"], ["badge", "Beta grátis até 31/03/2027"]] }]);
+  assert.deepEqual(mediaTexts(reel), [{ id: "hook (hook)", lines: [["title", "Notas do recesso já programadas"], ["voice", "Deixe as notas programadas."]] }, { id: "tela (screen)", lines: [["headline", "No dia programado"]] }]);
+  assert.deepEqual(mediaTexts(null), []);
+  const dir = tempDir({ "specs/story.cards.json": JSON.stringify(story), "specs/carousel.cards.json": JSON.stringify(carousel), "media/s.jpg": png(1080, 1920), "media/c.jpg": png(1080, 1350) });
+  const data = manifest("instagram", [
+    item({ id: "2026-12-07-story", type: "story", caption: null, hashtags: [], media: [{ path: "media/s.jpg", kind: "image", width: 1080, height: 1920 }], spec: "specs/story.cards.json" }),
+    item({ id: "2026-12-07-carousel", type: "carousel", caption: "Legenda do carrossel", hashtags: [], spec: "specs/carousel.cards.json" }),
+  ], { approval: { status: "pending", by: null, at: null, revision: null } });
+  const out = sink();
+  await main(["issue-body", writeManifest(dir, data)], { out });
+  const body = out.text();
+  assert.match(body, /Texto na mídia \(do spec; revise como a legenda\):\n\n```text\nnt009-story\nChamada: NFS-e Nacional\nTítulo: Em 07\/12\/2026, o layout nacional muda\nTexto: Releases 1 a 3 entram em produção\. Link na bio\.\n```/);
+  assert.doesNotMatch(body, /#### `2026-12-07-story`[^#]*```text\n\n```/, "no empty caption block for a story");
+  assert.match(body, /```text\nLegenda do carrossel\n```\n\nTexto na mídia[^`]*```text\nlote-1 \(1\/2\)\nTítulo: No fechamento, emita o lote\n\nlote-2 \(2\/2\)\nTítulo: Teste grátis\nSelo: Beta grátis até 31\/03\/2027\n```/);
+  assert.doesNotMatch(body, /não aparece/);
+});

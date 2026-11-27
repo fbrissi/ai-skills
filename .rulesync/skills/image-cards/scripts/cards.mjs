@@ -2,6 +2,7 @@
 // (fonts and images inlined as data URLs, so rendering works offline).
 import { existsSync, readFileSync } from "node:fs";
 import { extname, resolve } from "node:path";
+import { imageSize } from "./social-manifest.mjs";
 
 export const FORMATS = {
   "ig-portrait": { w: 1080, h: 1350, safe: [96, 96, 96, 96], type: "jpeg", scale: 1 },
@@ -24,6 +25,11 @@ export const DEFAULT_BRAND = {
 };
 
 const MIME = { ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".svg": "image/svg+xml", ".webp": "image/webp", ".woff2": "font/woff2", ".woff": "font/woff", ".ttf": "font/ttf", ".otf": "font/otf" };
+
+/** Below this share of the safe area's height left blank in one stretch, a card reads as composed. */
+export const MAX_EMPTY_SHARE = 0.35;
+/** A screenshot drawn below this fraction of its source pixels has UI text too small to read on a phone. */
+export const MIN_SHOT_SCALE = 0.6;
 
 export class CardError extends Error {}
 
@@ -84,6 +90,8 @@ body{font-family:"${brand.font.family}",system-ui,sans-serif;color:${c.ink};-web
 .on-primary .kicker{color:${c.on_primary};opacity:.85}
 h1{font-size:${px(78)};line-height:1.06;font-weight:800;letter-spacing:-.02em;text-wrap:balance}
 .statement h1{font-size:${px(96)}}
+.solo h1{font-size:${px(format.h / format.w > 1.6 ? 108 : 92)};line-height:1.04}
+.solo .lead{font-size:${px(format.h / format.w > 1.6 ? 42 : 38)}}
 .thumbnail h1{font-size:${px(104)};line-height:1.02}
 .hl{color:${c.primary}}
 .on-primary .hl{color:${c.accent}}
@@ -107,7 +115,27 @@ export function validateCard(card) {
   if (!card.headline) errors.push(`${card.id}: headline is required`);
   for (const format of card.formats ?? []) if (!FORMATS[format]) errors.push(`${card.id}: unknown format ${format} (${Object.keys(FORMATS).join(", ")})`);
   if (!(card.formats ?? []).length) errors.push(`${card.id}: formats is required`);
+  if (card.image_focus !== undefined) {
+    const box = card.image_focus;
+    if (!card.image) errors.push(`${card.id}: image_focus needs an image`);
+    if (!box || !["x", "y", "w", "h"].every((key) => Number.isFinite(box[key])) || box.x < 0 || box.y < 0 || box.w <= 0 || box.h <= 0) errors.push(`${card.id}: image_focus must be {x, y, w, h} in image pixels`);
+  }
   return errors;
+}
+
+/**
+ * The screenshot as an image source: the file itself, or with image_focus an SVG that shows only that region (its
+ * intrinsic size is the region, so the card scales the region, not the whole screen, and UI text stays legible).
+ */
+export function shotSource(card, root) {
+  const source = dataUrl(card.image, root);
+  const box = card.image_focus;
+  if (!box) return source;
+  const size = imageSize(resolve(root, card.image));
+  if (!size?.width || !size?.height) throw new CardError(`${card.id}: cannot read the size of ${card.image}`);
+  if (box.x + box.w > size.width || box.y + box.h > size.height) throw new CardError(`${card.id}: image_focus goes past the image (${size.width}x${size.height})`);
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${box.w}" height="${box.h}" viewBox="${box.x} ${box.y} ${box.w} ${box.h}"><image xlink:href="${source}" href="${source}" x="0" y="0" width="${size.width}" height="${size.height}"/></svg>`;
+  return `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`;
 }
 
 export function buildPage(card, formatName, brand, root = process.cwd()) {
@@ -119,7 +147,7 @@ export function buildPage(card, formatName, brand, root = process.cwd()) {
   const headline = `<h1>${highlight(card.headline, card.highlight)}</h1>`;
   const lead = card.lead ? `<p class="lead">${escapeHtml(card.lead)}</p>` : "";
   const image = card.image
-    ? `<div class="stage"><img class="shot" src="${dataUrl(card.image, root)}" alt="${escapeHtml(card.alt ?? "")}">${card.image_label ? `<span class="shot-label">${escapeHtml(card.image_label)}</span>` : ""}</div>`
+    ? `<div class="stage"><img class="shot" src="${shotSource(card, root)}" alt="${escapeHtml(card.alt ?? "")}">${card.image_label ? `<span class="shot-label">${escapeHtml(card.image_label)}</span>` : ""}</div>`
     : "";
   const footerText = card.footer ?? brand.footer;
   const counter = template === "slide" && card.index ? `<span class="counter">${escapeHtml(card.index)}${card.total ? `/${escapeHtml(card.total)}` : ""}</span>` : "";
@@ -128,18 +156,42 @@ export function buildPage(card, formatName, brand, root = process.cwd()) {
   const copy = `${kicker}${headline}${lead}`;
   const body = format.row
     ? `<div class="safe"><div class="col">${logo}${copy}<div class="grow"></div>${foot}</div>${image}</div>`
-    : `<div class="safe">${logo}${copy}${image || '<div class="grow"></div>'}${foot}</div>`;
-  return `<!doctype html><html lang="${escapeHtml(card.lang ?? "pt-BR")}"><head><meta charset="utf-8"><title>${escapeHtml(card.alt ?? card.headline)}</title><style>${css(brand, format, root)}</style></head><body><main class="canvas ${template}${onPrimary ? " on-primary" : ""}${format.row ? " row" : ""}">${body}</main></body></html>`;
+    : image
+      ? `<div class="safe">${logo}${copy}${image}${foot}</div>`
+      : `<div class="safe">${logo}<div class="grow"></div>${copy}<div class="grow"></div>${foot}</div>`;
+  const solo = !image && !format.row && template !== "thumbnail";
+  return `<!doctype html><html lang="${escapeHtml(card.lang ?? "pt-BR")}"><head><meta charset="utf-8"><title>${escapeHtml(card.alt ?? card.headline)}</title><style>${css(brand, format, root)}</style></head><body><main class="canvas ${template}${onPrimary ? " on-primary" : ""}${format.row ? " row" : ""}${solo ? " solo" : ""}">${body}</main></body></html>`;
 }
 
-/** Runs inside the page: lists text that overflows its box or leaves the safe area. */
-export function layoutCheck() {
+/**
+ * Runs inside the page (serialized, so it uses no module scope; the thresholds are its arguments): lists text that
+ * overflows its box or leaves the safe area, a large blank stretch of the safe area, and a screenshot drawn too
+ * small for its UI text to be read on a phone.
+ */
+export function layoutCheck({ maxEmptyShare = 0.35, minShotScale = 0.6 } = {}) {
   const warnings = [];
   const safe = document.querySelector(".safe").getBoundingClientRect();
   for (const el of document.querySelectorAll(".safe h1, .safe .lead, .safe .kicker, .safe .foot, .safe .logo, .safe .shot")) {
     const r = el.getBoundingClientRect();
     if (r.top < safe.top - 1 || r.bottom > safe.bottom + 1 || r.left < safe.left - 1 || r.right > safe.right + 1) warnings.push(`${el.className || el.tagName} leaves the safe area`);
     if (el.scrollWidth > el.clientWidth + 1 && el.tagName !== "IMG") warnings.push(`${el.className || el.tagName} overflows horizontally`);
+  }
+  const spans = [...document.querySelectorAll(".safe h1, .safe .lead, .safe .kicker, .safe .foot, .safe .logo, .safe .shot")]
+    .map((el) => el.getBoundingClientRect())
+    .filter((r) => r.height > 0)
+    .map((r) => [Math.max(r.top, safe.top), Math.min(r.bottom, safe.bottom)])
+    .sort((a, b) => a[0] - b[0]);
+  let cursor = safe.top;
+  let gap = { size: 0, from: 0, to: 0 };
+  for (const [top, bottom] of [...spans, [safe.bottom, safe.bottom]]) {
+    if (top - cursor > gap.size) gap = { size: top - cursor, from: cursor, to: top };
+    cursor = Math.max(cursor, bottom);
+  }
+  if (safe.height > 0 && gap.size / safe.height > maxEmptyShare) warnings.push(`${Math.round((gap.size / safe.height) * 100)}% of the safe area is blank (y ${Math.round(gap.from)}-${Math.round(gap.to)}): balance the composition, use larger type, or add a cropped real screenshot`);
+  const shot = document.querySelector(".safe .shot");
+  if (shot && shot.naturalWidth) {
+    const scale = shot.getBoundingClientRect().width / shot.naturalWidth;
+    if (scale < minShotScale) warnings.push(`screenshot drawn at ${Math.round(scale * 100)}% of its ${shot.naturalWidth}px width: its UI text is too small to read on a phone; crop it to the relevant region with image_focus (at most about ${Math.round(shot.getBoundingClientRect().width / minShotScale)}px wide)`);
   }
   const stage = document.querySelector(".stage");
   if (stage && stage.clientHeight < 160) warnings.push(`image area too small (${stage.clientHeight}px): shorten the copy`);
