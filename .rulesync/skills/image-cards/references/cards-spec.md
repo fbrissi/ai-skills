@@ -33,6 +33,7 @@ A JSON file with a `cards` array. Paths are relative to the repository root (the
 | `highlight` | no | part of the headline drawn in the primary color (last occurrence) |
 | `kicker`, `lead` | no | line above and text below the headline |
 | `image`, `image_label`, `alt` | no | real screenshot, its source label, and its description |
+| `image_focus` | no | `{x, y, w, h}` in image pixels: show only that region of `image`, drawn at the region's size so its UI text stays legible; keep its edges off text and controls |
 | `badge`, `footer` | no | pill on the right of the footer; footer text (default `brand.footer`) |
 | `index`, `total` | no | slide counter for `slide` |
 | `background` | no | `primary` puts any template on the primary color |
@@ -41,5 +42,7 @@ A JSON file with a `cards` array. Paths are relative to the repository root (the
 | `lang` | no | page language (default `pt-BR`) |
 
 Without `--profile`, a `brand` object in the spec itself sets colors, font, logo, and footer (same shape as the profile's `brand`).
+
+Without `image`, a card's copy is centered vertically between the logo and the footer, with a larger headline and lead (except row formats and `thumbnail`). The render warns when one blank stretch takes more than 35% of the safe area's height, and when a screenshot is drawn below 60% of its source width (crop it with `image_focus`).
 
 A carousel is one card per slide (`template: "slide"`, same `formats`, `index` 1..n). Instagram carousels keep every slide at the same aspect ratio.

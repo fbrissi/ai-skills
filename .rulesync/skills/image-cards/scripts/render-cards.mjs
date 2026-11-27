@@ -6,7 +6,7 @@
 import { globSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { brandFrom, buildPage, FORMATS, layoutCheck, validateCard } from "./cards.mjs";
+import { brandFrom, buildPage, FORMATS, layoutCheck, MAX_EMPTY_SHARE, MIN_SHOT_SCALE, validateCard } from "./cards.mjs";
 import { isMain, readProfileConfig } from "./social-manifest.mjs";
 
 async function loadChromium() {
@@ -49,7 +49,7 @@ export async function main(argv) {
       await page.route("**/*", (route) => (route.request().url().startsWith("data:") ? route.continue() : route.abort()));
       await page.setContent(html, { waitUntil: "load" });
       await page.evaluate(() => document.fonts.ready);
-      const warnings = await page.evaluate(layoutCheck);
+      const warnings = await page.evaluate(layoutCheck, { maxEmptyShare: MAX_EMPTY_SHARE, minShotScale: MIN_SHOT_SCALE });
       await page.locator(".canvas").screenshot({ path, type, ...(type === "jpeg" ? { quality: Number(value("quality") ?? 92) } : {}) });
       await page.close();
       report.push({ id: card.id, format, path: relative(root, path), width: size.w, height: size.h, warnings });
