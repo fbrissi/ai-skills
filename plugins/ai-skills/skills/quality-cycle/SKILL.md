@@ -64,8 +64,10 @@ Merge both finding lists, drop duplicates, and classify each:
 | Class | Action |
 | --- | --- |
 | blocker, critical, high, medium | Fix in this cycle |
+| an acceptance criterion of the ticket the branch does not meet, at any severity a role gave it | Fix in this cycle (it counts as at least medium), never a follow-up; only the user can drop or defer a criterion |
+| a scenario the branch adds or changes that the project's default or CI selection never runs (for example a feature tag the config always excludes) | Fix in this cycle: move or retag it so it runs, or record the owner decision the project requires for an excluded tag |
 | low, in touched code, cheap (minutes) | Fix in this cycle |
-| low elsewhere, or pre-existing | Follow-up ticket (with the `ticket-create` skill if installed, otherwise a list in the cycle log for the user) |
+| low elsewhere, or pre-existing (never an acceptance criterion) | Follow-up ticket (with the `ticket-create` skill if installed, otherwise a list in the cycle log for the user) |
 | disputed | Record the evidence; the role that raised it decides next round, or the user decides |
 | needs a product or scope decision | Ask the user |
 

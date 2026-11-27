@@ -27,7 +27,7 @@ Never switch branches or move `HEAD` during a review. If the content you need is
 | branch | base = the given branch or `git symbolic-ref --short refs/remotes/origin/HEAD`; `git log --oneline <base>..HEAD`; `git diff --stat <base>...HEAD` |
 | PR | `<skill-dir>/scripts/pr-context.sh <pr> --all-threads` (absolute path, run from the repo root; needs `bash`, `gh`, `jq`); then `git fetch origin <pr.base> pull/<n>/head` (works for forks too) and diff `origin/<pr.base>...FETCH_HEAD`, reading PR files with `git show FETCH_HEAD:<path>` (or use `gh pr diff <n>`). If the PR head is already checked out, diff against `HEAD` instead |
 
-For a PR that clearly references exactly one ticket (body, title, or branch name; see `references/tickets.md`), load it and judge whether the PR meets the ticket's intent, opening every image of the ticket yourself (its `Images in every stage` section), not their description. If no access can load it, continue: review the diff on its own merits, skip the intent judgement, and add the `Ticket:` line below to the output and to any published review body. Never wait for input about ticket access, and never let it block publishing.
+For a PR that clearly references exactly one ticket (body, title, or branch name; see `references/tickets.md`), load it (with its parent issue as context, as `references/tickets.md` says under Parent and sub-issues) and judge whether the PR meets the ticket's intent and **each of its acceptance criteria** (the `## Acceptance criteria` checklist when present): a criterion the diff does not meet, or meets only in part, is at least a `medium` finding that quotes the criterion, never a low or a follow-up. Open every image of the ticket yourself (its `Images in every stage` section), not their description. If no access can load it, continue: review the diff on its own merits, skip the intent judgement, and add the `Ticket:` line below to the output and to any published review body. Never wait for input about ticket access, and never let it block publishing.
 
 ## 2. Read before judging
 
@@ -44,7 +44,7 @@ Correctness and logic regressions · missing error/edge handling · security, au
 
 Not findings: style, naming, or "consider refactoring" unless it hides a real defect.
 
-Severity: `critical` (data loss, security, broken deploy) · `high` (likely bug in normal use, broken contract) · `medium` (edge-case bug, likely follow-up breakage) · `low` (non-blocking; mention, never publish).
+Severity: `critical` (data loss, security, broken deploy) · `high` (likely bug in normal use, broken contract) · `medium` (edge-case bug, likely follow-up breakage, an unmet acceptance criterion) · `low` (non-blocking; mention, never publish).
 
 ## 4. PR-specific stability rules
 
