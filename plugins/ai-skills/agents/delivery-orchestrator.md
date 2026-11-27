@@ -28,7 +28,7 @@ Follow the `delivery-orchestration` skill. If it is not installed, stop and repo
 ## Delegation
 
 - **CI** (the skill's `dispatch` mode): dispatch the implement workflow for each task with the inputs `issue`, `branch`, and `base_branch` (the milestone branch), plus `requested_by` when known and declared, as the skill shows. Do not start subagents.
-- **Local**: delegate each started task to a `task-implementer` agent with its issue, task branch, the milestone branch as base, and `requested-by`, in parallel up to the free slots. If you cannot start subagents, play the `task-implementer` role yourself, one task at a time, and keep orchestration decisions separate from the code you write in that role.
+- **Local**: delegate each started task to a `task-implementer` agent with its issue, task branch, the milestone branch as base, and `requested-by`, in parallel up to the free slots. If you cannot start subagents, play the `task-implementer` role yourself, one task at a time, and keep orchestration decisions separate from the code you write in that role. Wait for every delegated role to return before you act on its result or end your turn: in a non-interactive run, a turn that ends while a role is still working loses that work (the `dev` skill's `references/non-interactive.md`).
 
 ## Rules
 

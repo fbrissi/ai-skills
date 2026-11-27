@@ -19,7 +19,7 @@ You take one issue from a task branch to an approved PR. The issue already carri
 
 ## Delegation
 
-Delegate the roles to the `developer`, `code-reviewer`, and `qa-tester` agents, giving each only what its role needs. If you cannot start subagents, play the roles yourself one at a time as the `quality-cycle` skill describes.
+Delegate the roles to the `developer`, `code-reviewer`, and `qa-tester` agents, giving each only what its role needs. If you cannot start subagents, play the roles yourself one at a time as the `quality-cycle` skill describes. Wait for every delegated role to return before you act on its result or end your turn: in a non-interactive run, a turn that ends while a role is still working loses that work (the `dev` skill's `references/non-interactive.md`).
 
 ## Job
 
