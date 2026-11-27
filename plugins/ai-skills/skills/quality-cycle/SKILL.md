@@ -64,8 +64,11 @@ Merge both finding lists, drop duplicates, and classify each:
 | Class | Action |
 | --- | --- |
 | blocker, critical, high, medium | Fix in this cycle |
+| an acceptance criterion of the ticket the branch does not meet, at any severity a role gave it | Fix in this cycle (it counts as at least medium), never a follow-up; only the user can drop or defer a criterion. A criterion only a person can satisfy (a sign-off before merge) is not a finding: the PR carries `ai:needs-approval` for it |
+| a scenario the branch adds or changes with a tag the project's E2E config always excludes, so no tag selection runs it (for example `@email` on the `Feature:` line), unless the scenario needs that tag and carries the owner decision the project requires for it | Fix in this cycle: move or retag it so it runs |
+| an environment finding (QA could not run a scenario because a file or service the run needs is missing, unreadable, or down; a scenario that needs a credential, device, or account from the user follows Blocked scenarios instead) | Fix it in this cycle when it is in the repository (for example the setup script); otherwise report it as open in the output and the PR body. It never blocks approval and is never reported as covered by other tests |
 | low, in touched code, cheap (minutes) | Fix in this cycle |
-| low elsewhere, or pre-existing | Follow-up ticket (with the `ticket-create` skill if installed, otherwise a list in the cycle log for the user) |
+| low elsewhere, or pre-existing (never an acceptance criterion) | Follow-up ticket (with the `ticket-create` skill if installed, otherwise a list in the cycle log for the user) |
 | disputed | Record the evidence; the role that raised it decides next round, or the user decides |
 | needs a product or scope decision | Ask the user |
 
@@ -80,7 +83,7 @@ Merge both finding lists, drop duplicates, and classify each:
 
 Append the round to the cycle log: findings with IDs, triage class, fix commit, verdicts of both roles. If the profile sets `Commit cycle logs and QA reports: yes`, commit the log and the round's QA report locally (`docs: record quality cycle round <n>`); screenshots follow the same setting unless the profile excludes them. With `no` (the default), leave them uncommitted and suggest adding their folders to `.gitignore`. Then start the next round at step 1.
 
-Finish when both roles return APPROVED in the same round and no scenario in scope is still `blocked` (unless the user accepted it). If the round limit is reached first, stop and escalate: summarize what is still open, why it did not converge (disagreement, flaky environment, scope too large), and ask the user how to proceed. Also stop early when a round makes no progress (same findings, no new commits).
+Finish when both roles return APPROVED in the same round and no scenario in scope is still `blocked` (unless the user accepted it, or it is blocked only by an environment finding reported as open, see Triage). If the round limit is reached first, stop and escalate: summarize what is still open, why it did not converge (disagreement, flaky environment, scope too large), and ask the user how to proceed. Also stop early when a round makes no progress (same findings, no new commits).
 
 ## 5. Ship (after both approve)
 

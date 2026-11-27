@@ -3,6 +3,18 @@
 All notable changes to this project are documented here. Release versions follow
 [Semantic Versioning](https://semver.org/).
 
+## v0.14.1
+
+### Fixed
+
+- An unmet acceptance criterion is never a follow-up. `review-changes` judges each acceptance criterion of the referenced ticket, and one the diff does not meet, or meets only in part, is at least a `medium` finding that quotes it. `quality-cycle` fixes such a finding in the cycle whatever severity a role gave it, and the `task-implementer` agent never lists a criterion under follow-ups: only a person can drop or defer one. A run had reported a hardcoded number that broke a "single source" criterion as a follow-up.
+- A scenario counts only when it can run. A scenario the change adds or changes with a tag the project's E2E config always excludes (for example `@email` inherited from the `Feature:` line) is a `medium` finding in `qa-e2e` and a fix in `quality-cycle`, unless it needs the tag and carries the owner decision the project requires. A scenario QA could not run because of the environment is `blocked` with its exact cause as an environment finding: `quality-cycle` fixes it when the cause is in the repository and otherwise reports it as open, never as covered by other tests.
+- The `task-implementer` agent labels a pull request that needs a person's sign-off (for example legal text) `ai:needs-approval` at creation, in every state that opens a PR, instead of only `ai:needs-human`. A criterion only a person can satisfy (a sign-off) is not a review finding, so it never blocks the cycle. The escalation label stopped the PR fix passes, so a review finding waited for the person too. With `fbrissi/github-actions` `v1.19.0`, the approval label keeps the fix passes running and only the merge waits for the person's approval of the final head.
+
+### Changed
+
+- Split issues keep their background as GitHub sub-issues. `business-refinement` and `technical-refinement` add each issue split from another as its sub-issue, keeping the text links. `references/tickets.md` gains "Parent and sub-issues (GitHub)": every skill that works from an issue loads its parent as context (why, for whom, research, decisions) and its sub-issues as scope already split out, while the issue's own body and acceptance criteria stay the contract.
+
 ## v0.14.0
 
 ### Added

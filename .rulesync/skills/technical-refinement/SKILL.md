@@ -52,7 +52,7 @@ Issues in a milestone are implemented in parallel, each on its own branch from t
 2. For every pair that touches the same file, migration sequence, shared contract, or generated artifact:
    - Make them disjoint by moving the shared change into the issue that owns it, or
    - Add `Depends on #<n>` to the later one so it starts only after the other is done, or
-   - Split an issue whose parts have different dependencies, or merge two issues that cannot be separated. Splits and merges keep the business sections and acceptance criteria intact across the result, keep every resulting issue in the milestone, link the originals, and close a merged-away issue with a comment pointing to the survivor.
+   - Split an issue whose parts have different dependencies, or merge two issues that cannot be separated. Splits and merges keep the business sections and acceptance criteria intact across the result, keep every resulting issue in the milestone, link the originals (on GitHub, add each new issue as a sub-issue of the issue it was split from, as `business-refinement` does), and close a merged-away issue with a comment pointing to the survivor.
    - Business refinement already shaped the issues by deliverable. Split or merge here only for code reasons (areas, dependencies, size), say the code reason in the linking comment, and never undo a business split or merge for a reason that is not technical.
 3. Reject dependency cycles: reorder or merge until the graph is acyclic.
 4. Never edit an issue that is already `in-progress` or later. If it conflicts, add the dependency to the other issue instead.

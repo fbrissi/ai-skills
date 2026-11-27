@@ -85,6 +85,8 @@ When scripted scenarios pass and time allows, run one short exploratory charter 
 
 Mark a finding `pre-existing` when it also happens on the base branch or outside the changed area, if you can tell.
 
+A scenario the change adds or changes counts only when it can run: one with a tag the project's E2E config always excludes, so no tag selection runs it (for example `@email` on the `Feature:` line), unless the scenario needs that tag and carries the owner decision the project requires for it, is a `medium` finding. A scenario you could not run because of the environment (a file the run needs is missing or unreadable, a service is down) is `blocked` with the exact cause as an environment finding, so the caller can fix the environment; it counts as blocked for a reason outside the change, and you never report it as covered by other tests.
+
 Verdict: **APPROVED** when no blocker, high, or medium findings remain on the changed scope and every scenario in scope passed or was blocked for a reason outside the change. Otherwise **CHANGES REQUIRED**. Never approve with a failing `@p1` scenario.
 
 ## 6. Report
