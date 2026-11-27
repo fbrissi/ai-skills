@@ -314,6 +314,7 @@ export function validateManifest(manifest, { manifestDir = ".", checkFiles = tru
     for (const [day, count] of perDay) if (count > LIMITS.facebook.reelsPerDay) errors.push(`${day}: more than ${LIMITS.facebook.reelsPerDay} reels in one day`);
   }
   if (forPublish && manifest.approval.status !== "approved") errors.push("batch is not approved (approval.status must be approved)");
+  else if (forPublish && (manifest.approval.revision ?? 1) !== (manifest.review?.revision ?? 1)) errors.push(`approval is for revision ${manifest.approval.revision}, but the batch is at revision ${manifest.review?.revision ?? 1}`);
   return errors;
 }
 
@@ -377,6 +378,15 @@ export function reportBlocked(manifest, out, retry = []) {
   for (const item of manifest.items) {
     if (needsCheck(manifest, item.id) && !retry.includes(item.id)) out.write(`needs a manual check: ${item.id} may already be live (${manifest.state[item.id].error ?? "no response"}); confirm on the platform, then rerun with --retry ${item.id} if it is not\n`);
   }
+}
+
+/**
+ * Splits pending items into those still schedulable and stale ones whose publish_at is now too close or past, so a
+ * late approval skips only the stale items (reported) instead of rejecting the whole batch.
+ */
+export function splitStale(items, { now = new Date(), minLeadSeconds, execute = true } = {}) {
+  const stale = execute ? items.filter((item) => item.scheduled && item.publish_at && (Date.parse(item.publish_at) - now.getTime()) / 1000 < minLeadSeconds) : [];
+  return { ready: items.filter((item) => !stale.includes(item)), stale };
 }
 
 /** Runs the final, non-idempotent call: a network failure (no HTTP response) becomes an UncertainError. */

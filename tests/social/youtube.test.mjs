@@ -83,9 +83,14 @@ test("quota errors stop the run without throwing; other errors throw", async () 
   assert.equal(JSON.parse(readFileSync(s2.path, "utf8")).state.a.status, "failed");
 });
 
-test("scheduled videos must go public at publish_at and need 15 minutes of lead", async () => {
-  const s = setup([short("a", { visibility: "unlisted" }), short("b", { date: "2026-11-27", publish_at: "2026-11-27T12:05:00-03:00" })]);
-  await assert.rejects(run(s, youtube()), (error) => /set visibility public/.test(error.message) && /at least 15 minutes/.test(error.message));
+test("scheduled videos must go public at publish_at; items under 15 minutes of lead are skipped as stale", async () => {
+  await assert.rejects(run(setup([short("a", { visibility: "unlisted" })]), youtube()), /set visibility public/);
+  const s = setup([short("b", { date: "2026-11-27", publish_at: "2026-11-27T12:05:00-03:00" })]);
+  const out = sink();
+  const fetchImpl = youtube();
+  await run(s, fetchImpl, { out });
+  assert.match(out.text(), /stale: b publish_at/);
+  assert.equal(fetchImpl.calls.length, 0);
 });
 
 test("refresh token exchange sends the OAuth fields and hides secrets in errors", async () => {

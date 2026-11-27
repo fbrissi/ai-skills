@@ -10,6 +10,7 @@
 //   review-batch.mjs set-issue <manifest.json> --issue <n> --url <issue URL>
 //   review-batch.mjs marker <issue-body.md|-> [--out <manifest.json>]
 //   review-batch.mjs adjust-requests --issue <n> [--repo owner/name]
+//   review-batch.mjs approve --issue <n> --comment-id <id> --out <manifest.json> [--repo owner/name] [--profile <md>]
 //   review-batch.mjs fetch <manifest.json>
 // Env: GOOGLE_DRIVE_CLIENT_ID, GOOGLE_DRIVE_CLIENT_SECRET, GOOGLE_DRIVE_REFRESH_TOKEN (upload, fetch);
 //      GH_TOKEN or GITHUB_TOKEN and GH_REPO or GITHUB_REPOSITORY (adjust-requests).
@@ -17,7 +18,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { gunzipSync, gzipSync } from "node:zlib";
 import { Drive, fileUrl, folderUrl, md5 } from "./drive.mjs";
-import { composeText, isMain, loadManifest, readProfileConfig, resolveMediaPath, saveManifest } from "./social-manifest.mjs";
+import { approveManifest, composeText, isMain, loadManifest, readProfileConfig, resolveMediaPath, saveManifest } from "./social-manifest.mjs";
 
 export const PLATFORM_NAMES = { facebook: "Facebook", instagram: "Instagram", youtube: "YouTube" };
 export const MARKER = /<!-- social-content-manifest:v1:([A-Za-z0-9+/=]+) -->/g;
@@ -162,32 +163,87 @@ async function github(fetchImpl, token, url) {
   return response.json();
 }
 
-/** /adjust comments after the latest revision comment, from users with write, maintain or admin access. */
-export async function adjustRequests({ repo, issue, token, fetchImpl = fetch, command = "/adjust", api = "https://api.github.com" }) {
+export const REVISION_MARK = /<!-- social-content:revision (\d+) -->/;
+
+/** True when a comment body starts with the command followed by whitespace or the end. */
+export function isCommand(body, command) {
+  const text = (body ?? "").trim().toLowerCase();
+  return text.startsWith(command.toLowerCase()) && (text.length === command.length || /\s/.test(text[command.length]));
+}
+
+async function listComments(fetchImpl, token, api, repo, issue) {
   const comments = [];
   for (let page = 1; ; page += 1) {
     const batch = await github(fetchImpl, token, `${api}/repos/${repo}/issues/${issue}/comments?per_page=100&page=${page}`);
     comments.push(...batch);
     if (batch.length < 100) break;
   }
-  const lastRevision = comments.reduce((index, comment, position) => (/<!-- social-content:revision \d+ -->/.test(comment.body ?? "") ? position : index), -1);
-  const matches = (body) => {
-    const text = (body ?? "").trim().toLowerCase();
-    return text.startsWith(command.toLowerCase()) && (text.length === command.length || /\s/.test(text[command.length]));
-  };
-  const candidates = comments.slice(lastRevision + 1).filter((comment) => matches(comment.body));
-  const allowed = new Map();
-  const requests = [];
-  for (const comment of candidates) {
-    const login = comment.user?.login;
-    if (!login || comment.user?.type === "Bot") continue;
-    if (!allowed.has(login)) {
+  return comments;
+}
+
+function permissionChecker(fetchImpl, token, api, repo) {
+  const cache = new Map();
+  return async (user) => {
+    const login = user?.login;
+    if (!login) return false;
+    if (!cache.has(login)) {
       const permission = await github(fetchImpl, token, `${api}/repos/${repo}/collaborators/${encodeURIComponent(login)}/permission`).catch(() => ({}));
-      allowed.set(login, ["admin", "maintain", "write"].includes(permission.role_name ?? permission.permission));
+      cache.set(login, ["admin", "maintain", "write"].includes(permission.role_name ?? permission.permission));
     }
-    if (allowed.get(login)) requests.push({ id: comment.id, login, created_at: comment.created_at, url: comment.html_url, body: comment.body.trim().slice(command.length).trim() });
+    return cache.get(login);
+  };
+}
+
+/** Index and number of the last revision comment posted by a bot (the workflow) or a writer; others cannot fake one. */
+async function lastRevision(comments, isWriter) {
+  let found = { index: -1, revision: 1 };
+  for (const [index, comment] of comments.entries()) {
+    const match = REVISION_MARK.exec(comment.body ?? "");
+    if (!match) continue;
+    if (comment.user?.type === "Bot" || (await isWriter(comment.user))) found = { index, revision: Number(match[1]) };
+  }
+  return found;
+}
+
+/** /adjust comments after the latest revision comment, from users with write, maintain or admin access. */
+export async function adjustRequests({ repo, issue, token, fetchImpl = fetch, command = "/adjust", api = "https://api.github.com" }) {
+  const comments = await listComments(fetchImpl, token, api, repo, issue);
+  const isWriter = permissionChecker(fetchImpl, token, api, repo);
+  const { index } = await lastRevision(comments, isWriter);
+  const requests = [];
+  for (const comment of comments.slice(index + 1)) {
+    if (!isCommand(comment.body, command) || comment.user?.type === "Bot") continue;
+    if (await isWriter(comment.user)) requests.push({ id: comment.id, login: comment.user.login, created_at: comment.created_at, url: comment.html_url, body: comment.body.trim().slice(command.length).trim() });
   }
   return requests;
+}
+
+/**
+ * Checks an approval comment and returns the approved manifest. The comment must be on this open issue, start with
+ * the approve command, come from a writer (not a bot), and be newer than the last revision comment; the issue body's
+ * header and marker must be at that same revision, so the approval covers exactly what the reviewer saw.
+ */
+export async function approveFromComment({ repo, issue, commentId, token, fetchImpl = fetch, command = "/aprove", api = "https://api.github.com" }) {
+  const data = await github(fetchImpl, token, `${api}/repos/${repo}/issues/${issue}`);
+  if (data.state !== "open") throw new ReviewError(`issue ${issue} is ${data.state}`);
+  const header = /<!-- social-content:batch platform=(\S+) batch=(\S+) revision=(\d+) -->/.exec(data.body ?? "");
+  if (!header) throw new ReviewError(`issue ${issue} is not a social content review issue`);
+  const manifest = decodeMarker(data.body);
+  if (!manifest) throw new ReviewError(`issue ${issue} has no manifest marker`);
+  const revision = Number(header[3]);
+  if (manifest.platform !== header[1] || manifest.batch_id !== header[2] || (manifest.review?.revision ?? 1) !== revision) throw new ReviewError("the issue header and the manifest marker disagree; wait for the running adjust to finish");
+  const comments = await listComments(fetchImpl, token, api, repo, issue);
+  const position = comments.findIndex((comment) => String(comment.id) === String(commentId));
+  if (position < 0) throw new ReviewError(`comment ${commentId} is not on issue ${issue}`);
+  const comment = comments[position];
+  if (!isCommand(comment.body, command)) throw new ReviewError(`comment ${commentId} is not ${command}`);
+  if (comment.user?.type === "Bot") throw new ReviewError("bots cannot approve");
+  const isWriter = permissionChecker(fetchImpl, token, api, repo);
+  if (!(await isWriter(comment.user))) throw new ReviewError(`${comment.user?.login} has no write access`);
+  const last = await lastRevision(comments, isWriter);
+  if (position < last.index) throw new ReviewError(`comment ${commentId} predates revision ${last.revision}; approve the current revision`);
+  if (last.index >= 0 && last.revision !== revision) throw new ReviewError(`the last revision comment is ${last.revision} but the issue body is at ${revision}`);
+  return approveManifest(manifest, { by: comment.user.login, at: new Date(comment.created_at) });
 }
 
 function args(argv) {
@@ -211,6 +267,15 @@ export async function main(argv, { env = process.env, fetchImpl = fetch, out = p
     const json = `${JSON.stringify(manifest, null, 2)}\n`;
     if (flags.out) writeFileSync(flags.out, json);
     else out.write(json);
+    return;
+  }
+  if (command === "approve") {
+    const token = env.GH_TOKEN || env.GITHUB_TOKEN;
+    const repo = flags.repo || env.GH_REPO || env.GITHUB_REPOSITORY;
+    if (!token || !repo || !flags.issue || !flags["comment-id"] || !flags.out) throw new ReviewError("approve needs --issue, --comment-id, --out, GH_TOKEN (or GITHUB_TOKEN) and GH_REPO (or GITHUB_REPOSITORY or --repo)");
+    const manifest = await approveFromComment({ repo, issue: flags.issue, commentId: flags["comment-id"], token, fetchImpl, command: commands(review).approve });
+    saveManifest(flags.out, manifest);
+    out.write(`${JSON.stringify({ approved: true, by: manifest.approval.by, revision: manifest.approval.revision, platform: manifest.platform, batch_id: manifest.batch_id })}\n`);
     return;
   }
   if (command === "adjust-requests") {

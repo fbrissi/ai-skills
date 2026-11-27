@@ -29,7 +29,7 @@ Flags: `--only <item-id>`, `--retry <id,id>` (items left `unknown`, after a manu
 
 Per item: `videos.insert` (resumable, `part=snippet,status`) with the title, the composed description (description, link, credits, hashtags), tags, `categoryId` (default 22), default language, `selfDeclaredMadeForKids`, and `containsSyntheticMedia` from `synthetic_media`. Scheduled items upload with `privacyStatus=private` and `publishAt` (they go public then); others use the item's visibility. The state (`scheduled`/`published`, video id, Shorts or watch URL) is saved right after the insert, so a re-run never uploads twice. When the upload itself gets no response, the video may exist: the item becomes `unknown` and is skipped (`needs a manual check`) until you check YouTube Studio and rerun with `--retry <id>`. Then, when the item has them: `thumbnails.set` (needs a verified channel), `playlistItems.insert`, `captions.insert`. Their failures are warnings in `state.<id>.extra.warnings`, not a failed upload.
 
-Limits: Shorts are vertical or square and at most 180 s (validated). The run stops (exit 0) when the uploads of the last 24 hours recorded in the manifest reach the daily limit, or when the API reports a quota error; the rest waits for the next run.
+Limits: Shorts are vertical or square and at most 180 s (validated). The run stops (exit 0) when the uploads of the last 24 hours recorded in this manifest reach the daily limit (uploads from other batches or tools on the same project are not counted, so set `--daily-limit` to what is left for this batch), or when the API reports a quota error; the rest waits for the next run.
 
 ## Rules
 

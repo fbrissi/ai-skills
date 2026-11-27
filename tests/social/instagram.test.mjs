@@ -36,7 +36,8 @@ test("only items whose date has come are due, in order; attached stories are not
   const data = manifest("instagram", [ig("future", "2026-12-02"), ig("today", "2026-11-27", { with_stories: ["story"] }), ig("story", "2026-11-27", { type: "story" }), ig("past", "2026-11-25")]);
   assert.deepEqual(dueItems(data, NOW).map((entry) => entry.id), ["today", "past"]);
   data.state.today = { status: "published", at: NOW.toISOString() };
-  assert.deepEqual(dueItems(data, NOW).map((entry) => entry.id), ["past"]);
+  data.state.story = { status: "failed", at: NOW.toISOString() };
+  assert.deepEqual(dueItems(data, NOW).map((entry) => entry.id), ["story", "past"], "a failed story is retried once its parent is published");
 });
 
 test("a photo is uploaded to the bucket, published in two steps and recorded", async () => {
@@ -45,10 +46,10 @@ test("a photo is uploaded to the bucket, published in two steps and recorded", a
   const done = await run(setupResult, fetchImpl);
   assert.deepEqual(done, ["p1"]);
   const put = fetchImpl.calls.find((call) => call.method === "PUT");
-  assert.equal(put.url, "https://acc.r2.cloudflarestorage.com/media/marketing/instagram/2026-11-27/a.jpg");
+  assert.equal(put.url, "https://acc.r2.cloudflarestorage.com/media/marketing/instagram/2026-11-27/p1/a.jpg");
   assert.match(put.headers.authorization, /^AWS4-HMAC-SHA256 Credential=AKID\/\d{8}\/auto\/s3\/aws4_request, SignedHeaders=content-type;host;x-amz-content-sha256;x-amz-date, Signature=[0-9a-f]{64}$/);
   const create = fetchImpl.calls.find((call) => call.url.endsWith("/ig1/media"));
-  assert.equal(create.body.get("image_url"), "https://cdn.example.com/marketing/instagram/2026-11-27/a.jpg");
+  assert.equal(create.body.get("image_url"), "https://cdn.example.com/marketing/instagram/2026-11-27/p1/a.jpg");
   assert.match(create.body.get("caption"), /#NFSe/);
   const saved = JSON.parse(readFileSync(setupResult.path, "utf8"));
   assert.equal(saved.state.p1.status, "published");
@@ -110,7 +111,7 @@ test("dry run and validation: scheduled Instagram items are rejected", async () 
   const good = setup([ig("x", "2026-11-27")]);
   const out = sink();
   await publish(good.data, { manifestDir: good.dir, manifestPath: good.path, execute: false, now: NOW, out });
-  assert.match(out.text(), /dry run: x photo -> marketing\/instagram\/2026-11-27\/a.jpg/);
+  assert.match(out.text(), /dry run: x photo -> marketing\/instagram\/2026-11-27\/x\/a.jpg/);
 });
 
 test("media keys follow the prefix template and S3 config needs every value", () => {

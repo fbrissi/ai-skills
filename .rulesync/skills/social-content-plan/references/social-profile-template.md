@@ -66,7 +66,7 @@ Dated events worth a post, each with its source (they also go in Parameters):
   },
   "platforms": {
     "facebook": { "enabled": true, "days": ["mon", "tue", "wed", "thu", "fri"], "times": ["12:30"], "per_batch": 5, "scheduled": true, "visibility": "public", "formats": ["photo", "post"], "images": true, "video": false },
-    "instagram": { "enabled": true, "days": ["mon", "wed", "fri"], "times": ["12:00"], "per_batch": 3, "formats": ["photo", "carousel"], "images": true, "video": false, "stories_with_feed": false, "media_prefix": "marketing/instagram/{date}/" },
+    "instagram": { "enabled": true, "days": ["mon", "wed", "fri"], "times": ["12:00"], "per_batch": 3, "formats": ["photo", "carousel"], "images": true, "video": false, "stories_with_feed": false, "media_prefix": "marketing/instagram/{date}/{id}/" },
     "youtube": { "enabled": true, "days": ["thu"], "times": ["18:00"], "per_batch": 1, "scheduled": true, "visibility": "public", "formats": ["short"], "video": true, "category_id": "28", "playlist_id": null, "made_for_kids": false }
   },
   "video": {

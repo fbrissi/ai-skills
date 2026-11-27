@@ -11,7 +11,7 @@ Deterministic Instagram publisher (Instagram API with Facebook Login): each run 
 | Manifest | approved Instagram batch | asks |
 | Execute | `--execute` | dry run |
 | Items per run | `--max` | 1 |
-| Bucket prefix | `--prefix` | `marketing/instagram/{date}/` |
+| Bucket prefix | `--prefix` | `marketing/instagram/{date}/{id}/` |
 
 ## Examples
 

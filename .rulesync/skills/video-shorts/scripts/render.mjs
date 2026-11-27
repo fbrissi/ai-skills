@@ -44,11 +44,11 @@ function sh(cmd, args, options = {}) {
 function prepareStudio(work, studioOverride) {
   if (studioOverride) return resolve(studioOverride);
   const studio = join(work, "studio");
-  const templatePackage = readFileSync(join(TEMPLATE, "package.json"), "utf8");
-  const current = existsSync(join(studio, "package.json")) ? readFileSync(join(studio, "package.json"), "utf8") : null;
-  if (current !== templatePackage) rmSync(join(studio, "node_modules"), { recursive: true, force: true });
+  const lock = (dir) => (existsSync(join(dir, "package-lock.json")) ? readFileSync(join(dir, "package-lock.json"), "utf8") : null);
+  if (lock(studio) !== lock(TEMPLATE)) rmSync(join(studio, "node_modules"), { recursive: true, force: true });
   cpSync(TEMPLATE, studio, { recursive: true });
-  if (!existsSync(join(studio, "node_modules", ".bin", "remotion"))) sh("npm", ["install", "--no-audit", "--no-fund"], { cwd: studio });
+  // Pinned by the bundled lockfile; install scripts stay off (Remotion's platform binaries are optional dependencies).
+  if (!existsSync(join(studio, "node_modules", ".bin", "remotion"))) sh("npm", ["ci", "--no-audit", "--no-fund", "--ignore-scripts"], { cwd: studio });
   return studio;
 }
 

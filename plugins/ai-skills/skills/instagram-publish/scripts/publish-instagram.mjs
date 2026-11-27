@@ -13,7 +13,7 @@ import { GraphClient, GraphError, graphEnv } from "./graph.mjs";
 import { putObject, s3Config } from "./s3.mjs";
 import { composeText, finalCall, isDone, isMain, loadManifest, recordState, resolveMediaPath, saveManifest, UncertainError, validateManifest, zoneOffset } from "./social-manifest.mjs";
 
-export const DEFAULT_PREFIX = "marketing/instagram/{date}/";
+export const DEFAULT_PREFIX = "marketing/instagram/{date}/{id}/";
 const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
 
 export class PublishError extends Error {}
@@ -25,14 +25,17 @@ function today(timeZone, now) {
   return new Date(now.getTime() + sign * (hours * 60 + minutes) * 60000).toISOString().slice(0, 10);
 }
 
-/** Items due now, in manifest order; stories attached to a feed item travel with it. */
+/**
+ * Items due now, in manifest order. A story attached to a feed item travels with it while the parent is pending;
+ * once the parent is done, a story that is still not done (it failed) is due on its own.
+ */
 export function dueItems(manifest, now = new Date(), { item = null } = {}) {
-  const attached = new Set(manifest.items.flatMap((entry) => entry.with_stories ?? []));
+  const parents = new Map(manifest.items.flatMap((entry) => (entry.with_stories ?? []).map((story) => [story, entry.id])));
   const day = today(manifest.timezone, now);
   return manifest.items.filter((entry) => {
     if (isDone(manifest, entry.id)) return false;
     if (item) return entry.id === item;
-    if (attached.has(entry.id)) return false;
+    if (parents.has(entry.id)) return isDone(manifest, parents.get(entry.id));
     if (entry.publish_at) return Date.parse(entry.publish_at) <= now.getTime();
     return entry.date <= day;
   });
@@ -100,7 +103,7 @@ async function publishOne(item, { client, igUserId, s3, prefix, manifestDir, fet
   const urls = [];
   for (const media of item.media) {
     const full = resolveMediaPath(manifestDir, media.path);
-    const type = media.kind === "video" ? "video/mp4" : "image/jpeg";
+    const type = media.kind === "image" ? "image/jpeg" : /\.mov$/i.test(media.path) ? "video/quicktime" : "video/mp4";
     urls.push(await putObject(s3, mediaKey(prefix, item, media.path), readFileSync(full), type, fetchImpl));
   }
   const caption = composeText(item, "instagram");

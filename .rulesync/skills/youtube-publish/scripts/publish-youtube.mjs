@@ -9,7 +9,7 @@
 import { readFileSync } from "node:fs";
 import { dirname, extname, resolve } from "node:path";
 import { accessToken, googleCredentials, googleJson, GoogleError } from "./google-auth.mjs";
-import { composeText, isDone, isMain, loadManifest, pendingItems, recordState, reportBlocked, resolveMediaPath, saveManifest, UncertainError, validateManifest } from "./social-manifest.mjs";
+import { LIMITS, splitStale, composeText, isDone, isMain, loadManifest, pendingItems, recordState, reportBlocked, resolveMediaPath, saveManifest, UncertainError, validateManifest } from "./social-manifest.mjs";
 
 export const API = "https://www.googleapis.com/youtube/v3";
 export const UPLOAD = "https://www.googleapis.com/upload/youtube/v3";
@@ -94,10 +94,11 @@ export async function insertCaptions({ fetchImpl, token }, videoId, path, langua
 }
 
 export async function publish(manifest, { manifestDir, manifestPath, api, execute, now = new Date(), only = null, retry = [], dailyLimit = DEFAULT_DAILY_LIMIT, out = process.stdout }) {
-  const pending = pendingItems(manifest, { only, retry });
+  const { ready: pending, stale } = splitStale(pendingItems(manifest, { only, retry }), { now, minLeadSeconds: LIMITS.youtube.minLeadSeconds, execute });
   const errors = validateManifest(manifest, { manifestDir, forPublish: execute, now }).filter((error) => !manifest.items.some((entry) => error.startsWith(`${entry.id}:`) && !pending.includes(entry)));
   if (manifest.platform !== "youtube") errors.unshift(`manifest platform is ${manifest.platform}, not youtube`);
   if (errors.length) throw new PublishError(`invalid batch:\n- ${errors.join("\n- ")}`);
+  for (const item of stale) out.write(`stale: ${item.id} publish_at ${item.publish_at} is past or too close to schedule; move it to a new batch\n`);
 
   for (const item of manifest.items) if (isDone(manifest, item.id)) out.write(`already ${manifest.state[item.id].status}: ${item.id} (${manifest.state[item.id].remote_id})\n`);
   reportBlocked(manifest, out, retry);

@@ -26,9 +26,9 @@ node <skill-dir>/scripts/publish-instagram.mjs <batch-dir>/manifest.json        
 node <skill-dir>/scripts/publish-instagram.mjs <batch-dir>/manifest.json --execute
 ```
 
-Flags: `--max N` (items per run, default 1), `--item <id>` (that item, even if not yet due), `--prefix <template>` (bucket key prefix, default `marketing/instagram/{date}/`; `{date}` is the item's date, `{id}` its id), `--poll-seconds`, `--timeout-seconds` (container wait, default 5 s and 600 s), `--now <ISO>`.
+Flags: `--max N` (items per run, default 1), `--item <id>` (that item, even if not yet due), `--prefix <template>` (bucket key prefix, default `marketing/instagram/{date}/{id}/`; `{date}` is the item's date, `{id}` its id), `--poll-seconds`, `--timeout-seconds` (container wait, default 5 s and 600 s), `--now <ISO>`.
 
-Due items, in manifest order: not yet published, not a story attached to another item, and with `date` on or before today in the batch time zone (or `publish_at` passed when it is set). Stories named in an item's `with_stories` go out right after it, in the same run.
+Due items, in manifest order: not yet published, not a story attached to another item, and with `date` on or before today in the batch time zone (or `publish_at` passed when it is set). Stories named in an item's `with_stories` go out right after it, in the same run; a story that failed is due on its own once its parent is published.
 
 Per item: read `content_publishing_limit` and stop (exit 0) when the 24-hour quota cannot fit the item and its stories; upload each file to `<prefix><file>` with a signed PUT (JPEG `image/jpeg`, video `video/mp4`); create the container (`image_url`; `media_type=REELS` with `video_url` and `share_to_feed`; `media_type=STORIES`; carousel children with `is_carousel_item` then `media_type=CAROUSEL`); poll `status_code` until `FINISHED`; `media_publish`; read the permalink; write `state.<id>` (`published`, media id, permalink, public media URLs). Before `media_publish` it saves the container id with status `unknown`. If the call gets no response, the next run reads that container's `status_code`: `PUBLISHED` marks the item published, `FINISHED` publishes the same container, anything else redoes the item, so a post never goes out twice. Other errors stop the run and are recorded as `failed`; the next run retries them first.
 

@@ -124,3 +124,19 @@ test("a lost response on the final call leaves the item unknown; it is skipped u
   await run(saved, dir, path, new GraphClient({ token: TOKEN, fetchImpl: again }), { retry: ["2026-11-30-facebook-1"] });
   assert.equal(JSON.parse(readFileSync(path, "utf8")).state["2026-11-30-facebook-1"].status, "scheduled");
 });
+
+test("a late approval skips stale items and still schedules the rest", async () => {
+  const { dir, data, path } = setup([item({ id: "late", date: "2026-11-27", publish_at: "2026-11-27T12:05:00-03:00" }), item({ id: "next", date: "2026-12-01", publish_at: "2026-12-01T12:30:00-03:00" })]);
+  const fetchImpl = graph();
+  const out = sink();
+  await run(data, dir, path, new GraphClient({ token: TOKEN, fetchImpl }), { out });
+  assert.match(out.text(), /stale: late publish_at 2026-11-27T12:05:00-03:00/);
+  const saved = JSON.parse(readFileSync(path, "utf8"));
+  assert.equal(saved.state.next.status, "scheduled");
+  assert.equal(saved.state.late, undefined);
+});
+
+test("publishing requires the approval to match the current revision", async () => {
+  const { dir, data, path } = setup([item()], { review: { revision: 2 }, approval: { status: "approved", by: "ana", at: NOW.toISOString(), revision: 1 } });
+  await assert.rejects(run(data, dir, path, new GraphClient({ token: TOKEN, fetchImpl: graph() })), /approval is for revision 1, but the batch is at revision 2/);
+});

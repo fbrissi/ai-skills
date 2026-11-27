@@ -163,7 +163,12 @@ export async function main(argv, { env = process.env, fetchImpl = fetch, out = p
     const files = (await drive.children(flags.folder)).filter((file) => file.mimeType !== FOLDER_MIME && (!match || match.test(file.name)));
     if (!files.length) throw new GoogleError("no files visible in that folder: with drive.file the app sees only files it uploaded (use drive.mjs upload), or share the folder publicly and set GOOGLE_API_KEY");
     const saved = [];
-    for (const file of files) saved.push(await drive.download(file.id, join(resolve(flags.out), file.name)));
+    const outDir = resolve(flags.out);
+    for (const file of files) {
+      const name = basename(String(file.name).replaceAll("\\", "/"));
+      if (!name || name === "." || name === "..") throw new GoogleError(`unsafe file name in the folder: ${file.name}`);
+      saved.push(await drive.download(file.id, join(outDir, name)));
+    }
     return print({ files: saved });
   }
   throw new GoogleError("usage: drive.mjs <ensure-folder|upload|list|download|download-folder> ...");

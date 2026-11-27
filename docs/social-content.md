@@ -56,7 +56,7 @@ All scripts are Node.js 22+ ES modules without dependencies, run from the consum
 | `render.mjs` (video-shorts) | `--spec <video.json> --out <mp4> [--profile <md>] [--work <dir>] [--studio <dir>] [--no-music]` |
 | `credits.mjs` (video-shorts) | `[--profile <md>] [--voice <id>] [--no-voice] [--music <file or title>] [--lang <code>]` |
 | `drive.mjs` (social-review, video-shorts) | `ensure-folder --path <A/B/C> [--share]`; `upload <file> --folder <id> [--name <n>] [--share]`; `list --folder <id>`; `download <id> --out <path>`; `download-folder --folder <id> --out <dir> [--match <regex>]` |
-| `review-batch.mjs` (social-review) | `upload <manifest> [--profile <md>] [--root <name>] [--no-share]`; `issue-body <manifest> [--profile <md>]`; `set-issue <manifest> --issue <n> --url <url>`; `revision-comment <manifest> --changed <ids> [--note <text>]`; `bump <manifest> --changed <ids> [--note <text>]`; `marker <body-file|-> [--out <file>]`; `adjust-requests --issue <n> [--repo <owner/name>]`; `fetch <manifest>` |
+| `review-batch.mjs` (social-review) | `upload <manifest> [--profile <md>] [--root <name>] [--no-share]`; `issue-body <manifest> [--profile <md>]`; `set-issue <manifest> --issue <n> --url <url>`; `revision-comment <manifest> --changed <ids> [--note <text>]`; `bump <manifest> --changed <ids> [--note <text>]`; `marker <body-file|-> [--out <file>]`; `adjust-requests --issue <n> [--repo <owner/name>]`; `approve --issue <n> --comment-id <id> --out <manifest> [--repo <owner/name>] [--profile <md>]`; `fetch <manifest>` |
 | `publish-facebook.mjs` (facebook-publish) | `<manifest> [--execute] [--only <id>] [--retry <id,id>] [--now ISO]` |
 | `publish-instagram.mjs` (instagram-publish) | `<manifest> [--execute] [--max N] [--item <id>] [--prefix <template>] [--poll-seconds N] [--timeout-seconds N] [--now ISO]` |
 | `publish-youtube.mjs` (youtube-publish) | `<manifest> [--execute] [--only <id>] [--retry <id,id>] [--daily-limit N] [--now ISO]` |
@@ -76,8 +76,22 @@ All scripts are Node.js 22+ ES modules without dependencies, run from the consum
 
 A deterministic workflow handles `/aprove` (the command is `review.commands.approve` in the profile):
 
-1. Check that the commenter has write, maintain, or admin permission, and that the comment is on an open issue with the `<!-- social-content:batch ... -->` header.
-2. `gh issue view <n> --json body -q .body | node review-batch.mjs marker - --out <dir>/manifest.json`, then `node review-batch.mjs fetch <dir>/manifest.json`.
-3. `node social-manifest.mjs approve <dir>/manifest.json --by <login>`.
-4. Facebook and YouTube: run the publisher with `--execute` right away (they schedule natively). Instagram: store the approved manifest (the issue marker) and let the Instagram cron run `publish-instagram.mjs --execute` on each scheduled run.
-5. After every publisher run, write the updated manifest back to the issue body (`review-batch.mjs issue-body ... | gh issue edit <n> --body-file -`), so the next run sees the state. Close the issue when every item is `scheduled` or `published`. An item in `unknown` state needs a person: report it on the issue (the publisher prints `needs a manual check`) and rerun with `--retry <id>` only after confirming it is not live.
+1. `node review-batch.mjs approve --issue <n> --comment-id <comment id> --out <dir>/manifest.json [--profile <md>]`. It fails unless the issue is open and is a review issue, the comment starts with the approve command, its author has write, maintain, or admin access and is not a bot, the comment is newer than the last revision comment (only revision comments from bots or writers count), and the body header, marker, and last revision comment agree on the revision. It writes the manifest with `approval` stamped with that revision.
+2. `node review-batch.mjs fetch <dir>/manifest.json` (downloads media from Drive and checks checksums).
+3. Facebook and YouTube: run the publisher with `--execute` right away (they schedule natively). Instagram: write the approved manifest to the issue body and let the Instagram cron run `publish-instagram.mjs --execute`, after restoring it with `marker` and `fetch`.
+4. Persist the state after every publisher run, **including failed runs** (`if: always()`): `review-batch.mjs issue-body <manifest> | gh issue edit <n> --body-file -`. Publishers save each success before moving on, so dropping the manifest of a failed run would publish the earlier items again on the next run. Close the issue when every item is `scheduled` or `published`.
+5. Serialize everything that reads and writes one issue: a `concurrency` group per issue for the approve, adjust, and Instagram cron jobs, with `cancel-in-progress: false`. The last writer of the body wins, so two overlapping runs could otherwise lose each other's state.
+
+```yaml
+concurrency:
+  group: social-content-${{ github.event.issue.number || inputs.issue }}
+  cancel-in-progress: false
+steps:
+  - run: node "$SKILLS/social-review/scripts/review-batch.mjs" approve --issue "$ISSUE" --comment-id "$COMMENT_ID" --out batch/manifest.json
+  - run: node "$SKILLS/social-review/scripts/review-batch.mjs" fetch batch/manifest.json
+  - run: node "$SKILLS/youtube-publish/scripts/publish-youtube.mjs" batch/manifest.json --execute
+  - if: always() && hashFiles('batch/manifest.json') != ''
+    run: node "$SKILLS/social-review/scripts/review-batch.mjs" issue-body batch/manifest.json | gh issue edit "$ISSUE" --body-file -
+```
+
+Items in `unknown` state (the final publish call got no response) need a person: the publisher prints `needs a manual check`; rerun with `--retry <id>` only after confirming the item is not live. Items whose `publish_at` passed before approval are skipped as `stale` and belong in a new batch.

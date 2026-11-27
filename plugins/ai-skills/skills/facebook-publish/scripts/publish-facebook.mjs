@@ -9,7 +9,7 @@
 import { readFileSync, statSync } from "node:fs";
 import { dirname, extname, resolve } from "node:path";
 import { GraphClient, GraphError, graphEnv } from "./graph.mjs";
-import { composeText, finalCall, isDone, isMain, loadManifest, pendingItems, recordState, reportBlocked, resolveMediaPath, saveManifest, UncertainError, validateManifest } from "./social-manifest.mjs";
+import { LIMITS, splitStale, composeText, finalCall, isDone, isMain, loadManifest, pendingItems, recordState, reportBlocked, resolveMediaPath, saveManifest, UncertainError, validateManifest } from "./social-manifest.mjs";
 
 const IMAGE_TYPES = { ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg" };
 const RUPLOAD = "https://rupload.facebook.com/video-upload";
@@ -69,10 +69,11 @@ async function publishFeed(client, step) {
 }
 
 export async function publish(manifest, { manifestDir, manifestPath, client, pageId, execute, now = new Date(), only = null, retry = [], out = process.stdout }) {
-  const pending = pendingItems(manifest, { only, retry });
+  const { ready: pending, stale } = splitStale(pendingItems(manifest, { only, retry }), { now, minLeadSeconds: LIMITS.facebook.minLeadSeconds, execute });
   const errors = validateManifest(manifest, { manifestDir, forPublish: execute, now }).filter((error) => !manifest.items.some((entry) => error.startsWith(`${entry.id}:`) && !pending.includes(entry)));
   if (manifest.platform !== "facebook") errors.unshift(`manifest platform is ${manifest.platform}, not facebook`);
   if (errors.length) throw new PublishError(`invalid batch:\n- ${errors.join("\n- ")}`);
+  for (const item of stale) out.write(`stale: ${item.id} publish_at ${item.publish_at} is past or too close to schedule; move it to a new batch\n`);
 
   for (const item of manifest.items) if (isDone(manifest, item.id)) out.write(`already ${manifest.state[item.id].status}: ${item.id} (${manifest.state[item.id].remote_id})\n`);
   reportBlocked(manifest, out, retry);

@@ -135,3 +135,57 @@ test("set-issue records the issue in the manifest", async () => {
   assert.equal(saved.review.issue_url, "https://github.com/o/r/issues/12");
   await assert.rejects(main(["set-issue", path, "--issue", "x"], { out: { write() {} } }), /needs --issue/);
 });
+
+const header = (revision) => `<!-- social-content:batch platform=facebook batch=2026-11-30-facebook revision=${revision} -->`;
+
+function approvalApi({ revision = 1, comments, state = "open", writers = ["ana"] }) {
+  const data = pending([item()]);
+  data.review.revision = revision;
+  return fakeFetch([
+    [(url) => url.endsWith("/repos/o/r/issues/9"), () => ({ state, body: `${header(revision)}\n${encodeMarker(data)}` })],
+    [(url) => url.includes("/issues/9/comments"), () => comments],
+    [(url) => url.includes("/collaborators/"), (url) => ({ role_name: writers.some((login) => url.endsWith(`/${login}/permission`)) ? "write" : "read" })],
+  ]);
+}
+
+test("approve accepts a writer's /aprove after the last revision and stamps that revision", async () => {
+  const { approveFromComment } = await import("../../.rulesync/skills/social-review/scripts/review-batch.mjs");
+  const comments = [{ id: 1, body: "<!-- social-content:revision 2 -->", user: { login: "github-actions[bot]", type: "Bot" } }, { id: 2, body: "/aprove", user: { login: "ana", type: "User" }, created_at: "2026-11-28T10:00:00Z" }];
+  const approved = await approveFromComment({ repo: "o/r", issue: 9, commentId: 2, token: "t", fetchImpl: approvalApi({ revision: 2, comments }) });
+  assert.deepEqual(approved.approval, { status: "approved", by: "ana", at: "2026-11-28T10:00:00.000Z", revision: 2 });
+});
+
+test("approve refuses stale, unauthorized, bot, non-command and closed-issue approvals", async () => {
+  const { approveFromComment } = await import("../../.rulesync/skills/social-review/scripts/review-batch.mjs");
+  const call = (options, commentId) => approveFromComment({ repo: "o/r", issue: 9, commentId, token: "t", fetchImpl: approvalApi(options) });
+  const revision = { id: 5, body: "<!-- social-content:revision 2 -->", user: { login: "github-actions[bot]", type: "Bot" } };
+  await assert.rejects(call({ revision: 2, comments: [{ id: 1, body: "/aprove", user: { login: "ana", type: "User" } }, revision] }, 1), /predates revision 2/);
+  await assert.rejects(call({ comments: [{ id: 1, body: "/aprove", user: { login: "eve", type: "User" } }] }, 1), /eve has no write access/);
+  await assert.rejects(call({ comments: [{ id: 1, body: "/aprove", user: { login: "x[bot]", type: "Bot" } }] }, 1), /bots cannot approve/);
+  await assert.rejects(call({ comments: [{ id: 1, body: "/aproved later", user: { login: "ana", type: "User" } }] }, 1), /is not \/aprove/);
+  await assert.rejects(call({ comments: [], state: "closed" }, 1), /issue 9 is closed/);
+  await assert.rejects(call({ revision: 1, comments: [revision, { id: 2, body: "/aprove", user: { login: "ana", type: "User" } }] }, 2), /last revision comment is 2 but the issue body is at 1/);
+});
+
+test("a revision comment from a non-writer does not hide earlier /adjust requests", async () => {
+  const comments = [
+    { id: 1, body: "/adjust a: mude", user: { login: "ana", type: "User" } },
+    { id: 2, body: "<!-- social-content:revision 9 -->", user: { login: "eve", type: "User" } },
+  ];
+  const fetchImpl = fakeFetch([
+    [(url) => url.includes("/issues/9/comments"), () => comments],
+    [(url) => url.includes("/collaborators/"), (url) => ({ role_name: url.endsWith("/ana/permission") ? "write" : "read" })],
+  ]);
+  assert.deepEqual((await adjustRequests({ repo: "o/r", issue: 9, token: "t", fetchImpl })).map((r) => r.id), [1]);
+});
+
+test("download-folder keeps Drive file names inside the output directory", async () => {
+  const { main } = await import("../../.rulesync/skills/social-review/scripts/drive.mjs");
+  const dir = tempDir({});
+  const fetchImpl = fakeFetch([
+    [(url) => url.includes("/drive/v3/files?"), () => ({ files: [{ id: "A", name: "../../evil.mp3", mimeType: "audio/mpeg" }] })],
+    [(url) => url.includes("/files/A?alt=media"), () => new Response("x")],
+  ]);
+  await main(["download-folder", "--folder", "F", "--out", join(dir, "music")], { env: { GOOGLE_API_KEY: "k" }, fetchImpl, out: { write() {} } });
+  assert.equal(readFileSync(join(dir, "music", "evil.mp3"), "utf8"), "x");
+});

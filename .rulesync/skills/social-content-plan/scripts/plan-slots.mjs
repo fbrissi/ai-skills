@@ -41,7 +41,6 @@ export function platformSettings(config, platform) {
     days: (settings.days ?? ["mon", "wed", "fri"]).map((day) => day.toLowerCase().slice(0, 3)),
     times: settings.times ?? ["12:00"],
     perBatch: settings.per_batch ?? null,
-    everyWeeks: settings.every_weeks ?? 1,
     scheduled: platform === "instagram" ? false : settings.scheduled ?? true,
     visibility: settings.visibility ?? "public",
     formats: settings.formats ?? (platform === "youtube" ? ["short"] : ["photo"]),

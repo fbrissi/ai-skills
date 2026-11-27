@@ -68,7 +68,7 @@ The text a publisher sends is `composeText(item, platform)`: the caption (or des
 
 1. Agent (generate): `plan-slots.mjs --init` writes the skeleton; the agent fills items and media, runs the copy guard, `probe`, and `validate`.
 2. `social-review`: uploads media to Drive, opens the issue with the marker. Adjust: `bump`, regenerate the changed items, upload again, update the issue body, comment.
-3. Approval (a deterministic workflow, after a `/aprove` comment from a writer): `social-manifest.mjs approve --by <login>`.
+3. Approval (a deterministic workflow, on a `/aprove` comment): `review-batch.mjs approve --issue <n> --comment-id <id> --out manifest.json` checks the comment (writer, not a bot, newer than the last revision) and that the issue body is at the same revision, then stamps `approval` with that revision. Publishers refuse an approval whose revision differs from `review.revision`.
 4. Publishers: `validate --for-publish`, then publish and record `state`. Re-runs skip done items, retry `failed` ones, and skip `unknown` ones until a person checks the platform and passes `--retry <id>` (Facebook, YouTube).
 
 ## Issue marker

@@ -45,7 +45,7 @@ node <skill-dir>/scripts/review-batch.mjs issue-body <manifest> --profile <profi
 
 ## Rules
 
-- Never set `approval` to approved, never publish, never close the issue.
+- Never set `approval` to approved, never publish, never close the issue. Approval is the workflow's `review-batch.mjs approve --issue <n> --comment-id <id> --out <manifest>` step: it accepts only a writer's approve comment newer than the last revision, on an issue whose header and marker are at that revision.
 - Never put tokens, personal data, or customer data in the issue or in Drive.
 - The issue body limit is 65,536 characters; split a batch that does not fit.
 
