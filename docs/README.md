@@ -30,6 +30,14 @@
 | Operations | [`merge-risk`](skills/merge-risk.md) | Rates a PR's production risk 1-5 and decides MERGE or HOLD; merges only when allowed | PR comment, merge when allowed |
 | Brazil | [`inpi-trademark-watch`](skills/inpi-trademark-watch.md) | Analyzes an INPI RPI issue for a watched trademark: actions and deadlines | Writes an issue body file |
 | Brazil | [`nfse-technical-note-analysis`](skills/nfse-technical-note-analysis.md) | Maps an NFS-e Nacional technical note to code changes and a rollout plan | Writes an issue body file |
+| Social | [`social-content-plan`](skills/social-content-plan.md) | Dated slots and sourced briefs for the next Facebook, Instagram, or YouTube batch; skeleton manifest | Writes the batch directory |
+| Social | [`copy-guard`](skills/copy-guard.md) | Mandatory check for AI writing tells, engagement bait, unsupported claims (pt-BR and English) | None |
+| Social | [`image-cards`](skills/image-cards.md) | Social cards and thumbnails rendered offline with Playwright in Docker | Writes images |
+| Social | [`video-shorts`](skills/video-shorts.md) | 9:16 Shorts and Reels with Remotion, Piper narration, music, and credits | Writes videos |
+| Social | [`social-review`](skills/social-review.md) | Drive upload and GitHub review issue with a manifest marker; `/adjust` revisions | Drive files, issue, comments |
+| Social | [`facebook-publish`](skills/facebook-publish.md) | Deterministic Graph API scheduler for approved posts, photos, and Reels | Scheduled Page posts |
+| Social | [`instagram-publish`](skills/instagram-publish.md) | Deterministic Instagram publisher, one due item per run, media in a public bucket | Instagram posts, bucket objects |
+| Social | [`youtube-publish`](skills/youtube-publish.md) | Deterministic YouTube uploader with `publishAt` scheduling | YouTube videos |
 | Media | [`flow-video-ad`](skills/flow-video-ad.md) | Plans a Google Flow ad with real screen footage and assembles the video | Writes files in the ads folder |
 
 How they fit together:
@@ -52,11 +60,13 @@ sentry-issues ──► tracker issues ──► observability-triage ──► 
 dependency-updates ──► dev (breaking changes) ──► quality-cycle ──► pr-create (dependency-updater)
 
 business-refinement ──► technical-refinement ──► readiness-review ──► delivery-orchestration ──► dev ──► quality-cycle ──► pr-create
+
+social-content-plan ──► image-cards / video-shorts ──► copy-guard ──► social-review ──► (approval) ──► facebook-publish / instagram-publish / youtube-publish
 ```
 
 The delivery skills, their agents, statuses, and CI use are described once in [delivery-flow.md](delivery-flow.md).
 
-The Brazil and Media skills stand alone and read a project profile.
+The Brazil and Media skills stand alone and read a project profile. The Social skills and their agents are described once in [social-content.md](social-content.md).
 
 ## Agents
 
@@ -80,6 +90,7 @@ In CI (`CI` or `GITHUB_ACTIONS` set), or when a caller says so, no skill asks or
 | `dependency-updates` | ecosystems, directories, bots, outdated level, labels, packages never to update or to hold, supply chain, checks and extra validation, schedule; branches and the bugfix target from `delivery` |
 | `merge-risk` | auto-merge, max risk, base branches and per-base limits, merge method, required human approvals, hold labels, path floors |
 | `business-refinement`, `technical-refinement`, `readiness-review`, `delivery-orchestration` (one shared `docs/ai/delivery.md`) | repository scope and code map, source tracker, milestone template, languages, status labels and Project, triage fields and Size scale, base branch, branch templates, implement workflow, parallel limit, research sources, context |
+| Social skills (one shared `docs/ai/social-content.md`) | audience, goal, offer, allowed and forbidden claims with sources, real screens, calendar hooks, voice; JSON parameters: time zone, UTM, blackout dates, brand, copy guard additions, review label and Drive root, per-platform schedule and formats, video voice and music |
 | `flow-video-ad` | product name and pronunciation, folders, claim sources, forbidden claims, character, voice, setting, crop, end card, privacy rules |
 
 ## Using the skills per harness
@@ -112,6 +123,7 @@ Every harness also picks a skill **automatically** when your request matches its
 - `observability-triage` needs access to the observability tool (MCP server, CLI, or a token already in the environment).
 - `sentry-issues` needs `SENTRY_AUTH_TOKEN` and `SENTRY_ORG` in the environment (optional `SENTRY_BASE_URL`), and `bash`, `curl`, and `jq` for its script, or a Sentry MCP server.
 - `dependency-updates` needs the package managers of the ecosystems it updates, and network access to their registries and release notes.
+- The Social skills need Node.js 22+; `image-cards` needs Docker (or `playwright-core`), `video-shorts` needs `ffmpeg`, `ffprobe`, and Python with `piper-tts`, and `social-review` and the publishers need the platform credentials listed in [social-content.md](social-content.md#environment).
 - `inpi-trademark-watch` needs Ruby and `unzip` to download RPI issues; `flow-video-ad` needs `ffmpeg` and `whisper-cli` to assemble the video.
 
 ## Background
