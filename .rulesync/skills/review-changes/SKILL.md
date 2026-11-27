@@ -27,7 +27,7 @@ Never switch branches or move `HEAD` during a review. If the content you need is
 | branch | base = the given branch or `git symbolic-ref --short refs/remotes/origin/HEAD`; `git log --oneline <base>..HEAD`; `git diff --stat <base>...HEAD` |
 | PR | `<skill-dir>/scripts/pr-context.sh <pr> --all-threads` (absolute path, run from the repo root; needs `bash`, `gh`, `jq`); then `git fetch origin <pr.base> pull/<n>/head` (works for forks too) and diff `origin/<pr.base>...FETCH_HEAD`, reading PR files with `git show FETCH_HEAD:<path>` (or use `gh pr diff <n>`). If the PR head is already checked out, diff against `HEAD` instead |
 
-For a PR that clearly references exactly one ticket (body, title, or branch name; see `references/tickets.md`), load it and judge whether the PR meets the ticket's intent. If no access can load it, continue: review the diff on its own merits, skip the intent judgement, and add the `Ticket:` line below to the output and to any published review body. Never wait for input about ticket access, and never let it block publishing.
+For a PR that clearly references exactly one ticket (body, title, or branch name; see `references/tickets.md`), load it and judge whether the PR meets the ticket's intent, opening every image of the ticket yourself (its `Images in every stage` section), not their description. If no access can load it, continue: review the diff on its own merits, skip the intent judgement, and add the `Ticket:` line below to the output and to any published review body. Never wait for input about ticket access, and never let it block publishing.
 
 ## 2. Read before judging
 
@@ -61,6 +61,7 @@ Severity: `critical` (data loss, security, broken deploy) · `high` (likely bug 
 
 - **Partial coverage**: a review that is still partial never approves. Publish the grade as a `COMMENT` review whose body has the `Covered:` and `Not covered:` lines, even at 5 stars.
 - **5 stars** on a complete review (one pass or cumulative): `gh pr review <n> --approve`, adding `--body "<Ticket: line>"` when the ticket could not be loaded (skip if `viewer` already approved `pr.headSha`). If approving fails (for example on your own PR), fall back to `gh pr review <n> --comment --body "★★★★★"` (plus the `Ticket:` line, if any).
+- **Resolve your fixed threads** on a re-review: for each unresolved thread whose first comment is by `viewer` (a finding you posted earlier), when the current head fixes that finding, reply in the thread with one line naming the fixing commit and resolve it (`gh api graphql -f query='mutation($id:ID!){resolveReviewThread(input:{threadId:$id}){thread{isResolved}}}' -f id=<threadId>`, the id from `pr-context.sh`). Leave a thread open when the finding still holds, and never resolve a thread a person started. Do this also when nothing else is published.
 - **Nothing new**: when the grade is below 5 and every finding was already raised by `viewer` on the same effective diff, publish nothing.
 - **Below 5**: submit **one** review with every inline comment in a single API call:
 

@@ -56,7 +56,7 @@ Classify each item by id, with one line of evidence:
 - `disputed`: claim is wrong or out of scope; explain why
 - `needs-clarification`: cannot decide without more information
 
-Read the **whole thread**: later replies often settle or change the request.
+Read the **whole thread**: later replies often settle or change the request. When an item points at an image (a screenshot or mockup in the comment, or one on the linked ticket), download and open it yourself before classifying, as [Images in every stage](references/tickets.md#images-in-every-stage) says.
 
 ## 4. Fix, validate
 
@@ -78,7 +78,7 @@ Show a short table (item, class, action) plus validation results, then ask the u
    - Issue comments, review bodies, CI: post **one** aggregated `gh pr comment <n> --body-file <f>` that references each source.
    - `actionable`: one-line summary of the fix and its commit sha. `disputed`: the technical reason. `needs-clarification`: one focused question.
    - Do not reply to `already-addressed` or `superseded` items unless silence would confuse.
-3. Do not resolve threads yourself unless the user asked for that.
+3. Resolve a thread only when a bot started it (its first comment's `type` is `bot`, or its author is `viewer`, a review you posted) and its item was `actionable` and fixed in the pushed commit, so a merge gate that waits for zero unresolved threads does not stall on a finding that is already fixed: `gh api graphql -f query='mutation($id:ID!){resolveReviewThread(input:{threadId:$id}){thread{isResolved}}}' -f id=<threadId>` (from the script output), after the reply. Threads a person started stay open for that person, unless the user asked you to resolve them.
 
 ## 7. Loop mode
 

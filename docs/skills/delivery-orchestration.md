@@ -12,7 +12,7 @@ Fourth step of the [delivery flow](../delivery-flow.md). Never codes. Loads the 
 | `base-branch` | branch | the default branch |
 | `implement-workflow` | workflow file | `ai-implement.yml` |
 | `max-parallel` | number | `3` |
-| `release-notes-file`, `release-heading`, `release-version`, `version-files`, `release-notes-branch-template` | see [release notes](../../shared/references/delivery-profile.md#release-notes) | none (no release notes step), `## {version}`, `{name}`, none, `feature/{release-slug}-release-notes` |
+| `release-notes-file`, `release-heading`, `release-version`, `version-files`, `release-notes-branch-template`, `no-release-paths` | see [release notes](../../shared/references/delivery-profile.md#release-notes) | none (no release notes step), `## {version}`, `{name}`, none, `feature/{release-slug}-release-notes`, none (every release gets notes) |
 | `status-labels`, `project`, `project-status-field`, `project-status-options` | see [work status](../../shared/references/work-status.md) | `status:<state>`, none, `Status`, Title Case of the state |
 | `context` | free text | none |
 | `requested-by` | GitHub login of the person who started the flow | the milestone's `requested-by` marker |

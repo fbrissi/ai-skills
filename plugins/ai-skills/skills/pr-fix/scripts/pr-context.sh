@@ -61,7 +61,7 @@ query($owner: String!, $repo: String!, $number: Int!) {
       reviewThreads(first: 100) {
         pageInfo { hasNextPage }
         nodes {
-          isResolved isOutdated path line startLine
+          id isResolved isOutdated path line startLine
           comments(first: 50) { nodes { databaseId body createdAt authorAssociation author { login __typename } } }
         }
       }
@@ -95,7 +95,7 @@ def recent(ts): if $since == "" then true else (ts // "") > $since end;
   comments: [$p.comments.nodes[] | select(recent(.createdAt)) | who + {id: .databaseId, body, createdAt}],
   threads: [(if $all then $p.reviewThreads.nodes else $open end)[]
     | select(any(.comments.nodes[]; recent(.createdAt)))
-    | {resolved: .isResolved, outdated: .isOutdated, path, line, startLine, replyToId: .comments.nodes[0].databaseId,
+    | {threadId: .id, resolved: .isResolved, outdated: .isOutdated, path, line, startLine, replyToId: .comments.nodes[0].databaseId,
        comments: [.comments.nodes[] | who + {id: .databaseId, body, createdAt}]}],
   resolvedThreads: ([$p.reviewThreads.nodes[] | select(.isResolved)] | length),
   truncated: ($p.reviews.pageInfo.hasPreviousPage or $p.comments.pageInfo.hasPreviousPage or $p.reviewThreads.pageInfo.hasNextPage

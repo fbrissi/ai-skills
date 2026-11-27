@@ -20,7 +20,7 @@ Stop with `Unable to refine: missing milestone or issue` if neither is given.
 
 ## 1. Load
 
-1. Load the target with comments and attachments following [references/tickets.md](references/tickets.md): for a milestone, every issue in it (`gh issue list --milestone "<title>" --state all --json number,title,labels,body,state`), so plans already written count in the conflict pass. Download and read the tracker attachments an issue lists under `## Attachments` when the access exists, as `tickets.md` says.
+1. Load the target with comments and attachments following [references/tickets.md](references/tickets.md): for a milestone, every issue in it (`gh issue list --milestone "<title>" --state all --json number,title,labels,body,state`), so plans already written count in the conflict pass. Download and read the tracker attachments an issue lists under `## Attachments`, and open every image of the issue and its source yourself, as [Images in every stage](references/tickets.md#images-in-every-stage) says: the plan's UI and rules come from the images, not their descriptions.
 2. In scope: issues in `needs-technical-refinement`, and issues in `technical-blocked` whose questions were answered since. Leave the others as they are.
 3. Read the repository's guidance (`AGENTS.md`, `CLAUDE.md`, project docs, the profile's Code map and Context) once for the whole run.
 
