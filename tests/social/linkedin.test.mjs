@@ -240,3 +240,14 @@ test("a video part without an ETag fails clearly", async () => {
   const noEtag = async (url, init) => (String(url).startsWith("https://upload.example/v") ? new Response("", { status: 200 }) : base(url, init));
   await assert.rejects(run(setup([video]), noEtag), /upload returned no ETag/);
 });
+
+test("after a refused post the retry uploads the media again; after a budget stop it reuses it", async () => {
+  const s = setup([li("a", "2026-11-27")]);
+  await assert.rejects(run(s, api({ postFails: "Invalid image" })), /422/);
+  const failed = JSON.parse(readFileSync(s.path, "utf8")).state.a;
+  assert.equal(failed.extra.media_urns, undefined, "media that may be the problem is dropped");
+  const retry = api();
+  await run({ ...s, data: failed ? JSON.parse(readFileSync(s.path, "utf8")) : null }, retry);
+  assert.ok(retry.calls.some((call) => call.url.includes("/rest/images?action=initializeUpload")), "the retry uploads the current file again");
+  assert.equal(JSON.parse(readFileSync(s.path, "utf8")).state.a.extra.budget_stop, undefined);
+});

@@ -99,8 +99,10 @@ async function publishOne(item, { client, manifestDir, language, previous, check
     const existing = await findExisting(client, commentary, previous);
     if (existing) return { remote_id: existing.id, url: postUrl(existing.id), extra: { resolved: "found by read-back" } };
   }
-  // Media uploaded by an earlier attempt (cut by the budget or a failure after the upload) is reused.
-  let urns = previous?.extra?.media_urns ?? [];
+  // Media uploaded by an earlier attempt is reused only when that attempt may have posted it (unknown) or was cut by
+  // the budget; after a real failure the media may be the problem, so it is uploaded again from the current files.
+  const reusable = previous?.status === "unknown" || previous?.extra?.budget_stop === true;
+  let urns = reusable ? previous?.extra?.media_urns ?? [] : [];
   if (urns.length !== item.media.length) {
     urns = [];
     for (const media of item.media) {
@@ -115,7 +117,7 @@ async function publishOne(item, { client, manifestDir, language, previous, check
     error.budget = true;
     throw error;
   }
-  checkpoint({ extra: { media_urns: urns, sent_at: previous?.status === "unknown" ? previous.extra?.sent_at ?? previous.at : new Date().toISOString() } });
+  checkpoint({ extra: { media_urns: urns, sent_at: previous?.status === "unknown" ? previous.extra?.sent_at ?? previous.at : attempt.now.toISOString() } });
   attempt.posted = true;
   let id;
   try {
@@ -168,7 +170,7 @@ export async function publish(manifest, { manifestDir, manifestPath, client, exe
       recordState(manifest, entry.id, { status: "unknown", error: "post sent; waiting for the response", ...extra, extra: { ...extra.extra, api_calls: calls() } }, now);
       saveManifest(manifestPath, manifest);
     };
-    const attempt = { posted: false, mediaUrns: null };
+    const attempt = { posted: false, mediaUrns: null, now };
     try {
       const result = await publishOne(entry, { client, manifestDir, language: manifest.language, previous, checkpoint, pollMs, timeoutMs, attempt });
       recordState(manifest, entry.id, { status: "published", publish_at: now.toISOString(), error: null, ...result, extra: { ...result.extra, api_calls: calls() } }, now);
@@ -178,7 +180,14 @@ export async function publish(manifest, { manifestDir, manifestPath, client, exe
     } catch (error) {
       const status = outcomeStatus({ previous, error, attempt });
       const extra = { ...(previous?.extra ?? {}), ...(manifest.state[entry.id]?.extra ?? {}), ...(attempt.mediaUrns ? { media_urns: attempt.mediaUrns } : {}), api_calls: calls() };
-      if (status === "failed" && !error.budget) extra.failed_attempts = (previous?.extra?.failed_attempts ?? 0) + 1;
+      if (error.budget) extra.budget_stop = true;
+      else {
+        delete extra.budget_stop;
+        if (status === "failed") {
+          extra.failed_attempts = (previous?.extra?.failed_attempts ?? 0) + 1;
+          delete extra.media_urns;
+        }
+      }
       recordState(manifest, entry.id, { status, error: error.message, extra }, now);
       saveManifest(manifestPath, manifest);
       if (error.budget) {
