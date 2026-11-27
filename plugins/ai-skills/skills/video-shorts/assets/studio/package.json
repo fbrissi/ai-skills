@@ -1,0 +1,24 @@
+{
+  "name": "video-shorts-studio",
+  "private": true,
+  "type": "module",
+  "version": "1.0.0",
+  "description": "Remotion studio for vertical Shorts and Reels, driven by props written by the video-shorts skill.",
+  "scripts": {
+    "studio": "remotion studio",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.539",
+    "@remotion/fonts": "4.0.539",
+    "@remotion/media": "4.0.539",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "remotion": "4.0.539",
+    "zod": "4.5.4"
+  },
+  "devDependencies": {
+    "@types/react": "19.2.2",
+    "typescript": "5.9.3"
+  }
+}

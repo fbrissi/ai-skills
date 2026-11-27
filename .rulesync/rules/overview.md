@@ -11,7 +11,7 @@ Public library of reusable, harness-agnostic AI agent skills, plus Claude Code a
 
 ## Source of truth
 
-- Edit only `.rulesync/**`, `shared/**`, `docs/**`, `scripts/**`, `.github/workflows/**`, and the root files (`README.md`, `CHANGELOG.md`, `package.json`, configs).
+- Edit only `.rulesync/**`, `shared/**`, `docs/**`, `scripts/**`, `tests/**`, `.github/workflows/**`, and the root files (`README.md`, `CHANGELOG.md`, `package.json`, configs).
 - Generated and committed, never edit by hand: `AGENTS.md`, `CLAUDE.md`. Edit `.rulesync/rules/overview.md`, then run `npm run generate` and commit both.
 - Generated and committed, never edit by hand: `plugins/ai-skills/agents/`, `plugins/ai-skills/skills/`, and `plugins/ai-skills/opencode/agent/` (copied from `.opencode/agents/` by `scripts/copy-opencode-agents.sh`, part of `npm run generate`). Hand-written and committed: `plugins/ai-skills/.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json`.
 - Generated and gitignored, never edit or commit: `.claude/`, `.agents/`, `.cursor/`, `.opencode/`, `.github/skills/`, `.github/copilot-instructions.md`. Committed skill folders would make the `skills` CLI list each skill twice.
@@ -27,6 +27,7 @@ Require Node.js 22.22+ and bash.
 - `npm run generate`: sync shared files and regenerate outputs
 - `npm run check`: fail if shared copies (content, exec bit, orphans) or generated outputs are stale
 - `npm run check:discovery`: fail if the `skills` CLI does not find every skill
+- `npm test`: unit tests of the skill scripts (`tests/**/*.test.mjs`, Node's test runner)
 - `npm run doctor`: diagnose the Rulesync config
 - `npm run generate:global`: dev preview into `~/.claude/skills` and `~/.agents/skills`; `rulesync.global.jsonc` must keep `delete: false`. Do not mix with `npx skills add -g`.
 

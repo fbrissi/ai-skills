@@ -33,6 +33,9 @@ The plugin contains every skill too, so you do not need `npx skills add` for Cla
 | `readiness-reviewer` | Delivery | Ready or back to refinement, with `readiness-review`; never edits bodies | Labels, comments |
 | `delivery-orchestrator` | Orchestrator | Starts a milestone's unblocked issues up to a limit, with `delivery-orchestration`; keeps the draft milestone PR, marks it ready, closes the milestone after it merges | Branches, labels, workflow dispatches, PR, milestone |
 | `task-implementer` | Orchestrator | One issue on its task branch: `dev`, `quality-cycle`, `pr-create` into the milestone branch | Commits, push, PR, labels |
+| `facebook-content` | Social | `generate`: plans, writes, renders, guards, and opens the review issue for a Facebook batch; `adjust <issue>`: redoes what `/adjust` comments ask for. Never publishes | Drive files, review issue, comments |
+| `instagram-content` | Social | Same for Instagram: JPEG cards, carousels, Stories, Reels; items wait for the publisher's cron | Drive files, review issue, comments |
+| `youtube-content` | Social | Same for YouTube Shorts: narrated videos with credits, thumbnails, synthetic media flag | Drive files, review issue, comments |
 
 How the agents delegate to each other:
 
@@ -62,7 +65,7 @@ flowchart LR
   PS & NC --> DEV & CR & QA & CI
 ```
 
-`inpi-watch` and the delivery agents `business-analyst`, `tech-lead`, and `readiness-reviewer` work alone.
+`inpi-watch`, the delivery agents `business-analyst`, `tech-lead`, and `readiness-reviewer`, and the social agents `facebook-content`, `instagram-content`, and `youtube-content` work alone.
 
 Which skills each agent follows (an agent that delegates uses the skills through its workers):
 
@@ -80,6 +83,7 @@ flowchart LR
     DU["dependency-updater"]
     NC["nfse-compliance"]
     IW["inpi-watch"]
+    SC["facebook-content<br/>instagram-content<br/>youtube-content"]
     DEV["developer"]
     CR["code-reviewer"]
     QA["qa-tester"]
@@ -106,6 +110,11 @@ flowchart LR
     sTC["ticket-create"]
     sNT["nfse-technical-note-analysis"]
     sIN["inpi-trademark-watch"]
+    sSP["social-content-plan"]
+    sCG["copy-guard"]
+    sIC["image-cards"]
+    sVS["video-shorts"]
+    sSR["social-review"]
   end
   BA --> sBR
   TL --> sTR & sTP
@@ -118,6 +127,7 @@ flowchart LR
   DU --> sDU & sQC & sPC
   NC --> sNT & sTC & sQC & sPC & sPF & sMR
   IW --> sIN & sTC
+  SC --> sSP & sCG & sIC & sVS & sSR
   DEV --> sDEV
   CR --> sRC
   QA --> sQE & sBDD
@@ -217,6 +227,14 @@ Runs `inpi-trademark-watch` for each RPI, then creates or updates `INPI: RPI <n>
 
 In `scan` mode it finds notes with no issue yet. For each note: `nfse-technical-note-analysis`, then an issue with category labels (tax, layout, API, events, DANFSE, validation), estimates, priority, and due dates from the official dates and rollout plan. Not-applicable notes are recorded and closed. Issues go to the milestone the profile's milestone policy names (a release milestone for deadline work, a tracking milestone for watched work). On resume it reconciles an existing issue with the current profile and sources first, so a policy change fixes old issues instead of duplicating them. Required changes are implemented homologation first on `feature/nfse-nt-<n>-<slug>` (the profile's branch template), go through `quality-cycle` and `pr-create`, then the `pr-shepherd` loop in `auto` mode until a person approves, then `merge-risk` in `decide` mode. With the profile's `PR follow-up: events`, it handles the feedback already on the PR in one pass and stops with `awaiting review`; a CI workflow that reacts to review events runs it again, and a run on an approved PR goes on to the merge decision. It never deploys.
 
+### Social content
+
+`facebook-content`, `instagram-content`, and `youtube-content` each run one platform of the [social content flow](social-content.md). `generate` follows `social-content-plan`, writes the copy, renders media with `image-cards` and `video-shorts`, passes `copy-guard`, validates the manifest, and opens the review issue with `social-review`. `adjust <issue>` restores the batch from the issue, applies only the `/adjust` comments of people with write access, and posts a revision. They are headless, never ask, never approve, and never publish: the publishers (`facebook-publish`, `instagram-publish`, `youtube-publish`) run in a separate deterministic workflow after a person comments `/aprove`.
+
+```bash
+claude -p --agent ai-skills:youtube-content "generate"
+```
+
 ### Delivery flow
 
 `business-analyst`, `tech-lead`, `readiness-reviewer`, `delivery-orchestrator`, and `task-implementer` run one step each of the [delivery flow](delivery-flow.md): business refinement, technical refinement, readiness review, orchestration, and implementation. Each step is its own non-interactive run, usually started by a workflow, and moves issues through the `status:*` labels. Every run ends with one status label per issue in scope and, for each blocked item, a comment starting with `<!-- ai-delivery blocker stage=<stage> -->` and `Blocked: <line>`, plus a `Blocked:` list in its report, so a workflow can chain the next step or hand off to `requested-by`. The first three only change issues; they follow their skill and stop if it is not installed. With a GitHub milestone as the source, `business-analyst` reorganizes the milestone's existing issues in place instead of creating new ones.
@@ -253,3 +271,4 @@ The agents read the profiles of the skills they use:
 | `nfse-compliance` | `nfse-technical-note-analysis` (Automation section), `merge-risk`, plus the cycle profiles |
 | `business-analyst`, `tech-lead`, `readiness-reviewer`, `delivery-orchestrator` | `delivery` (`docs/ai/delivery.md`) |
 | `task-implementer` | `delivery`, plus the cycle profiles |
+| `facebook-content`, `instagram-content`, `youtube-content` | `social-content` (`docs/ai/social-content.md`) |

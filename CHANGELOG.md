@@ -3,6 +3,17 @@
 All notable changes to this project are documented here. Release versions follow
 [Semantic Versioning](https://semver.org/).
 
+## v0.12.0
+
+### Added
+
+- Social content flow ([docs/social-content.md](docs/social-content.md)): agents generate organic content for Facebook, Instagram, and YouTube from the project's context, a person reviews it on a GitHub issue, and deterministic publishers post it only after approval.
+- Agents `facebook-content`, `instagram-content`, and `youtube-content`, each with a `generate` mode (plan, copy, media, copy guard, manifest, Drive upload, review issue) and an `adjust <issue>` mode (redo only what `/adjust` comments from writers ask for). Headless; they never publish.
+- Skills `social-content-plan` (dated slots from the profile's days, times, time zone, blackout dates, and calendar hooks; sourced briefs; skeleton manifest), `copy-guard` (mandatory checker and detect-only review for AI writing tells, engagement bait, unsupported social proof, and fiscal or savings promises, pt-BR and English, extendable per project), `image-cards` (HTML/CSS cards rendered with Playwright in Docker without network: Instagram 4:5, square, and Stories, Facebook 1080x1350 and 1200x630, YouTube thumbnails), `video-shorts` (9:16 Shorts and Reels with Remotion, Piper narration at −16 LUFS, music from a Drive folder, voice and music credits), and `social-review` (Drive upload with the `drive.file` scope under `<root>/<Platform>/<date>/`, review issue with a hidden manifest marker, `/adjust` revisions).
+- Deterministic publishers `facebook-publish` (Graph API posts, photos, multi-photo posts, and scheduled Reels), `instagram-publish` (one due item per cron run, media in a public S3-compatible bucket, two-step container publishing, 24-hour limit), and `youtube-publish` (resumable uploads scheduled with `publishAt`, synthetic media disclosure, thumbnail, playlist, captions, daily limit). All keep idempotent state in the manifest and never print tokens.
+- One platform-neutral batch manifest with a JSON Schema and a validator (`social-manifest.mjs`), shared by every social skill; one consumer profile, `docs/ai/social-content.md`.
+- Unit tests for every social script in `tests/social/` (`node --test`), run by CI.
+
 ## v0.11.0
 
 ### Changed

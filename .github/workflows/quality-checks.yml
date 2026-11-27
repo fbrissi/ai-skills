@@ -29,7 +29,9 @@ jobs:
           - name: rulesync-doctor
             command: npm run doctor
           - name: shell-syntax
-            command: for f in scripts/*.sh shared/scripts/*.sh .rulesync/skills/*/scripts/*.sh; do bash -n "$f"; done; for f in .rulesync/skills/*/scripts/*.rb; do ruby -c "$f"; done
+            command: for f in scripts/*.sh shared/scripts/*.sh .rulesync/skills/*/scripts/*.sh; do bash -n "$f"; done; for f in .rulesync/skills/*/scripts/*.rb; do ruby -c "$f"; done; for f in shared/scripts/*.mjs .rulesync/skills/*/scripts/*.mjs; do node --check "$f"; done
+          - name: script-tests
+            command: node --test 'tests/**/*.test.mjs'
           - name: skills-discovery
             command: scripts/check-discovery.sh
           - name: dependency-audit
