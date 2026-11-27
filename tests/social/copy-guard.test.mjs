@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
+import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import { checkManifest, checkText, main, profileRules } from "../../.rulesync/skills/copy-guard/scripts/copy-guard.mjs";
-import { item, manifest, sink, tempDir } from "./helpers.mjs";
+import { item, manifest, sink, tempDir, writeManifest } from "./helpers.mjs";
 
 const rules = (text, lang = "pt-BR", options = {}) => checkText(text, { lang, ...options }).map((finding) => `${finding.level}:${finding.rule}`);
 
@@ -92,4 +93,101 @@ test("hashtag caps: Instagram allows 5 whatever the profile says; per-platform m
   assert.equal(hashtagCap(null, "facebook"), null);
   const data = manifest("instagram", [item({ publish_at: null, scheduled: false, caption: "Texto. #a #b #c #d #e #f" , hashtags: [] })]);
   assert.ok(checkManifest(data).some((f) => f.rule === "hashtag-count"));
+});
+
+const PROFILE = [
+  "# Social content: Test",
+  "",
+  "## Offer",
+  "Plano Escritório por R$ 99 até 31/03/2027 (source: site).",
+  "",
+  "## Allowed claims",
+  "- XML e DANFSE guardados de 30 dias no teste grátis a 5 anos (source: site)",
+  "- Tutorial: 9 vídeos curtos, cerca de 8 minutos ao todo (source: site)",
+  "",
+  "## Forbidden claims",
+  "- 40 recorrências por cliente",
+  "",
+  "## Parameters",
+  "",
+  "```json",
+  JSON.stringify({ language: "pt-BR", calendar_hooks: [{ date: "2026-12-18", hook: "13º salário (2ª parcela) vence na sexta", source: "x" }], copy_guard: { allowed_numbers: ["50 números"] } }),
+  "```",
+  "",
+].join("\n");
+
+test("numeric claims must come from the profile; dates, times, prices and profile numbers pass", async () => {
+  const { profileClaims } = await import("../../.rulesync/skills/copy-guard/scripts/copy-guard.mjs");
+  const dir = tempDir({ "profile.md": PROFILE });
+  const config = { copy_guard: { allowed_numbers: ["50 números"] }, calendar_hooks: [{ date: "2026-12-18", hook: "13º salário (2ª parcela) vence na sexta" }] };
+  const allowedClaims = profileClaims(PROFILE, config);
+  const with_ = (text, lang = "pt-BR") => rules(text, lang, { allowedClaims });
+  assert.ok(with_("Fechamento do mês com 30 recorrências?").includes("error:unsourced-number"));
+  for (const text of ["Reduza o tempo em 40%.", "Cadastre 40 recorrências por cliente.", "São 12 empresas na conta.", "Close the month with 30 invoices."]) {
+    assert.ok(with_(text, text.startsWith("Close") ? "en" : "pt-BR").includes("error:unsourced-number"), text);
+  }
+  for (const text of [
+    "O XML fica guardado por 30 dias no teste grátis e até 5 anos no Escritório.",
+    "O tutorial tem 9 vídeos, cerca de 8 minutos.",
+    "O DAS vence em 21/12, às 12:30, ou às 18h.",
+    "O Escritório custa R$ 99 até 31 de março de 2027.",
+    "O 13º salário vence em 18/12/2026.",
+    "Validamos os próximos 50 números.",
+    "Em 2027, a NFS-e muda (Lei nº 12.741/2012).",
+    "Veja https://example.com/?utm_campaign=organic-2027 #NFSe2026",
+    "On December 7, at 6pm, the release goes live.",
+  ]) {
+    assert.ok(!with_(text, text.startsWith("On") ? "en" : "pt-BR").includes("error:unsourced-number"), `${text} -> ${with_(text)}`);
+  }
+  assert.ok(rules("Fechamento do mês com 30 recorrências?").includes("warn:unsourced-number"));
+  const data = manifest("instagram", [item({ publish_at: null, scheduled: false, caption: "Fechamento do mês com 30 recorrências?", credits: "Voz CC BY 4.0, modelo hifi_tts_92, leitora 92.", hashtags: [] })]);
+  const numbers = checkManifest(data, { allowedClaims }).filter((f) => f.rule === "unsourced-number");
+  assert.deepEqual(numbers.map((f) => f.level), ["error"]);
+  assert.match(numbers[0].excerpt, /30 recorrências/);
+  const out = sink();
+  writeFileSync(join(dir, "t.txt"), "Fechamento do mês com 30 recorrências?");
+  assert.equal(main(["--text", join(dir, "t.txt"), "--profile", join(dir, "profile.md")], { out }), 1);
+  assert.match(out.text(), /ERROR text: unsourced-number/);
+  writeFileSync(join(dir, "ok.txt"), "Guardamos o XML por 30 dias no teste grátis.");
+  assert.equal(main(["--text", join(dir, "ok.txt"), "--profile", join(dir, "profile.md")], { out: sink() }), 0);
+});
+
+test("relative day words are errors in cron-published items and Stories, allowed in scheduled items", () => {
+  for (const text of ["Hoje, 07/12, sai a release.", "Amanhã o DAS vence.", "Nesta sexta, o 13º.", "Esta semana tem prazo."]) {
+    assert.ok(rules(text, "pt-BR", { cron: true }).includes("error:relative-day"), text);
+    assert.ok(!rules(text).includes("error:relative-day"), text);
+  }
+  assert.ok(rules("Tomorrow the release goes live.", "en", { cron: true }).includes("error:relative-day"));
+  assert.ok(!rules("Em 07/12 sai a release.", "pt-BR", { cron: true }).includes("error:relative-day"));
+  const story = manifest("instagram", [item({ type: "story", publish_at: null, scheduled: false, caption: "Hoje, 07/12, sai a release.", hashtags: [] })]);
+  assert.ok(checkManifest(story).some((f) => f.rule === "relative-day" && f.level === "error"));
+  const facebook = manifest("facebook", [item({ caption: "Hoje sai a release." })]);
+  assert.ok(!checkManifest(facebook).some((f) => f.rule === "relative-day"));
+  const unscheduled = manifest("facebook", [item({ scheduled: false, publish_at: null, caption: "Hoje sai a release." })]);
+  assert.ok(checkManifest(unscheduled).some((f) => f.rule === "relative-day"));
+  const dir = tempDir({ "s.txt": "Amanhã sai a release." });
+  assert.equal(main(["--text", join(dir, "s.txt"), "--platform", "instagram"], { out: sink() }), 1);
+  assert.equal(main(["--text", join(dir, "s.txt"), "--platform", "facebook"], { out: sink() }), 0);
+  assert.equal(main(["--text", join(dir, "s.txt"), "--cron"], { out: sink() }), 1);
+});
+
+test("manifest check reads the text drawn in cards and videos from each item's spec", async () => {
+  const { profileClaims } = await import("../../.rulesync/skills/copy-guard/scripts/copy-guard.mjs");
+  const allowedClaims = profileClaims(PROFILE, {});
+  const dir = tempDir({
+    "specs/carousel.cards.json": JSON.stringify({ cards: [{ id: "c1", template: "slide", formats: ["ig-portrait"], headline: "Fechamento do mês com 30 recorrências?", alt: "Lista de recorrências" }] }),
+    "specs/story.cards.json": JSON.stringify({ cards: [{ id: "s1", formats: ["story"], kicker: "Hoje, 07/12", headline: "Release 1 da NT 009" }] }),
+    "specs/reel.video.json": JSON.stringify({ id: "reel", scenes: [{ id: "hook", kind: "hook", title: "Amanhã vence o DAS", voice: "Amanhã vence o DAS.", say: "Amanhã vence o dás." }] }),
+  });
+  const data = manifest("instagram", [
+    item({ id: "carousel", type: "carousel", publish_at: null, scheduled: false, caption: "Texto limpo.", hashtags: [], spec: "specs/carousel.cards.json" }),
+    item({ id: "story", type: "story", publish_at: null, scheduled: false, caption: null, hashtags: [], spec: "specs/story.cards.json" }),
+    item({ id: "reel", type: "reel", publish_at: null, scheduled: false, caption: "Texto limpo.", hashtags: [], spec: "specs/reel.video.json" }),
+  ]);
+  const findings = checkManifest(data, { allowedClaims, manifestDir: dir }).filter((f) => f.level === "error").map((f) => `${f.where}:${f.rule}`);
+  assert.deepEqual(findings, ["carousel.spec:cards[0].headline:unsourced-number", "story.spec:cards[0].kicker:relative-day", "reel.spec:scenes[0].title:relative-day", "reel.spec:scenes[0].voice:relative-day"]);
+  const path = writeManifest(dir, data);
+  const out = sink();
+  assert.equal(main(["--manifest", path], { out }), 1);
+  assert.match(out.text(), /ERROR story\.spec:cards\[0\]\.kicker: relative-day/);
 });

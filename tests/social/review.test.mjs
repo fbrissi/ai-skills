@@ -3,6 +3,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import { Drive } from "../../.rulesync/skills/social-review/scripts/drive.mjs";
+import { composeText } from "../../.rulesync/skills/social-review/scripts/social-manifest.mjs";
 import { adjustRequests, bump, decodeMarker, encodeMarker, fetchMedia, issueBody, revisionComment, upload } from "../../.rulesync/skills/social-review/scripts/review-batch.mjs";
 import { fakeFetch, item, json, manifest, png, tempDir, writeManifest } from "./helpers.mjs";
 
@@ -195,4 +196,19 @@ test("the issue shows the music license evidence and the AI disclosure", () => {
   const body = issueBody(pending([item({ music, ai_audio: true })]));
   assert.match(body, /Música: "City Sunshine", Kevin MacLeod, FreePD \(CC0; \[licença\]\(https:\/\/freepd.com\/\); \[evidência\]\(https:\/\/drive.google.com\/file\/d\/EVID\/view\); sha256 `aaaaaaaaaaaa…`\)/);
   assert.match(body, /IA: narração sintética \(rótulo de IA na Meta, aviso no texto do LinkedIn\)/);
+});
+
+test("issue body shows each item's link and its UTM, even when the link is sent apart from the text", () => {
+  const link = "https://example.com/?utm_source=facebook&utm_medium=social&utm_campaign=organic-lote#planos";
+  const body = issueBody(pending([item({ type: "post", media: [], caption: "Texto do post.", link }), item({ id: "b", caption: "Sem link." })]));
+  const section = body.slice(body.indexOf("#### `2026-11-30-facebook-1`"), body.indexOf("#### `b`"));
+  assert.ok(!composeText(item({ type: "post", media: [], caption: "Texto do post.", link }), "facebook").includes(link));
+  assert.match(section, /Link \(prévia do link\): https:\/\/example\.com\/\?utm_source=facebook&utm_medium=social&utm_campaign=organic-lote#planos/);
+  assert.match(section, /UTM: utm_source=facebook · utm_medium=social · utm_campaign=organic-lote/);
+  assert.ok(!body.slice(body.indexOf("#### `b`")).includes("Link"));
+  const plain = pending([item({ type: "photo", link: "https://example.com/sem-utm" })]);
+  plain.language = "en";
+  assert.match(issueBody(plain), /Link \(at the end of the text\): https:\/\/example\.com\/sem-utm\n\nUTM: none/);
+  const ig = manifest("instagram", [item({ publish_at: null, scheduled: false, link })], { approval: { status: "pending", by: null, at: null, revision: null } });
+  assert.match(issueBody(ig), /Link \(não enviado: o Instagram não tem link clicável; use o link na bio\): https:\/\/example\.com/);
 });

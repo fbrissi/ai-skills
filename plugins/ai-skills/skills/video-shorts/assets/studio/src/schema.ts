@@ -16,6 +16,8 @@ export const sceneSchema = z.object({
     body: z.string().optional(),
     url: z.string().optional(),
     label: z.string().optional(),
+    disclaimer: z.string().optional(),
+    synthetic: z.boolean().optional(),
     image: z.string().optional(),
     imageWidth: z.number().optional(),
     imageHeight: z.number().optional(),

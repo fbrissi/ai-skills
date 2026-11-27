@@ -12,6 +12,7 @@ const L = {
     logo: { y: 130, height: 52 },
     headline: { y: 260, fontSize: 72 },
     screen: { y: 560, width: 1000, maxHeight: 720 },
+    disclaimer: { gap: 12, fontSize: 24 },
     caption: { y: 1330, fontSize: 50 },
     footnote: { y: 1490, fontSize: 26 },
 };
@@ -114,8 +115,8 @@ const Headline = ({ text, brand }: { text: string; brand: Brand }) => {
     );
 };
 
-/** Window around a real product screen or recording, with its source label. */
-const ScreenFrame = ({ aspect, label, brand, children }: { aspect: number; label?: string; brand: Brand; children: React.ReactNode }) => {
+/** Window around a real product screen or recording, with its source label and the profile's required disclaimer under it. */
+const ScreenFrame = ({ aspect, label, disclaimer, brand, children }: { aspect: number; label?: string; disclaimer?: string; brand: Brand; children: React.ReactNode }) => {
     const frame = useCurrentFrame();
     const width = Math.min(L.screen.width, L.screen.maxHeight * aspect);
     const height = width / aspect;
@@ -128,6 +129,9 @@ const ScreenFrame = ({ aspect, label, brand, children }: { aspect: number; label
                 </div>
             )}
             <div style={{ position: "relative", width, height, overflow: "hidden", borderRadius: 22, backgroundColor: "#fff", boxShadow: "0 30px 70px rgba(0,0,0,0.18)" }}>{children}</div>
+            {disclaimer && (
+                <div style={{ position: "absolute", top: height + L.disclaimer.gap, left: 0, right: 0, textAlign: "center", fontSize: L.disclaimer.fontSize, lineHeight: 1.2, fontWeight: 600, color: brand.colors.ink }}>{disclaimer}</div>
+            )}
         </div>
     );
 };
@@ -173,7 +177,7 @@ const SceneView = ({ scene, brand }: { scene: SceneProps; brand: Brand }) => {
         return (
             <>
                 {scene.headline && <Headline text={scene.headline} brand={brand} />}
-                <ScreenFrame aspect={aspect} label={scene.label} brand={brand}>
+                <ScreenFrame aspect={aspect} label={scene.label} disclaimer={scene.disclaimer} brand={brand}>
                     <ScreenImage scene={scene} frameWidth={width} frameHeight={width / aspect} />
                 </ScreenFrame>
             </>
@@ -184,7 +188,7 @@ const SceneView = ({ scene, brand }: { scene: SceneProps; brand: Brand }) => {
         return (
             <>
                 {scene.headline && <Headline text={scene.headline} brand={brand} />}
-                <ScreenFrame aspect={aspect} label={scene.label} brand={brand}>
+                <ScreenFrame aspect={aspect} label={scene.label} disclaimer={scene.disclaimer} brand={brand}>
                     <Video src={staticFile(scene.video)} muted playbackRate={scene.playbackRate ?? 1} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                 </ScreenFrame>
             </>

@@ -38,5 +38,6 @@ Load this in step 2 of the copy guard. These are the patterns a regex misses. Fo
 
 ## Claims (both languages)
 
-- Every number, customer, result, saving, ranking, or comparison must appear in the item's `sources` and in the profile's allowed claims. Otherwise flag it as `unsupported claim` and cut it.
+- Every number, customer, result, saving, ranking, or comparison must appear in the item's `sources` and in the profile's allowed claims. Otherwise flag it as `unsupported claim` and cut it. The checker catches numbers written in digits (`unsourced-number`); check numbers written in words ("trinta recorrências", "dez vezes") here.
+- Items a cron publishes (Stories, Instagram, LinkedIn): no day relative to publication in words the checker does not list ("logo mais", "nos próximos dias", "later today"); use the explicit date or timeless copy.
 - Dates, prices, and offers must match the profile's Offer section exactly.

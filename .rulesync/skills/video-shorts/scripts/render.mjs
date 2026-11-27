@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Renders a 9:16 Short/Reel from a video spec with the bundled Remotion studio, then normalizes the mix to
 // -16 LUFS integrated (two-pass ffmpeg loudnorm, video stream copied). Run voice.mjs first.
+// Every product screen gets the profile's video.screen_disclaimer under it; the render stops when one lacks it.
 // Usage: render.mjs --spec <video.json> --out <file.mp4> [--profile <profile.md>] [--work .cache/video-shorts]
 //        [--studio <dir with node_modules>] [--no-music]
 // Prints {path, width, height, duration, synthetic_media, ai_audio, music} (music: the manifest entry with license
@@ -21,9 +22,53 @@ const DEFAULT_COLORS = { background: "#f5f7fa", ink: "#14213d", primary: "#2d5ba
 
 export class RenderError extends Error {}
 
-/** Spec checks that keep fake product UIs and missing files out before anything renders. */
-export function specErrors(spec, root = process.cwd()) {
+/** The window that shows screens and footage in Short.tsx (L.screen): 1000x720 on the 1080x1920 canvas. */
+export const SCREEN_FRAME = { width: 1000, height: 720 };
+/** Longest screen disclaimer that fits one line under the screen frame. */
+export const DISCLAIMER_MAX = 80;
+
+/** The profile's required line under every product screen (video.screen_disclaimer), or null. */
+export function screenDisclaimer(config) {
+  const text = config?.video?.screen_disclaimer;
+  return typeof text === "string" && text.trim() ? text.trim() : null;
+}
+
+/** Scenes that show the product: screenshots, and recordings that are not AI-generated footage. */
+export function showsProductScreen(scene) {
+  return scene.kind === "screen" || (scene.kind === "footage" && scene.synthetic !== true);
+}
+
+/** Same camera as ScreenImage in Short.tsx: the box fills the frame, never zooming out past cover nor in past 2.4x cover. */
+export function screenCamera(box, image, frame = SCREEN_FRAME) {
+  const cover = Math.max(frame.width / image.width, frame.height / image.height);
+  const scale = Math.max(cover, Math.min(frame.width / box.w, frame.height / box.h, cover * 2.4));
+  return { scale, visibleWidth: frame.width / scale, visibleHeight: frame.height / scale };
+}
+
+/** A camera box that the frame cannot show whole: its edges, and any label or sidebar item on them, get cut. */
+export function boxFitError(where, name, box, image) {
+  if (box.x < 0 || box.y < 0 || box.x + box.w > image.width + 0.5 || box.y + box.h > image.height + 0.5) return `${where}: ${name} box goes past the image (${image.width}x${image.height})`;
+  const camera = screenCamera(box, image);
+  if (box.w <= camera.visibleWidth + 1 && box.h <= camera.visibleHeight + 1) return null;
+  return `${where}: ${name} box ${box.w}x${box.h} does not fit the ${SCREEN_FRAME.width}x${SCREEN_FRAME.height} screen frame: the camera shows at most ${Math.round(camera.visibleWidth)}x${Math.round(camera.visibleHeight)} image pixels at that zoom, so the box edges (labels, sidebar items, buttons) would be cut; use a box with the frame's ${SCREEN_FRAME.width}:${SCREEN_FRAME.height} aspect inside the image`;
+}
+
+/** Footage fills the frame with object-fit cover: a clip of another aspect loses its sides or its top and bottom. */
+export function footageFitError(where, width, height) {
+  const target = SCREEN_FRAME.width / SCREEN_FRAME.height;
+  const aspect = width / height;
+  if (Math.abs(aspect - target) / target <= 0.02) return null;
+  const wide = aspect > target;
+  const lost = Math.round((1 - (wide ? target / aspect : aspect / target)) * 100);
+  const suggestion = wide ? `${Math.round(height * target)}:${height}:x:y` : `${width}:${Math.round(width / target)}:x:y`;
+  return `${where}: footage ${width}x${height} is cut to the ${SCREEN_FRAME.width}:${SCREEN_FRAME.height} screen frame (${lost}% of its ${wide ? "width" : "height"} is lost); crop it to that aspect (for example ${suggestion})`;
+}
+
+/** Spec checks that keep fake product UIs, missing files, cut screens, and an oversized disclaimer out before rendering. */
+export function specErrors(spec, root = process.cwd(), config = null) {
   const errors = [];
+  const disclaimer = screenDisclaimer(config);
+  if (disclaimer && disclaimer.length > DISCLAIMER_MAX) errors.push(`video.screen_disclaimer has ${disclaimer.length} characters; keep it within ${DISCLAIMER_MAX} so it fits one line under the screen`);
   if (!/^[a-z0-9][a-z0-9-]*$/.test(spec.id ?? "")) errors.push("id must be kebab-case");
   if (!Array.isArray(spec.scenes) || !spec.scenes.length) errors.push("scenes is required");
   for (const scene of spec.scenes ?? []) {
@@ -33,6 +78,21 @@ export function specErrors(spec, root = process.cwd()) {
     if (scene.kind === "footage" && !scene.video) errors.push(`${where}: footage scenes need a video (a real recording or a supplied clip)`);
     for (const path of [scene.image, scene.video].filter(Boolean)) if (!existsSync(resolve(root, path))) errors.push(`${where}: file not found: ${path}`);
     if (scene.generated_ui) errors.push(`${where}: AI-generated product UI is not allowed; use a real screenshot or recording`);
+    if (scene.kind === "screen" && scene.image && existsSync(resolve(root, scene.image))) {
+      const size = imageSize(resolve(root, scene.image));
+      if (size?.width && size?.height) {
+        const image = { width: size.width, height: size.height };
+        for (const [name, box] of [["focus", scene.focus ?? { x: 0, y: 0, w: image.width, h: image.height }], ["pan_to", scene.pan_to]]) {
+          const error = box ? boxFitError(where, name, box, image) : null;
+          if (error) errors.push(error);
+        }
+      }
+    }
+    if (scene.kind === "footage" && scene.crop) {
+      const [width, height] = String(scene.crop).split(":").map(Number);
+      const error = width > 0 && height > 0 ? footageFitError(where, width, height) : `${where}: crop must be w:h:x:y in pixels`;
+      if (error) errors.push(error);
+    }
   }
   if (spec.music && !existsSync(resolve(root, spec.music))) errors.push(`music not found: ${spec.music} (download it with drive.mjs download-folder)`);
   return errors;
@@ -71,8 +131,16 @@ export function normalizeLoudness(input, output) {
   execFileSync("ffmpeg", ["-v", "error", "-y", "-i", input, "-c:v", "copy", "-af", second, "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-movflags", "+faststart", output]);
 }
 
+/** Every product screen in the render props must carry the profile's disclaimer, exactly. */
+export function disclaimerErrors(props, config) {
+  const required = screenDisclaimer(config);
+  if (!required) return [];
+  return props.scenes.filter((scene) => showsProductScreen(scene) && scene.disclaimer !== required).map((scene) => `scene ${scene.id}: shows a product screen without the profile's video.screen_disclaimer`);
+}
+
 export function buildProps(spec, { config, root, jobDir, jobPublic, voice, music }) {
   const brand = config?.brand ?? {};
+  const disclaimer = screenDisclaimer(config);
   mkdirSync(jobDir, { recursive: true });
   const copy = (path, name) => {
     copyFileSync(resolve(root, path), join(jobDir, name));
@@ -80,7 +148,7 @@ export function buildProps(spec, { config, root, jobDir, jobPublic, voice, music
   };
   const fontFile = brand.font?.files?.[0] ? copy(typeof brand.font.files[0] === "string" ? brand.font.files[0] : brand.font.files[0].path, `font${extname(typeof brand.font.files[0] === "string" ? brand.font.files[0] : brand.font.files[0].path)}`) : null;
   const scenes = spec.scenes.map((scene, index) => {
-    const entry = { id: scene.id, kind: scene.kind, caption: scene.voice ?? "", title: scene.title, highlight: scene.highlight, headline: scene.headline, body: scene.body, url: scene.url, label: scene.label, focus: scene.focus, panTo: scene.pan_to };
+    const entry = { id: scene.id, kind: scene.kind, caption: scene.voice ?? "", title: scene.title, highlight: scene.highlight, headline: scene.headline, body: scene.body, url: scene.url, label: scene.label, focus: scene.focus, panTo: scene.pan_to, synthetic: scene.synthetic === true ? true : undefined, disclaimer: disclaimer && showsProductScreen(scene) ? disclaimer : undefined };
     let clipSeconds = null;
     if (scene.image) {
       entry.image = copy(scene.image, `${index}-${basename(scene.image)}`);
@@ -105,7 +173,7 @@ export function buildProps(spec, { config, root, jobDir, jobPublic, voice, music
   return {
     brand: { colors: { ...DEFAULT_COLORS, ...(brand.colors ?? {}) }, fontFamily: brand.font?.family ?? "system-ui", fontFile, logo },
     music: music ? copy(music, `music${extname(music)}`) : null,
-    footnote: spec.footnote ?? null,
+    footnote: spec.footnote ?? config?.video?.footnote ?? null,
     scenes,
   };
 }
@@ -118,9 +186,15 @@ export function main(argv) {
   if (!value("spec") || !value("out")) throw new RenderError("usage: render.mjs --spec <video.json> --out <file.mp4> [--profile <md>] [--work <dir>] [--studio <dir>] [--no-music]");
   const root = process.cwd();
   const spec = JSON.parse(readFileSync(value("spec"), "utf8"));
-  const errors = specErrors(spec, root);
-  if (errors.length) throw new RenderError(`invalid video spec:\n- ${errors.join("\n- ")}`);
   const config = value("profile") ? readProfileConfig(value("profile")) : null;
+  const errors = specErrors(spec, root, config);
+  for (const scene of spec.scenes ?? []) {
+    if (scene.kind !== "footage" || scene.crop || !scene.video || !existsSync(resolve(root, scene.video))) continue;
+    const info = videoInfo(resolve(root, scene.video));
+    const error = info?.width && info?.height ? footageFitError(`scene ${scene.id}`, info.width, info.height) : null;
+    if (error) errors.push(error);
+  }
+  if (errors.length) throw new RenderError(`invalid video spec:\n- ${errors.join("\n- ")}`);
   const work = resolve(value("work") ?? ".cache/video-shorts");
   const voiceDir = join(work, "voice", spec.id);
   const voice = existsSync(join(voiceDir, "voice.json")) ? JSON.parse(readFileSync(join(voiceDir, "voice.json"), "utf8")) : {};
@@ -136,6 +210,8 @@ export function main(argv) {
   const musicInfo = music ? (config ? musicEntry(config, resolve(root, music)) : null) : null;
   if (music && !config) throw new RenderError("music needs --profile so its license evidence can be checked");
   const props = buildProps(spec, { config, root, jobDir, jobPublic, voice, music });
+  const missingDisclaimer = disclaimerErrors(props, config);
+  if (missingDisclaimer.length) throw new RenderError(`invalid render props:\n- ${missingDisclaimer.join("\n- ")}`);
   const propsPath = join(work, `${spec.id}.props.json`);
   writeFileSync(propsPath, `${JSON.stringify(props, null, 2)}\n`);
   const out = resolve(value("out"));

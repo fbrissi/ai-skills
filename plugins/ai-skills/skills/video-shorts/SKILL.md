@@ -15,7 +15,7 @@ Script the scenes, generate the narration, render, watch the result, and hand th
 ## Inputs
 
 - **Brief**: the item's theme, claims (with sources), and call to action, from `social-content-plan` or the user.
-- **Profile**: default `docs/ai/social-content.md`: `brand`, `video.voice`, `video.length_scale`, `video.music`, `video.footnote`, and the Voice section (pronunciation).
+- **Profile**: default `docs/ai/social-content.md`: `brand`, `video.voice`, `video.length_scale`, `video.music`, `video.footnote`, `video.screen_disclaimer`, and the Voice section (pronunciation). When the profile's prose requires a line on product screens but `video.screen_disclaimer` is not set, stop and ask for it (in a non-interactive run, report it as a blocker); never type the line into the spec yourself.
 - **Screens**: real screenshots or recordings the project provides or captures (profile Sources), with fictitious data. Never generate a fake product UI with AI. Realistic AI footage (Google Flow/Veo clips) only when supplied by a person, as `footage` scenes with `"synthetic": true`; see the `flow-video-ad` skill to plan them (if it is not installed, ask for the finished clips).
 - **Requirements**: Node 22+, `ffmpeg` and `ffprobe`, Python with `piper-tts` (`PIPER_PYTHON`), and network for the first `npm ci` of the studio and the voice download.
 
@@ -23,7 +23,7 @@ Load [references/video-spec.md](references/video-spec.md) now for the spec forma
 
 ## 1. Script
 
-Write `<batch-dir>/specs/<item-id>.video.json`: a 1.5–2.5 s `hook`, two to four `screen` or `footage` scenes, an optional `statement`, and a `cta`. One short spoken sentence per scene (`voice`, shown as captions; `say` rewrites words only for pronunciation). Total 15–45 s; Facebook Reels must stay within 3–90 s, YouTube Shorts within 180 s. Run the `copy-guard` checker on the voice lines (`--text -`). If `copy-guard` is not installed, check them by hand for its rules: no em dashes, no "não é X, é Y" or "not X but Y", no engagement bait, no unsupported social proof, no result or savings promises.
+Write `<batch-dir>/specs/<item-id>.video.json`: a 1.5–2.5 s `hook`, two to four `screen` or `footage` scenes, an optional `statement`, and a `cta`. One short spoken sentence per scene (`voice`, shown as captions; `say` rewrites words only for pronunciation). Give each `screen` a `focus` box (and `pan_to`) with the frame's 1000:720 aspect that keeps whole UI elements inside, with a margin around any text: never put a box edge through a label, sidebar item, or button. Crop `footage` to 1000:720 too. Total 15–45 s; Facebook Reels must stay within 3–90 s, YouTube Shorts within 180 s. Run the `copy-guard` checker on the voice lines (`--text -`). If `copy-guard` is not installed, check them by hand for its rules: no em dashes, no "não é X, é Y" or "not X but Y", no engagement bait, no unsupported social proof, no result or savings promises.
 
 ## 2. Music
 
@@ -42,9 +42,9 @@ node <skill-dir>/scripts/voice.mjs --spec <spec> --profile docs/ai/social-conten
 node <skill-dir>/scripts/render.mjs --spec <spec> --profile docs/ai/social-content.md --out <batch-dir>/media/<item-id>.mp4
 ```
 
-`voice.mjs` downloads the Piper voice (default `pt_BR-faber-medium`) into `.cache/video-shorts/models`, writes one WAV per scene (silence trimmed, EQ, loudnorm −16 LUFS), and skips unchanged lines. `render.mjs` copies the studio template to `.cache/video-shorts/studio` (installing it once with `npm ci --ignore-scripts` from the bundled lockfile), renders 1080x1920 at 30 fps (H.264), normalizes the mix to −16 LUFS, and prints `{path, width, height, duration, synthetic_media, music}`. Add `.cache/` to `.gitignore`.
+`voice.mjs` downloads the Piper voice (default `pt_BR-faber-medium`) into `.cache/video-shorts/models`, writes one WAV per scene (silence trimmed, EQ, loudnorm −16 LUFS), and skips unchanged lines. `render.mjs` copies the studio template to `.cache/video-shorts/studio` (installing it once with `npm ci --ignore-scripts` from the bundled lockfile), renders 1080x1920 at 30 fps (H.264), normalizes the mix to −16 LUFS, and prints `{path, width, height, duration, synthetic_media, music}`. It draws `video.screen_disclaimer` under every `screen` scene and every `footage` scene that is not `synthetic`, and refuses to render when one lacks it, when the disclaimer does not fit one line, when a `focus` or `pan_to` box cannot be shown whole (the frame would cut its edges), or when footage is not cropped to the frame aspect. Add `.cache/` to `.gitignore`.
 
-Watch the video, or at least extract a frame per scene (`ffmpeg -ss <t> -i <mp4> -frames:v 1 <png>`) and look at each: captions inside the safe area, the right screen in focus, nothing cut. Fix the spec and render again.
+Watch the video, or at least extract a frame per scene (`ffmpeg -ss <t> -i <mp4> -frames:v 1 <png>`) and look at each: captions inside the safe area, the right screen in focus, the screen disclaimer under every product screen, and no text of the UI cut at the frame edges (labels, sidebar items, buttons). Fix the spec and render again.
 
 ## 4. Credits and manifest
 
