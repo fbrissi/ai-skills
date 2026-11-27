@@ -99,6 +99,8 @@ export async function insertCaptions({ fetchImpl, token }, videoId, path, langua
  * thumbnails.set works only after YouTube finishes processing the upload (Data API revision of 2026-11-03), so a
  * thumbnail that failed right after the upload is retried on later runs until it is set.
  */
+export const MAX_THUMBNAIL_ATTEMPTS = 5;
+
 export async function retryThumbnails(manifest, { manifestDir, manifestPath, api, out }) {
   for (const item of manifest.items) {
     const state = manifest.state?.[item.id];
@@ -108,7 +110,14 @@ export async function retryThumbnails(manifest, { manifestDir, manifestPath, api
       state.extra = { ...state.extra, pending_thumbnail: false, warnings: (state.extra.warnings ?? []).filter((warning) => !warning.startsWith("thumbnail:")) };
       out.write(`thumbnail set: ${item.id}\n`);
     } catch (error) {
-      out.write(`thumbnail still pending: ${item.id} (${error.message})\n`);
+      const attempts = (state.extra.thumbnail_attempts ?? 1) + 1;
+      if (attempts >= MAX_THUMBNAIL_ATTEMPTS) {
+        state.extra = { ...state.extra, pending_thumbnail: false, thumbnail_attempts: attempts, warnings: [...(state.extra.warnings ?? []).filter((warning) => !warning.startsWith("thumbnail:")), `thumbnail: gave up after ${attempts} attempts (${error.message}); set it in YouTube Studio`] };
+        out.write(`thumbnail gave up: ${item.id} after ${attempts} attempts (${error.message})\n`);
+      } else {
+        state.extra = { ...state.extra, thumbnail_attempts: attempts };
+        out.write(`thumbnail still pending: ${item.id} (${error.message})\n`);
+      }
     }
     saveManifest(manifestPath, manifest);
   }

@@ -26,12 +26,18 @@ function today(timeZone, now) {
   return new Date(now.getTime() + sign * (hours * 60 + minutes) * 60000).toISOString().slice(0, 10);
 }
 
+export const MAX_ATTEMPTS = 3;
+
+/** A failed item that used up its attempts is skipped by cron runs so it cannot block the queue (--item forces it). */
+export const gaveUp = (manifest, id) => manifest.state?.[id]?.status === "failed" && (manifest.state[id].attempts ?? 0) >= MAX_ATTEMPTS;
+
 /** Items due now, in manifest order: not done, and dated today or earlier (or publish_at passed when set). */
 export function dueItems(manifest, now = new Date(), { item = null } = {}) {
   const day = today(manifest.timezone, now);
   return manifest.items.filter((entry) => {
     if (isDone(manifest, entry.id)) return false;
     if (item) return entry.id === item;
+    if (gaveUp(manifest, entry.id)) return false;
     if (entry.publish_at) return Date.parse(entry.publish_at) <= now.getTime();
     return entry.date <= day;
   });
@@ -42,7 +48,13 @@ export function callsInLast24h(manifest, now) {
   return Object.values(manifest.state ?? {}).filter((entry) => now.getTime() - Date.parse(entry.at) < 24 * 3600 * 1000).reduce((sum, entry) => sum + (entry.extra?.api_calls ?? 0), 0);
 }
 
-/** Rough upper bound of calls an item needs (uploads, status polls, post, read-back). */
+/** Calls of earlier attempts in the last 24 hours plus this run's, so retries add up instead of replacing. */
+export function accumulatedCalls(previous, now, runCalls) {
+  const recent = previous?.at && now.getTime() - Date.parse(previous.at) < 24 * 3600 * 1000 ? previous.extra?.api_calls ?? 0 : 0;
+  return recent + runCalls;
+}
+
+/** Estimate of calls an item needs (uploads, a few status polls, post, read-back); the client enforces the real budget. */
 export function estimateCalls(item) {
   const images = item.media.filter((media) => media.kind === "image").length;
   const videos = item.media.filter((media) => media.kind === "video").length;
@@ -57,15 +69,29 @@ export function postContent(item, mediaUrns) {
   throw new PublishError(`${item.id}: unsupported type ${item.type}`);
 }
 
-async function findExisting(client, commentary) {
+const contentIds = (post) => [post.content?.media?.id, ...(post.content?.multiImage?.images ?? []).map((image) => image.id)].filter(Boolean);
+
+/**
+ * A recent Page post that is this item: same commentary, created after the attempt started (10 min of clock slack),
+ * and, when media was uploaded, carrying those media URNs, so an older post with the same text never matches.
+ */
+export function matchesAttempt(post, { commentary, previous }) {
+  if (post.commentary !== commentary) return false;
+  const since = previous?.at ? Date.parse(previous.at) - 10 * 60 * 1000 : 0;
+  if (post.createdAt && post.createdAt < since) return false;
+  const urns = previous?.extra?.media_urns ?? [];
+  return !urns.length || contentIds(post).some((id) => urns.includes(id));
+}
+
+async function findExisting(client, commentary, previous) {
   const posts = await client.recentPosts(20);
-  return posts.find((post) => post.commentary === commentary) ?? null;
+  return posts.find((post) => matchesAttempt(post, { commentary, previous })) ?? null;
 }
 
 async function publishOne(item, { client, manifestDir, language, previous, checkpoint, pollMs, timeoutMs }) {
   const commentary = littleText(composeText(item, "linkedin", language));
   if (previous?.status === "unknown") {
-    const existing = await findExisting(client, commentary);
+    const existing = await findExisting(client, commentary, previous);
     if (existing) return { remote_id: existing.id, url: postUrl(existing.id), extra: { resolved: "found by read-back" } };
   }
   let urns = previous?.status === "unknown" ? previous.extra?.media_urns ?? [] : [];
@@ -93,6 +119,7 @@ export async function publish(manifest, { manifestDir, manifestPath, client, exe
   const errors = validateManifest(manifest, { manifestDir, forPublish: execute, now }).filter((error) => !manifest.items.some((entry) => error.startsWith(`${entry.id}:`) && isDone(manifest, entry.id)));
   if (manifest.platform !== "linkedin") errors.unshift(`manifest platform is ${manifest.platform}, not linkedin`);
   if (errors.length) throw new PublishError(`invalid batch:\n- ${errors.join("\n- ")}`);
+  for (const entry of manifest.items) if (!item && gaveUp(manifest, entry.id)) out.write(`gave up after ${MAX_ATTEMPTS} failed attempts: ${entry.id} (${manifest.state[entry.id].error}); fix it and run with --item ${entry.id}\n`);
   const due = dueItems(manifest, now, { item }).slice(0, max);
   if (!due.length) {
     out.write("nothing due: every approved item is published or waits for its date\n");
@@ -111,20 +138,22 @@ export async function publish(manifest, { manifestDir, manifestPath, client, exe
     }
     const previous = manifest.state[entry.id];
     const before = client.calls;
+    client.maxCalls = client.calls + Math.min(callBudget - client.calls, dailyCalls - spentToday - client.calls);
+    const calls = () => accumulatedCalls(previous, now, client.calls - before);
     const checkpoint = (extra) => {
-      recordState(manifest, entry.id, { status: "unknown", error: "post sent; waiting for the response", ...extra, extra: { ...extra.extra, api_calls: client.calls - before } }, now);
+      recordState(manifest, entry.id, { status: "unknown", error: "post sent; waiting for the response", ...extra, extra: { ...extra.extra, api_calls: calls() } }, now);
       saveManifest(manifestPath, manifest);
     };
     try {
       const result = await publishOne(entry, { client, manifestDir, language: manifest.language, previous, checkpoint, pollMs, timeoutMs });
-      recordState(manifest, entry.id, { status: "published", publish_at: now.toISOString(), error: null, ...result, extra: { ...result.extra, api_calls: client.calls - before } }, now);
+      recordState(manifest, entry.id, { status: "published", publish_at: now.toISOString(), error: null, ...result, extra: { ...result.extra, api_calls: calls() } }, now);
       saveManifest(manifestPath, manifest);
       out.write(`published: ${entry.id} (${result.remote_id}) ${result.url}\n`);
       done.push(entry.id);
     } catch (error) {
       // Once the post was sent (unknown), only the read-back may decide; before that, errors are plain failures.
       const sent = manifest.state[entry.id]?.status === "unknown" && !error.definite;
-      recordState(manifest, entry.id, { status: sent ? "unknown" : "failed", error: error.message, extra: { ...(manifest.state[entry.id]?.extra ?? {}), api_calls: client.calls - before } }, now);
+      recordState(manifest, entry.id, { status: sent ? "unknown" : "failed", error: error.message, extra: { ...(manifest.state[entry.id]?.extra ?? {}), api_calls: calls() } }, now);
       saveManifest(manifestPath, manifest);
       throw new PublishError(`${entry.id}: ${error.message}`);
     }

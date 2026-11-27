@@ -43,7 +43,11 @@ The commentary uses LinkedIn's little text format: reserved characters are escap
 
 Before the final `POST /rest/posts` the item is saved as `unknown` with its media URNs. If that call gets no response (or a 5xx), the next run reads the Page's latest posts and marks the item published when one has the same commentary; otherwise it posts again with the media already uploaded, so a post never goes out twice. A 4xx answer is a refusal and is recorded as `failed`. Errors before the post are `failed` and retried by the next run.
 
-Calls: every request counts. A run stops (exit 0) before an item when the run budget or the 24-hour total recorded in this manifest (`state.<id>.extra.api_calls`) would pass the limit; other batches and tools share the app's limit, so lower `--daily-calls` when they run too.
+Calls: every request counts, media status polls included, and the client refuses a call once the run budget or the 24-hour limit is reached (the item is then `failed` before posting and retried by a later run). A run stops (exit 0) before an item whose estimated calls would pass the limit. The 24-hour total adds up the calls recorded in this manifest (`state.<id>.extra.api_calls`, retries included); other batches and tools share the app's limit, so lower `--daily-calls` when they run too.
+
+A `failed` item is retried by the next runs; after 3 failed attempts cron runs skip it (`gave up after 3 failed attempts`) so later items still go out. Fix it and publish it with `--item <id>`.
+
+The read-back only accepts a recent post with the same commentary, created after the attempt started, and carrying the attempt's media URNs, so an older post with the same text never counts.
 
 ## AI disclosure
 

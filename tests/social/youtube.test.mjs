@@ -138,3 +138,15 @@ test("an upload without a response is unknown and never re-uploaded without --re
   assert.equal(again.calls.length, 0);
   assert.match(out.text(), /needs a manual check: a/);
 });
+
+test("a pending thumbnail gives up after 5 attempts with a warning", async () => {
+  const { retryThumbnails } = await import("../../.rulesync/skills/youtube-publish/scripts/publish-youtube.mjs");
+  const s = setup([short("a", { thumbnail: "media/t.jpg" })]);
+  s.data.state.a = { status: "scheduled", remote_id: "vid1", at: NOW.toISOString(), extra: { pending_thumbnail: true, thumbnail_attempts: 4, warnings: ["thumbnail: x"] } };
+  const out = sink();
+  await retryThumbnails(s.data, { manifestDir: s.dir, manifestPath: s.path, api: { fetchImpl: youtube({ failThumb: true }), token: "t" }, out });
+  const extra = JSON.parse(readFileSync(s.path, "utf8")).state.a.extra;
+  assert.equal(extra.pending_thumbnail, false);
+  assert.match(extra.warnings[0], /gave up after 5 attempts/);
+  assert.match(out.text(), /thumbnail gave up: a/);
+});

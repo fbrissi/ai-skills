@@ -64,7 +64,7 @@ test("manifest check covers composed text and titles per item; CLI exits 1 on er
 });
 
 test("fear, urgency and official-endorsement claims are errors in pt-BR", () => {
-  for (const text of ["Evite multa: emita hoje.", "Você pode ser multado se atrasar.", "Prazo final chegando.", "Todas as empresas são obrigadas a usar.", "Sistema aprovado pela Receita Federal.", "Emissor credenciado pela SEFIN.", "Conformidade garantida."]) {
+  for (const text of ["Evite multa: emita hoje.", "Você pode ser multado se atrasar.", "Prazo final chegando.", "Últimos dias para aproveitar o desconto.", "Sistema aprovado pela Receita Federal.", "Emissor credenciado pela SEFIN.", "Conformidade garantida."]) {
     assert.ok(rules(text).includes("error:medo-urgencia"), text);
   }
   for (const text of ["Empresas podem ser multadas.", "Sua empresa pode levar multa.", "Vai levar multa.", "Evite uma multa.", "Última chance.", "Não perca o prazo."]) {
@@ -74,6 +74,12 @@ test("fear, urgency and official-endorsement claims are errors in pt-BR", () => 
     assert.ok(!rules(text).includes("error:medo-urgencia"), text);
   }
   assert.deepEqual(rules("O prazo do DAS vence em 21/12, segundo a Receita Federal."), []);
+  for (const text of ["O prazo final para entrega da DCTFWeb é 15 de março, segundo a Receita Federal.", "Nos últimos dias, a Receita publicou a nota técnica."]) {
+    assert.ok(!rules(text).includes("error:medo-urgencia"), text);
+  }
+  assert.ok(rules("Todas as empresas são obrigadas a usar.").includes("warn:obrigacao-geral"));
+  assert.ok(rules("A NFS-e nacional: todas as empresas estão obrigadas desde janeiro (fonte: gov.br).").every((rule) => !rule.startsWith("error:")));
+  assert.ok(!rules("Nem todas as empresas são obrigadas ao padrão nacional.").includes("warn:obrigacao-geral"));
 });
 
 test("hashtag caps: Instagram allows 5 whatever the profile says; per-platform maps work", async () => {

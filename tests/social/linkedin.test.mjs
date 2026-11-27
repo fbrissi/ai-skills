@@ -32,6 +32,12 @@ function api({ postFails = null, posts = [] } = {}) {
 const client = (fetchImpl) => new LinkedInClient({ token: "li-token", version: "202610", fetchImpl, organizationId: "42" });
 const run = (s, fetchImpl, extra = {}) => publish(s.data, { manifestDir: s.dir, manifestPath: s.path, client: client(fetchImpl), execute: true, now: NOW, pollMs: 1, timeoutMs: 1000, out: sink(), ...extra });
 
+test("littleText keeps the escape of a reserved character right after a hashtag", () => {
+  assert.equal(littleText("Veja #Tag)"), "Veja {hashtag|\\#|Tag}\\)");
+  assert.equal(littleText("#Tag* x"), "{hashtag|\\#|Tag}\\* x");
+  assert.equal(littleText("#a#b"), "{hashtag|\\#|a}\\#b");
+});
+
 test("littleText escapes reserved characters and turns #tags into hashtag templates", () => {
   assert.equal(littleText("Veja (agora) https://x.com/?utm_source=linkedin #NFSe_Nacional e @fulano"), "Veja \\(agora\\) https://x.com/?utm\\_source=linkedin {hashtag|\\#|NFSe_Nacional} e \\@fulano");
 });
@@ -92,7 +98,7 @@ test("a lost post response is resolved by reading back the Page's posts, never p
   const saved = JSON.parse(readFileSync(s.path, "utf8"));
   assert.equal(saved.state.a.status, "unknown");
   assert.deepEqual(saved.state.a.extra.media_urns, ["urn:li:image:I1"]);
-  const found = api({ posts: [{ id: "urn:li:share:9", commentary: "Fechou o mês? {hashtag|\\#|NFSe}" }] });
+  const found = api({ posts: [{ id: "urn:li:share:8", commentary: "Fechou o mês? {hashtag|\\#|NFSe}", content: { media: { id: "urn:li:image:OLDER" } } }, { id: "urn:li:share:9", commentary: "Fechou o mês? {hashtag|\\#|NFSe}", content: { media: { id: "urn:li:image:I1" } } }] });
   assert.deepEqual(await run({ ...s, data: saved }, found), ["a"]);
   assert.ok(!found.calls.some((call) => call.method === "PUT" || (call.url.endsWith("/rest/posts") && call.method === "POST")));
   assert.equal(JSON.parse(readFileSync(s.path, "utf8")).state.a.remote_id, "urn:li:share:9");
@@ -146,4 +152,46 @@ test("credentials: env names, token refresh, rotation warning without values", a
   await main([s.path, "--execute", "--now", NOW.toISOString(), "--poll-seconds", "0"], { env: { LINKEDIN_ORGANIZATION_ID: "42", LINKEDIN_CLIENT_ID: "c", LINKEDIN_CLIENT_SECRET: "s", LINKEDIN_REFRESH_TOKEN: "old" }, fetchImpl: all, out });
   assert.match(out.text(), /new refresh token; update LINKEDIN_REFRESH_TOKEN \(value not printed\)/);
   assert.ok(!out.text().includes("new-refresh-secret"));
+});
+
+test("the call budget is enforced on every request, media polling included", async () => {
+  const s = setup([li("a", "2026-11-27")]);
+  let polls = 0;
+  const base = api();
+  const slow = async (url, init) => (/\/rest\/images\/urn/.test(String(url)) ? (polls += 1, json({ status: "PROCESSING" })) : base(url, init));
+  await assert.rejects(publish(s.data, { manifestDir: s.dir, manifestPath: s.path, client: client(slow), execute: true, now: NOW, pollMs: 0, timeoutMs: 60000, callBudget: 12, out: sink() }), /call budget exhausted after 12 calls/);
+  assert.ok(polls < 12);
+  const state = JSON.parse(readFileSync(s.path, "utf8")).state.a;
+  assert.equal(state.status, "failed");
+  assert.equal(state.extra.api_calls, 12);
+});
+
+test("a failed item stops being retried by cron after 3 attempts, so later items go out", async () => {
+  const s = setup([li("a", "2026-11-26"), li("b", "2026-11-27")]);
+  s.data.state.a = { status: "failed", at: NOW.toISOString(), attempts: 3, error: "422 bad media" };
+  const out = sink();
+  assert.deepEqual(await run(s, api(), { out }), ["b"]);
+  assert.match(out.text(), /gave up after 3 failed attempts: a \(422 bad media\); fix it and run with --item a/);
+  assert.deepEqual(dueItems(s.data, NOW, { item: "a" }).map((entry) => entry.id), ["a"]);
+});
+
+test("retries add their API calls to the 24-hour total instead of replacing them", async () => {
+  const { accumulatedCalls } = await import("../../.rulesync/skills/linkedin-publish/scripts/publish-linkedin.mjs");
+  assert.equal(accumulatedCalls({ at: NOW.toISOString(), extra: { api_calls: 7 } }, NOW, 5), 12);
+  assert.equal(accumulatedCalls({ at: "2026-11-25T00:00:00Z", extra: { api_calls: 7 } }, NOW, 5), 5);
+});
+
+test("read-back ignores an older post with the same text", async () => {
+  const { matchesAttempt } = await import("../../.rulesync/skills/linkedin-publish/scripts/publish-linkedin.mjs");
+  const previous = { at: NOW.toISOString(), extra: { media_urns: ["urn:li:image:I1"] } };
+  assert.equal(matchesAttempt({ commentary: "x", createdAt: NOW.getTime() - 2 * 3600 * 1000, content: { media: { id: "urn:li:image:I1" } } }, { commentary: "x", previous }), false);
+  assert.equal(matchesAttempt({ commentary: "x", createdAt: NOW.getTime() + 1000, content: { media: { id: "urn:li:image:OTHER" } } }, { commentary: "x", previous }), false);
+  assert.equal(matchesAttempt({ commentary: "x", createdAt: NOW.getTime() + 1000, content: { multiImage: { images: [{ id: "urn:li:image:I1" }] } } }, { commentary: "x", previous }), true);
+});
+
+test("a video part without an ETag fails clearly", async () => {
+  const video = li("v", "2026-11-27", { type: "video", media: [{ path: "media/v.mp4", kind: "video", width: 1080, height: 1920, duration: 20 }] });
+  const base = api();
+  const noEtag = async (url, init) => (String(url).startsWith("https://upload.example/v") ? new Response("", { status: 200 }) : base(url, init));
+  await assert.rejects(run(setup([video]), noEtag), /upload returned no ETag/);
 });

@@ -45,7 +45,7 @@ export async function accessToken({ clientId, clientSecret, refreshToken }, fetc
 export function littleText(text) {
   return String(text)
     .replace(RESERVED, (char) => `\\${char}`)
-    .replace(/(^|\s)\\#([\p{L}\p{N}_\\]+)/gu, (_, space, tag) => `${space}{hashtag|\\#|${tag.replace(/\\_/g, "_")}}`);
+    .replace(/(^|\s)\\#((?:[\p{L}\p{N}]|\\_)+)/gu, (_, space, tag) => `${space}{hashtag|\\#|${tag.replace(/\\_/g, "_")}}`);
 }
 
 export class LinkedInClient {
@@ -62,6 +62,12 @@ export class LinkedInClient {
   }
 
   async request(method, url, { body, headers = {}, raw = false } = {}) {
+    // The budget is checked on every call, media status polls included, before anything is sent.
+    if (this.maxCalls !== undefined && this.calls >= this.maxCalls) {
+      const error = new LinkedInError(`call budget exhausted after ${this.calls} calls; the item waits for the next run`);
+      error.definite = true;
+      throw error;
+    }
     this.calls += 1;
     let response;
     try {
@@ -103,7 +109,9 @@ export class LinkedInClient {
     const etags = [];
     for (const part of uploadInstructions) {
       const response = await this.request("PUT", part.uploadUrl, { body: bytes.subarray(part.firstByte, part.lastByte + 1), headers: { "content-type": "application/octet-stream" }, raw: true });
-      etags.push(response.headers.get("etag"));
+      const etag = response.headers.get("etag");
+      if (!etag) throw new LinkedInError(`video part ${part.firstByte}-${part.lastByte} upload returned no ETag`);
+      etags.push(etag);
     }
     await this.json("POST", "/videos?action=finalizeUpload", { finalizeUploadRequest: { video, uploadToken, uploadedPartIds: etags } });
     return video;

@@ -35,7 +35,7 @@ Limits: Shorts are vertical or square and at most 180 s (validated). The run sto
 - Every upload declares `paidProductPlacementDetails.hasPaidProductPlacement` (from `options.paid_product_placement`, default false): since the 2026-11-16 Data API revision an omitted field means "not declared".
 - `containsSyntheticMedia` follows `synthetic_media` (realistic AI visuals). A synthetic narration voice that does not imitate a real person does not need it.
 - A Short with music must stay at most 60 s (validated): a longer Short with a Content ID claim is blocked worldwide.
-- `thumbnails.set` works only after processing finishes (2026-11-03 revision). A thumbnail that fails right after the upload is kept as `state.<id>.extra.pending_thumbnail` and retried on each later run until it is set; the video is never uploaded again.
+- `thumbnails.set` works only after processing finishes (2026-11-03 revision). A thumbnail that fails right after the upload is kept as `state.<id>.extra.pending_thumbnail` and retried on later runs (at most 5 attempts in all, then a warning to set it in YouTube Studio); the video is never uploaded again.
 
 ## Platform setup
 

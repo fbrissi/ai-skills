@@ -39,7 +39,7 @@ It checks the batch first (`validate --for-publish`): approval, the 10-minute to
 
 - Meta labels AI content: when an item has `ai_audio` (TTS narration) or `synthetic_media` (realistic AI footage), the Reel's `finish` call sends `is_ai_generated=true`.
 - Reels schedule up to 29 days ahead; feed posts up to 30 days (validated).
-- After a Reel upload the script reads its `copyright_check_information`; matches (or a failed read) go to `state.<id>.extra.warnings`, never failing the publish. Check them in Meta Business Suite before the Reel goes out.
+- Right after a Reel upload the script reads its `copyright_check_information` once (the check is often still running then, so no warning is no guarantee); matches (or a failed read) go to `state.<id>.extra.warnings`, never failing the publish. Check them in Meta Business Suite before the Reel goes out.
 
 ## Platform setup
 
