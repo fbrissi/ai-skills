@@ -79,7 +79,7 @@ A deterministic workflow handles `/aprove` (the command is `review.commands.appr
 1. `node review-batch.mjs approve --issue <n> --comment-id <comment id> --out <dir>/manifest.json [--profile <md>]`. It fails unless the issue is open and is a review issue, the comment starts with the approve command, its author has write, maintain, or admin access and is not a bot, the comment is newer than the last revision comment (only revision comments from bots or writers count), and the body header, marker, and last revision comment agree on the revision. It writes the manifest with `approval` stamped with that revision.
 2. `node review-batch.mjs fetch <dir>/manifest.json` (downloads media from Drive and checks checksums).
 3. Facebook and YouTube: run the publisher with `--execute` right away (they schedule natively). Instagram: write the approved manifest to the issue body and let the Instagram cron run `publish-instagram.mjs --execute`, after restoring it with `marker` and `fetch`.
-4. Persist the state after every publisher run, **including failed runs** (`if: always()`): `review-batch.mjs issue-body <manifest> | gh issue edit <n> --body-file -`. Publishers save each success before moving on, so dropping the manifest of a failed run would publish the earlier items again on the next run. Close the issue when every item is `scheduled` or `published`.
+4. Persist the state after every publisher run, **including failed runs** (`if: always()`): `review-batch.mjs issue-body <manifest> | gh issue edit <n> --body-file -`. Publishers save each success before moving on, so dropping the manifest of a failed run would publish the earlier items again on the next run. Close the issue when every item is `scheduled` or `published`, or was reported `stale` (stale items get no state; move them to a new batch).
 5. Serialize everything that reads and writes one issue: a `concurrency` group per issue for the approve, adjust, and Instagram cron jobs, with `cancel-in-progress: false`. The last writer of the body wins, so two overlapping runs could otherwise lose each other's state.
 
 ```yaml
@@ -91,7 +91,7 @@ steps:
   - run: node "$SKILLS/social-review/scripts/review-batch.mjs" fetch batch/manifest.json
   - run: node "$SKILLS/youtube-publish/scripts/publish-youtube.mjs" batch/manifest.json --execute
   - if: always() && hashFiles('batch/manifest.json') != ''
-    run: node "$SKILLS/social-review/scripts/review-batch.mjs" issue-body batch/manifest.json | gh issue edit "$ISSUE" --body-file -
+    run: node "$SKILLS/social-review/scripts/review-batch.mjs" issue-body batch/manifest.json --profile docs/ai/social-content.md | gh issue edit "$ISSUE" --body-file -
 ```
 
 Items in `unknown` state (the final publish call got no response) need a person: the publisher prints `needs a manual check`; rerun with `--retry <id>` only after confirming the item is not live. Items whose `publish_at` passed before approval are skipped as `stale` and belong in a new batch.

@@ -160,7 +160,9 @@ export async function publish(manifest, { manifestDir, manifestPath, client, igU
         out.write(`published: ${target.id} (${result.remote_id})${result.url ? ` ${result.url}` : ""}\n`);
         done.push(target.id);
       } catch (error) {
-        recordState(manifest, target.id, { status: error instanceof UncertainError ? "unknown" : "failed", error: error.message }, now);
+        // Once a container is saved (status unknown), only its status_code may decide; never downgrade to failed.
+        const containerSaved = manifest.state[target.id]?.status === "unknown" && manifest.state[target.id]?.extra?.creation_id;
+        recordState(manifest, target.id, { status: containerSaved || error instanceof UncertainError ? "unknown" : "failed", error: error.message }, now);
         saveManifest(manifestPath, manifest);
         throw new PublishError(`${target.id}: ${error.message}`);
       }

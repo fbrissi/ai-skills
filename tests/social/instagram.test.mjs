@@ -161,3 +161,25 @@ test("an unknown item whose container is still FINISHED is published with the sa
   assert.ok(!fetchImpl.calls.some((call) => call.method === "PUT"));
   assert.equal(JSON.parse(readFileSync(setupResult.path, "utf8")).state.p1.remote_id, "m-c9");
 });
+
+test("an error while checking a saved container keeps the item unknown, so it is never uploaded again", async () => {
+  const setupResult = setup([ig("p1", "2026-11-27")]);
+  setupResult.data.state.p1 = { status: "unknown", at: NOW.toISOString(), media_urls: ["u"], extra: { creation_id: "c9" } };
+  const flaky = fakeFetch([
+    [(url) => url.includes("/content_publishing_limit"), () => ({ data: [{ quota_usage: 0, config: { quota_total: 100 } }] })],
+    [(url) => url.includes("/c9?fields=status_code"), () => new Response(JSON.stringify({ error: { message: "temporarily unavailable", code: 2 } }), { status: 503 })],
+  ]);
+  await assert.rejects(run(setupResult, flaky), /temporarily unavailable/);
+  const saved = JSON.parse(readFileSync(setupResult.path, "utf8"));
+  assert.equal(saved.state.p1.status, "unknown");
+  assert.equal(saved.state.p1.extra.creation_id, "c9");
+  assert.ok(!flaky.calls.some((call) => call.method === "PUT"));
+});
+
+test("an HTTP error from media_publish after the container is saved keeps it unknown", async () => {
+  const setupResult = setup([ig("p1", "2026-11-27")]);
+  const base = graph();
+  const failing = async (url, init) => (String(url).endsWith("/ig1/media_publish") ? new Response(JSON.stringify({ error: { message: "server error", code: 1 } }), { status: 500 }) : base(url, init));
+  await assert.rejects(run(setupResult, failing), /server error/);
+  assert.equal(JSON.parse(readFileSync(setupResult.path, "utf8")).state.p1.status, "unknown");
+});
