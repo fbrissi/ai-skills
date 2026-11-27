@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // Renders a 9:16 Short/Reel from a video spec with the bundled Remotion studio, then normalizes the mix to
 // -16 LUFS integrated (two-pass ffmpeg loudnorm, video stream copied). Run voice.mjs first.
-// Every product screen gets the profile's video.screen_disclaimer under it; the render stops when one lacks it.
+// When the profile sets video.screen_disclaimer, every product screen gets it under it and the render stops when one
+// lacks it. Without it (opt-in) product screens render bare and the render warns.
 // Usage: render.mjs --spec <video.json> --out <file.mp4> [--profile <profile.md>] [--work .cache/video-shorts]
 //        [--studio <dir with node_modules>] [--no-music]
 // Prints {path, width, height, duration, synthetic_media, ai_audio, music} (music: the manifest entry with license
@@ -131,7 +132,13 @@ export function normalizeLoudness(input, output) {
   execFileSync("ffmpeg", ["-v", "error", "-y", "-i", input, "-c:v", "copy", "-af", second, "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-movflags", "+faststart", output]);
 }
 
-/** Every product screen in the render props must carry the profile's disclaimer, exactly. */
+/** Product screens rendered without any disclaimer because the profile sets none (opt-in), by scene id. */
+export function undisclaimedScreens(props, config) {
+  if (screenDisclaimer(config)) return [];
+  return props.scenes.filter((scene) => showsProductScreen(scene)).map((scene) => scene.id);
+}
+
+/** When the profile sets a disclaimer, every product screen in the render props must carry it, exactly. */
 export function disclaimerErrors(props, config) {
   const required = screenDisclaimer(config);
   if (!required) return [];
@@ -212,6 +219,8 @@ export function main(argv) {
   const props = buildProps(spec, { config, root, jobDir, jobPublic, voice, music });
   const missingDisclaimer = disclaimerErrors(props, config);
   if (missingDisclaimer.length) throw new RenderError(`invalid render props:\n- ${missingDisclaimer.join("\n- ")}`);
+  const bareScreens = undisclaimedScreens(props, config);
+  if (bareScreens.length) process.stderr.write(`warning: ${bareScreens.join(", ")} show product screens and the profile sets no video.screen_disclaimer\n`);
   const propsPath = join(work, `${spec.id}.props.json`);
   writeFileSync(propsPath, `${JSON.stringify(props, null, 2)}\n`);
   const out = resolve(value("out"));

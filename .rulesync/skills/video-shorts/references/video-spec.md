@@ -36,7 +36,7 @@ A JSON file per video. Paths are relative to the repository root (the directory 
 
 ## Screen disclaimer
 
-The profile's `video.screen_disclaimer` (for example "Alíquotas e tributação: informadas por você ou pelo seu contador.") is drawn under the screen frame of every `screen` scene and every `footage` scene without `"synthetic": true`. It comes only from the profile: the spec has no field for it, and `render.mjs` stops when a product screen would render without it or when it is longer than 80 characters. `footnote` falls back to the profile's `video.footnote`.
+The profile's `video.screen_disclaimer` (for example "Alíquotas e tributação: informadas por você ou pelo seu contador.") is drawn under the screen frame of every `screen` scene and every `footage` scene without `"synthetic": true`. It comes only from the profile: the spec has no field for it, and `render.mjs` stops when a product screen would render without it or when it is longer than 80 characters. The key is opt-in: a profile without it renders product screens bare, and `render.mjs` prints a warning naming those scenes. `footnote` falls back to the profile's `video.footnote`.
 
 ## Zoom and crop
 

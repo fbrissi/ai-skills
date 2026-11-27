@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { credits, findTrack } from "../../.rulesync/skills/video-shorts/scripts/credits.mjs";
-import { buildProps, disclaimerErrors, footageFitError, specErrors } from "../../.rulesync/skills/video-shorts/scripts/render.mjs";
+import { buildProps, disclaimerErrors, footageFitError, specErrors, undisclaimedScreens } from "../../.rulesync/skills/video-shorts/scripts/render.mjs";
 import { sceneTiming } from "../../.rulesync/skills/video-shorts/scripts/timing.mjs";
 import { sceneKey, voiceSettings } from "../../.rulesync/skills/video-shorts/scripts/voice.mjs";
 import { join } from "node:path";
@@ -99,4 +99,12 @@ test("footage must be cropped to the frame aspect, or the frame cuts its sides",
   assert.deepEqual(specErrors({ id: "v", scenes: [{ id: "f", kind: "footage", video: "rec.mp4", crop: "1000:720:0:0" }] }, root), []);
   assert.deepEqual(specErrors({ id: "v", scenes: [{ id: "f", kind: "footage", video: "rec.mp4", crop: "1920:1080:0:0" }] }, root), ["scene f: footage 1920x1080 is cut to the 1000:720 screen frame (22% of its width is lost); crop it to that aspect (for example 1500:1080:x:y)"]);
   assert.equal(footageFitError("f", 1386, 1000), null);
+});
+
+test("without a profile disclaimer, product screens render bare and are reported for a warning", () => {
+  const props = { scenes: [{ id: "hook", kind: "hook" }, { id: "tela", kind: "screen" }, { id: "rec", kind: "footage" }, { id: "fake", kind: "footage", synthetic: true }] };
+  assert.deepEqual(disclaimerErrors(props, { video: {} }), []);
+  assert.deepEqual(undisclaimedScreens(props, { video: {} }), ["tela", "rec"]);
+  assert.deepEqual(undisclaimedScreens(props, null), ["tela", "rec"]);
+  assert.deepEqual(undisclaimedScreens(props, screenProfile), []);
 });
