@@ -95,3 +95,19 @@ test("refresh token exchange sends the OAuth fields and hides secrets in errors"
   const bad = fakeFetch([[() => true, () => json({ error: "invalid_grant", error_description: "Token has been expired or revoked." }, 400)]]);
   await assert.rejects(accessToken({ clientId: "id", clientSecret: "sec", refreshToken: "rt-secret" }, bad), (error) => /invalid_grant/.test(error.message) && !error.message.includes("rt-secret"));
 });
+
+test("an upload without a response is unknown and never re-uploaded without --retry", async () => {
+  const s = setup([short("a")]);
+  const fetchImpl = fakeFetch([
+    [(url) => url.includes("uploadType=resumable"), () => new Response("", { status: 200, headers: { location: "https://upload.example/session" } })],
+    [(url) => url === "https://upload.example/session", () => { throw new Error("ECONNRESET"); }],
+  ]);
+  await assert.rejects(run(s, fetchImpl), /no response/);
+  const saved = JSON.parse(readFileSync(s.path, "utf8"));
+  assert.equal(saved.state.a.status, "unknown");
+  const again = youtube();
+  const out = sink();
+  await run({ ...s, data: saved }, again, { out });
+  assert.equal(again.calls.length, 0);
+  assert.match(out.text(), /needs a manual check: a/);
+});

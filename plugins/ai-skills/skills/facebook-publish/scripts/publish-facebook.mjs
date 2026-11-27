@@ -2,13 +2,14 @@
 // Deterministic Facebook Page publisher for an approved social manifest (no LLM decisions).
 // Schedules posts, photos, multi-photo posts and Reels through the Graph API, records each result in the
 // manifest's state (idempotent: a re-run skips what is already scheduled or published), and never prints tokens.
-// Usage: publish-facebook.mjs <manifest.json> [--execute] [--now ISO] [--only <id>]
+// Usage: publish-facebook.mjs <manifest.json> [--execute] [--now ISO] [--only <id>] [--retry <id,id>]
+// A final call without a response leaves the item "unknown" (it may be live): it is skipped until --retry names it.
 // Without --execute it validates and prints what it would do. Env: FACEBOOK_PAGE_ID,
 // FACEBOOK_PAGE_ACCESS_TOKEN (a user token is exchanged for the Page token), FACEBOOK_GRAPH_VERSION.
 import { readFileSync, statSync } from "node:fs";
 import { dirname, extname, resolve } from "node:path";
 import { GraphClient, GraphError, graphEnv } from "./graph.mjs";
-import { composeText, isDone, isMain, loadManifest, recordState, resolveMediaPath, saveManifest, validateManifest } from "./social-manifest.mjs";
+import { composeText, finalCall, isDone, isMain, loadManifest, pendingItems, recordState, reportBlocked, resolveMediaPath, saveManifest, UncertainError, validateManifest } from "./social-manifest.mjs";
 
 const IMAGE_TYPES = { ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg" };
 const RUPLOAD = "https://rupload.facebook.com/video-upload";
@@ -44,14 +45,14 @@ async function publishReel(client, step) {
     body: readFileSync(step.video),
     headers: { authorization: `OAuth ${client.token}`, offset: "0", file_size: String(size), "content-type": "application/octet-stream" },
   });
-  const finish = await client.post(step.path, {
+  const finish = await finalCall(() => client.post(step.path, {
     upload_phase: "finish",
     video_id: start.video_id,
     video_state: step.scheduled ? "SCHEDULED" : "PUBLISHED",
     scheduled_publish_time: step.publishTime,
     description: step.description,
     title: step.title,
-  });
+  }));
   if (finish.success === false) throw new GraphError(`Reel ${start.video_id} was not accepted`);
   return { remote_id: start.video_id, url: `https://www.facebook.com/reel/${start.video_id}` };
 }
@@ -62,18 +63,19 @@ async function publishFeed(client, step) {
     const uploaded = await client.postFile(photo.path, photo.fields, photo.file);
     fields[`attached_media[${index}]`] = JSON.stringify({ media_fbid: uploaded.id });
   }
-  const response = await client.post(step.path, fields);
+  const response = await finalCall(() => client.post(step.path, fields));
   const id = response.post_id ?? response.id;
   return { remote_id: id, url: id ? `https://www.facebook.com/${id}` : null };
 }
 
-export async function publish(manifest, { manifestDir, manifestPath, client, pageId, execute, now = new Date(), only = null, out = process.stdout }) {
-  const pending = manifest.items.filter((item) => !isDone(manifest, item.id) && (!only || item.id === only));
+export async function publish(manifest, { manifestDir, manifestPath, client, pageId, execute, now = new Date(), only = null, retry = [], out = process.stdout }) {
+  const pending = pendingItems(manifest, { only, retry });
   const errors = validateManifest(manifest, { manifestDir, forPublish: execute, now }).filter((error) => !manifest.items.some((entry) => error.startsWith(`${entry.id}:`) && !pending.includes(entry)));
   if (manifest.platform !== "facebook") errors.unshift(`manifest platform is ${manifest.platform}, not facebook`);
   if (errors.length) throw new PublishError(`invalid batch:\n- ${errors.join("\n- ")}`);
 
   for (const item of manifest.items) if (isDone(manifest, item.id)) out.write(`already ${manifest.state[item.id].status}: ${item.id} (${manifest.state[item.id].remote_id})\n`);
+  reportBlocked(manifest, out, retry);
   for (const item of pending) {
     const step = plan(item, { pageId, manifestDir });
     const when = item.scheduled ? `at ${item.publish_at}` : "now";
@@ -87,7 +89,7 @@ export async function publish(manifest, { manifestDir, manifestPath, client, pag
       saveManifest(manifestPath, manifest);
       out.write(`${item.scheduled ? "scheduled" : "published"}: ${item.id} ${when} (${result.remote_id})\n`);
     } catch (error) {
-      recordState(manifest, item.id, { status: "failed", error: error.message }, now);
+      recordState(manifest, item.id, { status: error instanceof UncertainError ? "unknown" : "failed", error: error.message }, now);
       saveManifest(manifestPath, manifest);
       throw new PublishError(`${item.id}: ${error.message}`);
     }
@@ -99,7 +101,8 @@ export async function main(argv, { env = process.env, fetchImpl = fetch, out = p
   const execute = argv.includes("--execute");
   const nowIndex = argv.indexOf("--now");
   const onlyIndex = argv.indexOf("--only");
-  const manifestPath = argv.find((arg, index) => !arg.startsWith("--") && argv[index - 1] !== "--now" && argv[index - 1] !== "--only");
+  const retryIndex = argv.indexOf("--retry");
+  const manifestPath = argv.find((arg, index) => !arg.startsWith("--") && !["--now", "--only", "--retry"].includes(argv[index - 1]));
   if (!manifestPath) throw new PublishError("usage: publish-facebook.mjs <manifest.json> [--execute] [--now ISO] [--only <id>]");
   const { pageId, token, version } = graphEnv(env);
   if (execute && (!pageId || !token)) throw new PublishError("set FACEBOOK_PAGE_ID and FACEBOOK_PAGE_ACCESS_TOKEN");
@@ -113,6 +116,7 @@ export async function main(argv, { env = process.env, fetchImpl = fetch, out = p
     execute,
     now: nowIndex >= 0 ? new Date(argv[nowIndex + 1]) : new Date(),
     only: onlyIndex >= 0 ? argv[onlyIndex + 1] : null,
+    retry: retryIndex >= 0 ? String(argv[retryIndex + 1] ?? "").split(",").filter(Boolean) : [],
     out,
   });
 }

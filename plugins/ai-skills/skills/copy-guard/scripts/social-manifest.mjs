@@ -361,6 +361,34 @@ export function isDone(manifest, id) {
   return ["scheduled", "published", "skipped"].includes(manifest.state?.[id]?.status);
 }
 
+/** The final publish call got no response: the item may be live, so it is never retried without a check. */
+export class UncertainError extends Error {}
+
+export function needsCheck(manifest, id) {
+  return manifest.state?.[id]?.status === "unknown";
+}
+
+/** Items to publish: not done, and not waiting for a manual check unless listed in retry. */
+export function pendingItems(manifest, { only = null, retry = [] } = {}) {
+  return manifest.items.filter((item) => !isDone(manifest, item.id) && (!needsCheck(manifest, item.id) || retry.includes(item.id)) && (!only || item.id === only));
+}
+
+export function reportBlocked(manifest, out, retry = []) {
+  for (const item of manifest.items) {
+    if (needsCheck(manifest, item.id) && !retry.includes(item.id)) out.write(`needs a manual check: ${item.id} may already be live (${manifest.state[item.id].error ?? "no response"}); confirm on the platform, then rerun with --retry ${item.id} if it is not\n`);
+  }
+}
+
+/** Runs the final, non-idempotent call: a network failure (no HTTP response) becomes an UncertainError. */
+export async function finalCall(run) {
+  try {
+    return await run();
+  } catch (error) {
+    if (error.network) throw new UncertainError(error.message);
+    throw error;
+  }
+}
+
 // ---------- profile ----------
 
 /** The JSON object in the first ```json block under the profile's "## Parameters" heading. */

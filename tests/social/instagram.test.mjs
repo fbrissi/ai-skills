@@ -127,3 +127,36 @@ test("SigV4 matches the AWS CLI (botocore) for the same request", () => {
   const signed = signPut(config, "marketing/a b.jpg", Buffer.from("hello"), "image/jpeg", new Date("2026-11-27T05:10:09Z"));
   assert.match(signed.headers.authorization, /Signature=6a76382157434057b5dd0653e32c8ff003bfe97b6369a592cf2fa1e992f0bb1b$/);
 });
+
+test("a lost media_publish response is resolved from the saved container, never published twice", async () => {
+  const setupResult = setup([ig("p1", "2026-11-27")]);
+  const lost = graph();
+  const original = lost;
+  const failing = async (url, init) => {
+    if (String(url).endsWith("/ig1/media_publish")) throw new Error("ETIMEDOUT");
+    return original(url, init);
+  };
+  await assert.rejects(run(setupResult, failing), /network error/);
+  const saved = JSON.parse(readFileSync(setupResult.path, "utf8"));
+  assert.equal(saved.state.p1.status, "unknown");
+  assert.equal(saved.state.p1.extra.creation_id, "c1");
+
+  const live = fakeFetch([[(url) => url.includes("/c1?fields=status_code"), () => ({ status_code: "PUBLISHED" })], [(url) => url.includes("/content_publishing_limit"), () => ({ data: [{ quota_usage: 0, config: { quota_total: 100 } }] })]]);
+  assert.deepEqual(await run({ ...setupResult, data: saved }, live), ["p1"]);
+  assert.ok(!live.calls.some((call) => call.method === "PUT" || call.url.endsWith("/media_publish")));
+  assert.equal(JSON.parse(readFileSync(setupResult.path, "utf8")).state.p1.status, "published");
+});
+
+test("an unknown item whose container is still FINISHED is published with the same container", async () => {
+  const setupResult = setup([ig("p1", "2026-11-27")]);
+  setupResult.data.state.p1 = { status: "unknown", at: NOW.toISOString(), media_urls: ["u"], extra: { creation_id: "c9" } };
+  const fetchImpl = fakeFetch([
+    [(url) => url.includes("/content_publishing_limit"), () => ({ data: [{ quota_usage: 0, config: { quota_total: 100 } }] })],
+    [(url) => url.includes("/c9?fields=status_code"), () => ({ status_code: "FINISHED" })],
+    [(url) => url.endsWith("/ig1/media_publish"), (_, call) => ({ id: `m-${call.body.get("creation_id")}` })],
+    [(url) => url.includes("/m-c9?fields=permalink"), () => ({ permalink: "https://instagram.com/p/x" })],
+  ]);
+  await run(setupResult, fetchImpl);
+  assert.ok(!fetchImpl.calls.some((call) => call.method === "PUT"));
+  assert.equal(JSON.parse(readFileSync(setupResult.path, "utf8")).state.p1.remote_id, "m-c9");
+});

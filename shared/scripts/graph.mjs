@@ -44,7 +44,9 @@ export class GraphClient {
     try {
       response = await this.fetch(url.toString(), init);
     } catch (error) {
-      throw new GraphError(`Graph API network error on ${method} ${url.pathname}: ${redact(error.message, [this.token, this.originalToken])}`);
+      const failure = new GraphError(`Graph API network error on ${method} ${url.pathname}: ${redact(error.message, [this.token, this.originalToken])}`);
+      failure.network = true;
+      throw failure;
     }
     const text = await response.text();
     let data = {};

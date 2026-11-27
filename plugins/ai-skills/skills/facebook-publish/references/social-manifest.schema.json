@@ -442,8 +442,10 @@
             "scheduled",
             "published",
             "failed",
+            "unknown",
             "skipped"
-          ]
+          ],
+          "description": "unknown: the final publish call got no response, so the item may be live; publishers never retry it on their own (Instagram checks its container)."
         },
         "remote_id": {
           "type": [

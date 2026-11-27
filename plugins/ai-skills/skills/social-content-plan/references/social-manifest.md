@@ -25,7 +25,7 @@ Every path in the manifest is relative to its directory and must stay inside it.
 | `items` | the content, in publication order |
 | `approval` | `{status: pending|approved|rejected, by, at, revision}`; only the approval step sets `approved` |
 | `review` | `{issue_number, issue_url, revision, drive_root_id, history[]}` |
-| `state` | `{<item id>: {status: scheduled|published|failed|skipped, remote_id, url, publish_at, at, attempts, error, media_urls, extra}}`, written only by publishers |
+| `state` | `{<item id>: {status: scheduled|published|failed|unknown|skipped, remote_id, url, publish_at, at, attempts, error, media_urls, extra}}`, written only by publishers. `failed`: the platform refused it (safe to retry). `unknown`: the final publish call got no response, so it may be live; never retried automatically (Instagram resolves it from the saved container) |
 
 ## Item
 
@@ -69,7 +69,7 @@ The text a publisher sends is `composeText(item, platform)`: the caption (or des
 1. Agent (generate): `plan-slots.mjs --init` writes the skeleton; the agent fills items and media, runs the copy guard, `probe`, and `validate`.
 2. `social-review`: uploads media to Drive, opens the issue with the marker. Adjust: `bump`, regenerate the changed items, upload again, update the issue body, comment.
 3. Approval (a deterministic workflow, after a `/aprove` comment from a writer): `social-manifest.mjs approve --by <login>`.
-4. Publishers: `validate --for-publish`, then publish and record `state`. Re-runs skip done items.
+4. Publishers: `validate --for-publish`, then publish and record `state`. Re-runs skip done items, retry `failed` ones, and skip `unknown` ones until a person checks the platform and passes `--retry <id>` (Facebook, YouTube).
 
 ## Issue marker
 

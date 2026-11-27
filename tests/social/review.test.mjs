@@ -53,6 +53,7 @@ test("adjust requests come only after the last revision, from writers, never bot
     { id: 4, body: "/adjust c: x", user: { login: "eve", type: "User" } },
     { id: 5, body: "/adjust d: y", user: { login: "helper[bot]", type: "Bot" } },
     { id: 6, body: "Looks good", user: { login: "ana", type: "User" } },
+    { id: 7, body: "/adjusted the plan myself", user: { login: "ana", type: "User" } },
   ];
   const fetchImpl = fakeFetch([
     [(url) => url.includes("/issues/9/comments"), () => comments],

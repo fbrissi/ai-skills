@@ -11,7 +11,7 @@ import { readFileSync } from "node:fs";
 import { basename, dirname, resolve } from "node:path";
 import { GraphClient, GraphError, graphEnv } from "./graph.mjs";
 import { putObject, s3Config } from "./s3.mjs";
-import { composeText, isDone, isMain, loadManifest, recordState, resolveMediaPath, saveManifest, validateManifest, zoneOffset } from "./social-manifest.mjs";
+import { composeText, finalCall, isDone, isMain, loadManifest, recordState, resolveMediaPath, saveManifest, UncertainError, validateManifest, zoneOffset } from "./social-manifest.mjs";
 
 export const DEFAULT_PREFIX = "marketing/instagram/{date}/";
 const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
@@ -72,7 +72,31 @@ export async function publishingQuota(client, igUserId) {
   return { used: entry.quota_usage ?? 0, total, left: total - (entry.quota_usage ?? 0) };
 }
 
-async function publishOne(item, { client, igUserId, s3, prefix, manifestDir, fetchImpl, pollMs, timeoutMs }) {
+async function publishContainer(client, igUserId, creationId) {
+  const published = await finalCall(() => client.post(`${igUserId}/media_publish`, { creation_id: creationId }));
+  let permalink = null;
+  try {
+    permalink = (await client.get(published.id, { fields: "permalink" })).permalink ?? null;
+  } catch {
+    permalink = null;
+  }
+  return { remote_id: published.id, url: permalink };
+}
+
+/**
+ * Resolves an item left "unknown" (media_publish sent, no response) from its saved container: PUBLISHED means it
+ * is live; FINISHED means it never went out, so the same container is published now. Anything else redoes the item.
+ */
+async function resumeContainer(state, { client, igUserId }) {
+  const creationId = state?.extra?.creation_id;
+  if (!creationId) return null;
+  const status = (await client.get(creationId, { fields: "status_code" })).status_code;
+  if (status === "PUBLISHED") return { remote_id: null, url: null, media_urls: state.media_urls ?? [], extra: { creation_id: creationId, resolved: "container already published" } };
+  if (status === "FINISHED") return { ...(await publishContainer(client, igUserId, creationId)), media_urls: state.media_urls ?? [], extra: { creation_id: creationId } };
+  return null;
+}
+
+async function publishOne(item, { client, igUserId, s3, prefix, manifestDir, fetchImpl, pollMs, timeoutMs, checkpoint }) {
   const urls = [];
   for (const media of item.media) {
     const full = resolveMediaPath(manifestDir, media.path);
@@ -94,14 +118,8 @@ async function publishOne(item, { client, igUserId, s3, prefix, manifestDir, fet
     creationId = (await client.post(`${igUserId}/media`, fields[0])).id;
   }
   await waitReady(client, creationId, { pollMs, timeoutMs });
-  const published = await client.post(`${igUserId}/media_publish`, { creation_id: creationId });
-  let permalink = null;
-  try {
-    permalink = (await client.get(published.id, { fields: "permalink" })).permalink ?? null;
-  } catch {
-    permalink = null;
-  }
-  return { remote_id: published.id, url: permalink, media_urls: urls };
+  checkpoint({ media_urls: urls, extra: { creation_id: creationId } });
+  return { ...(await publishContainer(client, igUserId, creationId)), media_urls: urls, extra: { creation_id: creationId } };
 }
 
 export async function publish(manifest, { manifestDir, manifestPath, client, igUserId, s3, execute, now = new Date(), max = 1, item = null, prefix = DEFAULT_PREFIX, fetchImpl = fetch, pollMs = 5000, timeoutMs = 600000, out = process.stdout }) {
@@ -128,13 +146,18 @@ export async function publish(manifest, { manifestDir, manifestPath, client, igU
     }
     for (const target of [entry, ...stories]) {
       try {
-        const result = await publishOne(target, { client, igUserId, s3, prefix, manifestDir, fetchImpl, pollMs, timeoutMs });
+        const checkpoint = (entry) => {
+          recordState(manifest, target.id, { status: "unknown", error: "media_publish sent; waiting for the response", ...entry }, now);
+          saveManifest(manifestPath, manifest);
+        };
+        const previous = manifest.state[target.id];
+        const result = (previous?.status === "unknown" ? await resumeContainer(previous, { client, igUserId }) : null) ?? (await publishOne(target, { client, igUserId, s3, prefix, manifestDir, fetchImpl, pollMs, timeoutMs, checkpoint }));
         recordState(manifest, target.id, { status: "published", publish_at: now.toISOString(), error: null, ...result }, now);
         saveManifest(manifestPath, manifest);
         out.write(`published: ${target.id} (${result.remote_id})${result.url ? ` ${result.url}` : ""}\n`);
         done.push(target.id);
       } catch (error) {
-        recordState(manifest, target.id, { status: "failed", error: error.message }, now);
+        recordState(manifest, target.id, { status: error instanceof UncertainError ? "unknown" : "failed", error: error.message }, now);
         saveManifest(manifestPath, manifest);
         throw new PublishError(`${target.id}: ${error.message}`);
       }

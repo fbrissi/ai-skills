@@ -171,7 +171,11 @@ export async function adjustRequests({ repo, issue, token, fetchImpl = fetch, co
     if (batch.length < 100) break;
   }
   const lastRevision = comments.reduce((index, comment, position) => (/<!-- social-content:revision \d+ -->/.test(comment.body ?? "") ? position : index), -1);
-  const candidates = comments.slice(lastRevision + 1).filter((comment) => (comment.body ?? "").trim().toLowerCase().startsWith(command.toLowerCase()));
+  const matches = (body) => {
+    const text = (body ?? "").trim().toLowerCase();
+    return text.startsWith(command.toLowerCase()) && (text.length === command.length || /\s/.test(text[command.length]));
+  };
+  const candidates = comments.slice(lastRevision + 1).filter((comment) => matches(comment.body));
   const allowed = new Map();
   const requests = [];
   for (const comment of candidates) {

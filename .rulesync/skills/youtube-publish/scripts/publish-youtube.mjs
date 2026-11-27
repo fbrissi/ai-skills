@@ -3,12 +3,13 @@
 // videos.insert (resumable), scheduled as private + publishAt or published with the item's visibility, then sets
 // the thumbnail, playlist and captions when the item has them. State goes to the manifest right after the insert,
 // so a re-run never uploads twice. Never prints tokens.
-// Usage: publish-youtube.mjs <manifest.json> [--execute] [--now ISO] [--only <id>] [--daily-limit N]
+// Usage: publish-youtube.mjs <manifest.json> [--execute] [--now ISO] [--only <id>] [--retry <id,id>] [--daily-limit N]
+// An upload without a response leaves the item "unknown" (the video may exist): it is skipped until --retry names it.
 // Env: YOUTUBE_CLIENT_ID, YOUTUBE_CLIENT_SECRET, YOUTUBE_REFRESH_TOKEN, YOUTUBE_DAILY_UPLOAD_LIMIT (default 100).
 import { readFileSync } from "node:fs";
 import { dirname, extname, resolve } from "node:path";
 import { accessToken, googleCredentials, googleJson, GoogleError } from "./google-auth.mjs";
-import { composeText, isDone, isMain, loadManifest, recordState, resolveMediaPath, saveManifest, validateManifest } from "./social-manifest.mjs";
+import { composeText, isDone, isMain, loadManifest, pendingItems, recordState, reportBlocked, resolveMediaPath, saveManifest, UncertainError, validateManifest } from "./social-manifest.mjs";
 
 export const API = "https://www.googleapis.com/youtube/v3";
 export const UPLOAD = "https://www.googleapis.com/upload/youtube/v3";
@@ -49,7 +50,12 @@ async function resumableUpload(fetchImpl, token, url, metadata, bytes, contentTy
     const data = await start.json().catch(() => ({}));
     throw new GoogleError(`YouTube upload start ${start.status}: ${data?.error?.message ?? "error"}`, start.status);
   }
-  const done = await fetchImpl(location, { method: "PUT", headers: { "content-type": contentType, "content-length": String(bytes.length) }, body: bytes });
+  let done;
+  try {
+    done = await fetchImpl(location, { method: "PUT", headers: { "content-type": contentType, "content-length": String(bytes.length) }, body: bytes });
+  } catch (error) {
+    throw new UncertainError(`YouTube upload got no response: ${error.message}`);
+  }
   const data = await done.json().catch(() => ({}));
   if (!done.ok || !data.id) throw new GoogleError(`YouTube upload ${done.status}: ${data?.error?.message ?? "error"}`, done.status);
   return data;
@@ -87,13 +93,14 @@ export async function insertCaptions({ fetchImpl, token }, videoId, path, langua
   }
 }
 
-export async function publish(manifest, { manifestDir, manifestPath, api, execute, now = new Date(), only = null, dailyLimit = DEFAULT_DAILY_LIMIT, out = process.stdout }) {
-  const pending = manifest.items.filter((item) => !isDone(manifest, item.id) && (!only || item.id === only));
+export async function publish(manifest, { manifestDir, manifestPath, api, execute, now = new Date(), only = null, retry = [], dailyLimit = DEFAULT_DAILY_LIMIT, out = process.stdout }) {
+  const pending = pendingItems(manifest, { only, retry });
   const errors = validateManifest(manifest, { manifestDir, forPublish: execute, now }).filter((error) => !manifest.items.some((entry) => error.startsWith(`${entry.id}:`) && !pending.includes(entry)));
   if (manifest.platform !== "youtube") errors.unshift(`manifest platform is ${manifest.platform}, not youtube`);
   if (errors.length) throw new PublishError(`invalid batch:\n- ${errors.join("\n- ")}`);
 
   for (const item of manifest.items) if (isDone(manifest, item.id)) out.write(`already ${manifest.state[item.id].status}: ${item.id} (${manifest.state[item.id].remote_id})\n`);
+  reportBlocked(manifest, out, retry);
   let used = uploadsInLast24h(manifest, now);
   for (const item of pending) {
     const when = item.scheduled ? `private until ${item.publish_at}` : item.visibility;
@@ -110,9 +117,9 @@ export async function publish(manifest, { manifestDir, manifestPath, api, execut
     try {
       inserted = await insertVideo(api, item, resolveMediaPath(manifestDir, video.path), manifest.language);
     } catch (error) {
-      recordState(manifest, item.id, { status: "failed", error: error.message }, now);
+      recordState(manifest, item.id, { status: error instanceof UncertainError ? "unknown" : "failed", error: error.message }, now);
       saveManifest(manifestPath, manifest);
-      if (/quota/i.test(error.message)) {
+      if (!(error instanceof UncertainError) && /quota/i.test(error.message)) {
         out.write(`quota exceeded: ${item.id} waits for the next run\n`);
         break;
       }
@@ -151,7 +158,7 @@ function flag(argv, name) {
 }
 
 export async function main(argv, { env = process.env, fetchImpl = fetch, out = process.stdout } = {}) {
-  const valued = new Set(["--now", "--only", "--daily-limit"]);
+  const valued = new Set(["--now", "--only", "--retry", "--daily-limit"]);
   const manifestPath = argv.find((arg, index) => !arg.startsWith("--") && !valued.has(argv[index - 1]));
   if (!manifestPath) throw new PublishError("usage: publish-youtube.mjs <manifest.json> [--execute] [--now ISO] [--only <id>] [--daily-limit N]");
   const execute = argv.includes("--execute");
@@ -163,6 +170,7 @@ export async function main(argv, { env = process.env, fetchImpl = fetch, out = p
     execute,
     now: flag(argv, "now") ? new Date(flag(argv, "now")) : new Date(),
     only: flag(argv, "only") ?? null,
+    retry: String(flag(argv, "retry") ?? "").split(",").filter(Boolean),
     dailyLimit: Number(flag(argv, "daily-limit") ?? env.YOUTUBE_DAILY_UPLOAD_LIMIT ?? DEFAULT_DAILY_LIMIT),
     out,
   });

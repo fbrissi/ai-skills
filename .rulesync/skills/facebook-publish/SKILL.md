@@ -25,7 +25,7 @@ node <skill-dir>/scripts/publish-facebook.mjs <batch-dir>/manifest.json         
 node <skill-dir>/scripts/publish-facebook.mjs <batch-dir>/manifest.json --execute  # schedule
 ```
 
-Flags: `--only <item-id>`, `--now <ISO>` (tests). What it does per item:
+Flags: `--only <item-id>`, `--retry <id,id>` (items left `unknown`, after a manual check), `--now <ISO>` (tests). What it does per item:
 
 | Type | Graph calls |
 |---|---|
@@ -33,7 +33,7 @@ Flags: `--only <item-id>`, `--now <ISO>` (tests). What it does per item:
 | `photo`, `carousel` | `POST /{page}/photos` per image (`published=false`, `temporary=true` when scheduled), then `/feed` with `attached_media[i]` |
 | `reel` | `POST /{page}/video_reels` `upload_phase=start`, upload to `rupload.facebook.com`, then `upload_phase=finish` with `video_state=SCHEDULED` and `scheduled_publish_time` (or `PUBLISHED`) |
 
-It checks the batch first (`validate --for-publish`): approval, the 10-minute to 30-day window, Reels 3–90 s and 9:16, at most 30 Reels a day. After each item it writes `state.<id>` (`scheduled`/`published`, the post or video id, URL) to the manifest, so a re-run skips done items and retries failed ones. The first API error stops the run, is recorded as `failed`, and is printed with the Graph code and without the token.
+It checks the batch first (`validate --for-publish`): approval, the 10-minute to 30-day window, Reels 3–90 s and 9:16, at most 30 Reels a day. After each item it writes `state.<id>` (`scheduled`/`published`, the post or video id, URL) to the manifest, so a re-run skips done items and retries failed ones. The first API error stops the run, is recorded as `failed` (the next run retries it), and is printed with the Graph code and without the token. When the final call (`/feed` or the Reel `finish`) gets no response at all, the post may exist: the item becomes `unknown` and every later run skips it with `needs a manual check`. Look in Meta Business Suite > Planner; rerun with `--retry <id>` only if it is not there.
 
 ## After the run
 

@@ -109,3 +109,18 @@ test("CLI requires page credentials to execute", async () => {
   const { path } = setup([item()]);
   await assert.rejects(main([path, "--execute"], { env: {}, out: sink() }), /FACEBOOK_PAGE_ID/);
 });
+
+test("a lost response on the final call leaves the item unknown; it is skipped until --retry names it", async () => {
+  const { dir, data, path } = setup([item({ type: "post", media: [] })]);
+  const lost = fakeFetch([[() => true, () => { throw new Error("socket hang up"); }]]);
+  await assert.rejects(run(data, dir, path, new GraphClient({ token: TOKEN, fetchImpl: lost })), /network error/);
+  const saved = JSON.parse(readFileSync(path, "utf8"));
+  assert.equal(saved.state["2026-11-30-facebook-1"].status, "unknown");
+  const again = graph();
+  const out = sink();
+  await run(saved, dir, path, new GraphClient({ token: TOKEN, fetchImpl: again }), { out });
+  assert.equal(again.calls.length, 0);
+  assert.match(out.text(), /needs a manual check: 2026-11-30-facebook-1 .*--retry 2026-11-30-facebook-1/);
+  await run(saved, dir, path, new GraphClient({ token: TOKEN, fetchImpl: again }), { retry: ["2026-11-30-facebook-1"] });
+  assert.equal(JSON.parse(readFileSync(path, "utf8")).state["2026-11-30-facebook-1"].status, "scheduled");
+});

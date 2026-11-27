@@ -57,9 +57,9 @@ All scripts are Node.js 22+ ES modules without dependencies, run from the consum
 | `credits.mjs` (video-shorts) | `[--profile <md>] [--voice <id>] [--no-voice] [--music <file or title>] [--lang <code>]` |
 | `drive.mjs` (social-review, video-shorts) | `ensure-folder --path <A/B/C> [--share]`; `upload <file> --folder <id> [--name <n>] [--share]`; `list --folder <id>`; `download <id> --out <path>`; `download-folder --folder <id> --out <dir> [--match <regex>]` |
 | `review-batch.mjs` (social-review) | `upload <manifest> [--profile <md>] [--root <name>] [--no-share]`; `issue-body <manifest> [--profile <md>]`; `set-issue <manifest> --issue <n> --url <url>`; `revision-comment <manifest> --changed <ids> [--note <text>]`; `bump <manifest> --changed <ids> [--note <text>]`; `marker <body-file|-> [--out <file>]`; `adjust-requests --issue <n> [--repo <owner/name>]`; `fetch <manifest>` |
-| `publish-facebook.mjs` (facebook-publish) | `<manifest> [--execute] [--only <id>] [--now ISO]` |
+| `publish-facebook.mjs` (facebook-publish) | `<manifest> [--execute] [--only <id>] [--retry <id,id>] [--now ISO]` |
 | `publish-instagram.mjs` (instagram-publish) | `<manifest> [--execute] [--max N] [--item <id>] [--prefix <template>] [--poll-seconds N] [--timeout-seconds N] [--now ISO]` |
-| `publish-youtube.mjs` (youtube-publish) | `<manifest> [--execute] [--only <id>] [--daily-limit N] [--now ISO]` |
+| `publish-youtube.mjs` (youtube-publish) | `<manifest> [--execute] [--only <id>] [--retry <id,id>] [--daily-limit N] [--now ISO]` |
 
 ## Environment
 
@@ -80,4 +80,4 @@ A deterministic workflow handles `/aprove` (the command is `review.commands.appr
 2. `gh issue view <n> --json body -q .body | node review-batch.mjs marker - --out <dir>/manifest.json`, then `node review-batch.mjs fetch <dir>/manifest.json`.
 3. `node social-manifest.mjs approve <dir>/manifest.json --by <login>`.
 4. Facebook and YouTube: run the publisher with `--execute` right away (they schedule natively). Instagram: store the approved manifest (the issue marker) and let the Instagram cron run `publish-instagram.mjs --execute` on each scheduled run.
-5. After every publisher run, write the updated manifest back to the issue body (`review-batch.mjs issue-body ... | gh issue edit <n> --body-file -`), so the next run sees the state. Close the issue when every item is `scheduled` or `published`.
+5. After every publisher run, write the updated manifest back to the issue body (`review-batch.mjs issue-body ... | gh issue edit <n> --body-file -`), so the next run sees the state. Close the issue when every item is `scheduled` or `published`. An item in `unknown` state needs a person: report it on the issue (the publisher prints `needs a manual check`) and rerun with `--retry <id>` only after confirming it is not live.
