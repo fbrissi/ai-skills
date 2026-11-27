@@ -56,7 +56,8 @@ Dated events worth a post, each with its source (they also go in Parameters):
     "forbidden": [{ "pattern": "\\b<TERM>\\b", "reason": "<why and what to say instead>" }],
     "disable": [],
     "max_hashtags": { "instagram": 5, "default": 3 },
-    "max_emoji": 3
+    "max_emoji": 3,
+    "allowed_numbers": []
   },
   "review": {
     "label": "marketing-content",
@@ -77,7 +78,8 @@ Dated events worth a post, each with its source (they also go in Parameters):
       "drive_folder_id": "<Drive folder id with the tracks>",
       "tracks": [{ "file": "city-sunshine.mp3", "title": "City Sunshine", "author": "Kevin MacLeod", "source": "FreePD", "license": "CC0", "license_url": "<URL of the license or the track page>", "evidence": "<Drive file id of the saved license page or receipt>", "sha256": "<sha256 of the mp3: shasum -a 256 city-sunshine.mp3>" }]
     },
-    "footnote": "<for example: Telas reais com dados fictícios>"
+    "footnote": "<for example: Telas reais com dados fictícios>",
+    "screen_disclaimer": "<required line under every product screen, or omit; for example: Alíquotas e tributação: informadas por você ou pelo seu contador.>"
   }
 }
 ```
@@ -90,4 +92,6 @@ Dated events worth a post, each with its source (they also go in Parameters):
 - `platforms.<p>.days`: `mon`…`sun`; `times`: `HH:MM` in `timezone`; `per_batch`: most items per batch; `formats`: item types to rotate.
 - `platforms.instagram` and `platforms.linkedin`: always published by the consumer's cron (no scheduling APIs). Keep `linkedin.enabled` false until LinkedIn approves the Community Management API for your app. `media_prefix` is the bucket key prefix (`{date}`, `{id}`).
 - `video.music.drive_folder_id`: a Drive folder whose tracks the app can see (uploaded with `drive.mjs upload`, since the `drive.file` scope only sees app-created files), or a public folder read with `GOOGLE_API_KEY`. Every track used must be listed in `tracks` with its license, `license_url`, `evidence` (Drive file id of the license evidence) and `sha256`; `video-shorts` refuses a track without them or whose file hash differs, and the review issue links the evidence.
+- `copy_guard.allowed_numbers`: numeric claims allowed besides those in Offer, Allowed claims, and Calendar hooks, written with the word that follows the number (`"50 números"`); a bare `"30"` allows the number in any context. `copy-guard` flags every other number in digits.
+- `video.screen_disclaimer`: a line `video-shorts` draws under every product screen (screenshots and real recordings), at most 80 characters; when set, the render stops when a product screen lacks it. Optional: without it product screens render bare with a warning. `video.footnote` is the small line near the bottom of screen scenes when the spec has none.
 - `video.voice_credits.<voice>.<pt|en>`: credit text for a Piper voice other than `pt_BR-faber-medium`.

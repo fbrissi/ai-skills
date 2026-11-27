@@ -44,6 +44,10 @@ node <skill-dir>/scripts/review-batch.mjs issue-body <manifest> --profile <profi
 3. Regenerate only the items the requests name (the caller does this with the content skills), run the copy guard and validation again, then `review-batch.mjs bump <manifest> --changed <id,id> --note "<one line>"` (new revision, approval back to pending).
 4. `upload` again, update the issue body (as in Open), and post `review-batch.mjs revision-comment <manifest> --changed <id,id> --note "<what changed>"` with `gh issue comment <n> --body-file`. Answer requests you did not apply in the same comment, with the reason (for example, a claim without a source).
 
+## Links in the issue
+
+Every item with a `link` shows it under its text, with how it is sent (link preview for a Facebook or LinkedIn `post`, at the end of the text, already in the text, or not sent on Instagram) and its UTM parameters, so the reviewer checks a link that is not part of the text.
+
 ## Music and AI in the issue
 
 Items with a `music` entry show the track, its license, the license URL, and a link to the license evidence in Drive, so the reviewer checks the license before approving. Items with `ai_audio` or `synthetic_media` say so, with the labels each platform gets.

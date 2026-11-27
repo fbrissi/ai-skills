@@ -3,6 +3,17 @@
 All notable changes to this project are documented here. Release versions follow
 [Semantic Versioning](https://semver.org/).
 
+## v0.13.1
+
+### Fixed
+
+- `copy-guard`: numbers in digits (counts, percentages, amounts, durations) must appear in the profile's Offer, Allowed claims, or Calendar hooks with the same word next to them, or in the new `copy_guard.allowed_numbers`; others are `unsourced-number` errors (warnings without `--profile`). Dates, years, times, prices, links, hashtags, credits, and legal or version ids are not claims. A carousel slide with an invented "30 recorrências" now fails.
+- `copy-guard`: the manifest check also reads the text drawn in each item's media (the cards or video spec in `spec`), where slide and Story text lives.
+- `copy-guard` and the `instagram-content` and `linkedin-content` agents: relative days ("hoje", "amanhã", "nesta sexta", "esta semana", "today", "tomorrow") are `relative-day` errors in items a cron publishes (Stories, Instagram, LinkedIn, anything not scheduled by the platform), whose run day is not guaranteed; text mode takes `--cron` or `--platform instagram|linkedin`.
+- `video-shorts`: the profile's new optional `video.screen_disclaimer` is drawn under every product screen (screenshots and real recordings); when it is set, the render stops when a product screen lacks it or it does not fit one line. Profiles without it keep rendering, with a warning that names the bare product screens. `footnote` falls back to the profile's `video.footnote`.
+- `video-shorts`: `render.mjs` refuses `focus` and `pan_to` boxes the 1000x720 screen frame cannot show whole (a wide screenshot without a box cut its sidebar labels), boxes past the image, and footage not cropped to the frame aspect; `video-spec.md` documents how to draw boxes that keep UI text whole.
+- `social-review`: the issue body shows each item's link, how it is sent (a Facebook or LinkedIn `post` sends it as the link preview, outside the text), and its UTM parameters.
+
 ## v0.13.0
 
 ### Added

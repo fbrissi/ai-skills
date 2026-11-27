@@ -27,8 +27,8 @@ export const MAX_BODY = 65000;
 export class ReviewError extends Error {}
 
 const LABELS = {
-  pt: { music: "Música", license: "licença", evidence: "evidência", ai: (item) => `IA: ${[item.ai_audio ? "narração sintética" : null, item.synthetic_media ? "imagens geradas por IA" : null].filter(Boolean).join(" e ")} (rótulo de IA na Meta${item.synthetic_media ? ", containsSyntheticMedia no YouTube" : ""}, aviso no texto do LinkedIn)`, title: (p, d, n) => `${p}: lote de ${d} (${n} ${n === 1 ? "item" : "itens"})`, date: "Data", type: "Tipo", text: "Texto", drive: "Drive", folder: "pasta", how: "Como revisar", howText: (adjust, approve) => `Comente \`${adjust} <id>: <o que mudar>\` (um ou mais itens) para refazer só o que pedir, ou \`${approve}\` para aprovar e publicar o lote. Só comentários de quem tem permissão de escrita contam.`, full: "Textos completos", sources: "Fontes", credits: "Créditos", next: "próxima execução", revision: (n) => `Revisão ${n}`, changed: "Itens refeitos", synthetic: "contém mídia sintética (IA)" },
-  en: { music: "Music", license: "license", evidence: "evidence", ai: (item) => `AI: ${[item.ai_audio ? "synthetic narration" : null, item.synthetic_media ? "AI-generated footage" : null].filter(Boolean).join(" and ")} (Meta AI label${item.synthetic_media ? ", YouTube containsSyntheticMedia" : ""}, LinkedIn text disclosure)`, title: (p, d, n) => `${p}: batch of ${d} (${n} ${n === 1 ? "item" : "items"})`, date: "Date", type: "Type", text: "Text", drive: "Drive", folder: "folder", how: "How to review", howText: (adjust, approve) => `Comment \`${adjust} <id>: <what to change>\` (one or more items) to redo only what you ask for, or \`${approve}\` to approve and publish the batch. Only comments from people with write access count.`, full: "Full copy", sources: "Sources", credits: "Credits", next: "next run", revision: (n) => `Revision ${n}`, changed: "Items redone", synthetic: "contains synthetic (AI) media" },
+  pt: { music: "Música", license: "licença", evidence: "evidência", ai: (item) => `IA: ${[item.ai_audio ? "narração sintética" : null, item.synthetic_media ? "imagens geradas por IA" : null].filter(Boolean).join(" e ")} (rótulo de IA na Meta${item.synthetic_media ? ", containsSyntheticMedia no YouTube" : ""}, aviso no texto do LinkedIn)`, title: (p, d, n) => `${p}: lote de ${d} (${n} ${n === 1 ? "item" : "itens"})`, date: "Data", type: "Tipo", text: "Texto", drive: "Drive", folder: "pasta", how: "Como revisar", howText: (adjust, approve) => `Comente \`${adjust} <id>: <o que mudar>\` (um ou mais itens) para refazer só o que pedir, ou \`${approve}\` para aprovar e publicar o lote. Só comentários de quem tem permissão de escrita contam.`, full: "Textos completos", sources: "Fontes", credits: "Créditos", next: "próxima execução", revision: (n) => `Revisão ${n}`, changed: "Itens refeitos", synthetic: "contém mídia sintética (IA)", link: "Link", sent: { preview: "prévia do link", text: "no fim do texto", inText: "no texto", none: "não enviado: o Instagram não tem link clicável; use o link na bio" }, noUtm: "nenhuma" },
+  en: { music: "Music", license: "license", evidence: "evidence", ai: (item) => `AI: ${[item.ai_audio ? "synthetic narration" : null, item.synthetic_media ? "AI-generated footage" : null].filter(Boolean).join(" and ")} (Meta AI label${item.synthetic_media ? ", YouTube containsSyntheticMedia" : ""}, LinkedIn text disclosure)`, title: (p, d, n) => `${p}: batch of ${d} (${n} ${n === 1 ? "item" : "items"})`, date: "Date", type: "Type", text: "Text", drive: "Drive", folder: "folder", how: "How to review", howText: (adjust, approve) => `Comment \`${adjust} <id>: <what to change>\` (one or more items) to redo only what you ask for, or \`${approve}\` to approve and publish the batch. Only comments from people with write access count.`, full: "Full copy", sources: "Sources", credits: "Credits", next: "next run", revision: (n) => `Revision ${n}`, changed: "Items redone", synthetic: "contains synthetic (AI) media", link: "Link", sent: { preview: "link preview", text: "at the end of the text", inText: "in the text", none: "not sent: Instagram links are not clickable; use the link in bio" }, noUtm: "none" },
 };
 
 const labelsFor = (manifest) => (String(manifest.language).toLowerCase().startsWith("pt") ? LABELS.pt : LABELS.en);
@@ -69,6 +69,23 @@ export function musicLine(music, labels) {
   return `${labels.music}: "${cell(music.title)}"${who ? `, ${cell(who)}` : ""} (${cell(music.license)}; [${labels.license}](${music.license_url}); [${labels.evidence}](${fileUrl(music.evidence)}); sha256 \`${music.sha256.slice(0, 12)}…\`)`;
 }
 
+/**
+ * The item's link, how the publisher sends it (same rules as composeText), and its UTM parameters, so the reviewer
+ * sees a link that does not appear in the text (a Facebook or LinkedIn post sends it as the link preview).
+ */
+export function linkLines(item, platform, labels) {
+  if (!item.link) return [];
+  const body = (platform === "youtube" ? item.description : item.caption) ?? "";
+  const sent = platform === "instagram" ? "none" : body.includes(item.link) ? "inText" : (platform === "facebook" || platform === "linkedin") && item.type === "post" ? "preview" : "text";
+  let utm = [];
+  try {
+    utm = [...new URL(item.link).searchParams].filter(([key]) => key.startsWith("utm_")).map(([key, value]) => `${key}=${value}`);
+  } catch {
+    utm = [];
+  }
+  return [`${labels.link} (${labels.sent[sent]}): ${item.link}`, "", `UTM: ${utm.length ? utm.join(" · ") : labels.noUtm}`];
+}
+
 export function issueBody(manifest, { review = {} } = {}) {
   const labels = labelsFor(manifest);
   const platform = PLATFORM_NAMES[manifest.platform];
@@ -94,6 +111,7 @@ export function issueBody(manifest, { review = {} } = {}) {
     lines.push("", `#### \`${item.id}\` (${item.type}, ${when(item, labels)}, ${item.visibility}${item.synthetic_media ? `, ${labels.synthetic}` : ""})`, "");
     if (item.title) lines.push(`**${cell(item.title)}**`, "");
     lines.push(`${mark}text`, text, mark);
+    if (item.link) lines.push("", ...linkLines(item, manifest.platform, labels));
     if (item.sources?.length) lines.push("", `${labels.sources}: ${item.sources.map(cell).join("; ")}`);
     if (item.music) lines.push("", musicLine(item.music, labels));
     if (item.ai_audio || item.synthetic_media) lines.push("", labels.ai(item));
