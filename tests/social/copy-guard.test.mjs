@@ -67,6 +67,12 @@ test("fear, urgency and official-endorsement claims are errors in pt-BR", () => 
   for (const text of ["Evite multa: emita hoje.", "Você pode ser multado se atrasar.", "Prazo final chegando.", "Todas as empresas são obrigadas a usar.", "Sistema aprovado pela Receita Federal.", "Emissor credenciado pela SEFIN.", "Conformidade garantida."]) {
     assert.ok(rules(text).includes("error:medo-urgencia"), text);
   }
+  for (const text of ["Empresas podem ser multadas.", "Sua empresa pode levar multa.", "Vai levar multa.", "Evite uma multa.", "Última chance.", "Não perca o prazo."]) {
+    assert.ok(rules(text).includes("error:medo-urgencia"), text);
+  }
+  for (const text of ["Nem todas as empresas são obrigadas ao padrão nacional.", "Envie o certificado no gov.br.", "Para que a validação corra bem, confira os dados."]) {
+    assert.ok(!rules(text).includes("error:medo-urgencia"), text);
+  }
   assert.deepEqual(rules("O prazo do DAS vence em 21/12, segundo a Receita Federal."), []);
 });
 

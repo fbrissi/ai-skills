@@ -17,7 +17,7 @@ All notable changes to this project are documented here. Release versions follow
 - Music license evidence: every track in `video.music.tracks` needs `license_url`, `evidence` and `sha256`; `video-shorts` refuses music without them or whose file hash differs, and the review issue links the evidence. YouTube Shorts with music must be at most 60 s. Facebook Reels record their copyright check in `state.<id>.extra`.
 - Instagram allows at most 5 hashtags; `copy-guard` takes a per-platform `max_hashtags` map and never allows Instagram more than 5. Instagram image posts send `alt_text` from `media.alt`.
 - Facebook Reels schedule at most 29 days ahead (feed posts stay at 30).
-- `copy-guard` flags pt-BR fear, urgency, and official-endorsement claims ("evite multa", "prazo final", "aprovado pela Receita", "conformidade garantida").
+- `copy-guard` flags pt-BR fear, urgency, and official-endorsement claims ("evite multa", "podem ser multadas", "prazo final", "última chance", "não perca o prazo", "todas as empresas são obrigadas", "aprovado pela Receita", "conformidade garantida"; not "nem todas as empresas são obrigadas").
 - Docs: Google OAuth "Testing" refresh tokens expire after 7 days (`invalid_grant`); Meta apps need Live mode, App Review, Page Publishing Authorization for Instagram, and a system-user Page token; YouTube asks only for `youtube.upload` unless playlists or captions are used; Instagram API Stories have no link sticker.
 
 ## v0.12.0
