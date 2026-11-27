@@ -22,6 +22,12 @@ Load this in step 2 of the copy guard. These are the patterns a regex misses. Fo
 | Formatting decoration | Emoji in every line, bold mid-sentence, bullets for two short sentences | Plain prose |
 | Uniform rhythm | Every sentence the same length and shape | Vary length where it helps |
 
+## Batch and brand (manifests)
+
+- Shared skeleton: the items follow one template ("<fact>. <Product> <verb>… <offer>. <CTA>.") with the blanks swapped. Rewrite each from its own creative brief: its angle, scene, and closing (`social-content-plan`'s creative method).
+- Product-description sentences ("O <produto> permite que você…", "<Product> lets you…") and feature lists in a caption. Show one mechanism through a scene from the reader's month.
+- Off-brand: copy that contradicts the profile's Brand section (personality, pillars) or reads like its bad examples.
+
 ## pt-BR specifics
 
 - Title Case em títulos ("Emissão Em Lote Para Escritórios"): só a primeira palavra e nomes próprios com maiúscula.

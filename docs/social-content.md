@@ -28,7 +28,7 @@ The batch contract is one JSON manifest per platform and batch: [`social-manifes
 
 ## Profile
 
-One profile per project at `docs/ai/social-content.md`, from [`social-profile-template.md`](../shared/references/social-profile-template.md): audience, goal, offer, allowed claims with sources, forbidden claims, sources and real screens, calendar hooks, voice, and a JSON `## Parameters` block (time zone, UTM, blackout dates, brand, copy guard additions, review label and Drive root, per-platform days, times, formats, and visibility, and the video voice and music).
+One profile per project at `docs/ai/social-content.md`, from [`social-profile-template.md`](../shared/references/social-profile-template.md): audience, goal, offer, allowed claims with sources, forbidden claims, sources and real screens, calendar hooks, voice, a Brand section (positioning, personality, audience pains in their words, messaging pillars, good and bad copy examples, visual direction) that drives the creative brief, and a JSON `## Parameters` block (time zone, UTM, blackout dates, brand, copy guard additions, review label and Drive root, per-platform days, times, formats, and visibility, and the video voice and music).
 
 ## Running the agents
 

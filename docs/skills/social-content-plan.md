@@ -24,7 +24,8 @@ Plans the next batch of organic posts for Facebook, Instagram, or YouTube from t
 
 1. Runs `scripts/plan-slots.mjs` to turn days, times, time zone, blackout dates, and calendar hooks into dated slots (`publish_at` with offset; `null` on Instagram) and writes a skeleton `manifest.json`.
 2. Writes one brief per slot: theme, claims with their sources, hook, format, media, and a link with the profile UTM. Claims without a source are dropped.
-3. Hands off to the copy, media, and `copy-guard` steps.
+3. Adds a creative brief per item (insight in the audience's words, single-minded message, pillar, angle, scene, proof, call to action) from the profile's Brand section, spreading angles and closings across the batch.
+4. Hands off to the copy (written from the creative brief with `references/creative-method.md`), media, and `copy-guard` steps.
 
 ## Side effects
 

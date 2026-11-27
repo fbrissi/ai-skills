@@ -29,7 +29,7 @@ It prints JSON with `slots` (date, time, `publish_at` with offset; `null` on Ins
 
 ## 2. Briefs
 
-Read the profile's Audience, Goal, Offer, Allowed claims, Forbidden claims, Sources, and Voice sections, and the previous four batches of the same platform when they exist (avoid repeating a theme, an opening line, or an image from them).
+Read the profile's Brand, Audience, Goal, Offer, Allowed claims, Forbidden claims, Sources, and Voice sections, and the previous four batches of the same platform when they exist (avoid repeating a theme, an opening line, or an image from them).
 
 For each slot, write a brief before any copy:
 
@@ -38,19 +38,20 @@ For each slot, write a brief before any copy:
 - **Hook** when the slot's date has a calendar hook; cite the hook's source.
 - **Format** from `defaults.formats` (rotate; at most one offer-led item per batch unless the profile says otherwise) and the **media** it needs: a card from `image-cards`, a short from `video-shorts`, or none.
 - **Link** to a `site_domains` page with the profile UTM (`utm_source`, `utm_medium`, `utm_campaign`), the UTM before any `#anchor`.
+- **Creative brief**: who and when, the insight in the audience's words, the single-minded message, the pillar, the angle, a concrete scene, the proof (a claim above), and the call to action, following [references/creative-method.md](references/creative-method.md) (load it now). Spread angles, pillars, and offer-led closings across the batch.
 
 Never use: numbers, testimonials, customers, savings, results, or "the only" unless the profile lists them as allowed claims with a source; a fake product screen; personal or customer data.
 
 ## 3. Hand off
 
-Record each brief in the item: `id` (`<date>-<theme>`), `type`, `sources`, `link`, and a `notes` line with the brief. The caller (an agent or the user) then writes the copy, creates the media, and runs the `copy-guard` skill. If `copy-guard` is not installed, run its rules by hand: no em dashes, no broetry, no emoji bullets, no engagement bait, no "it's not X, it's Y", no unsupported social proof, no result or savings promises.
+Record each brief in the item: `id` (`<date>-<theme>`), `type`, `sources`, `link`, and `notes` with the brief and its creative brief. The caller (an agent or the user) then writes the copy and the text of the media from the creative brief with steps 2 and 3 of [references/creative-method.md](references/creative-method.md) (the `copywriting` and `social` skills help when installed), creates the media, and runs the `copy-guard` skill. If `copy-guard` is not installed, run its rules by hand: no em dashes, no broetry, no emoji bullets, no engagement bait, no "it's not X, it's Y", no unsupported social proof, no result or savings promises.
 
 ## Output
 
 ```text
 Plan: <platform> <window start>..<end> (<time zone>)
-| Date | Time | Type | Theme | Claims (sources) | Media |
-|---|---|---|---|---|---|
+| Date | Time | Type | Theme | Message | Angle | Claims (sources) | Media |
+|---|---|---|---|---|---|---|---|
 Skipped: <date: reason>
 Hooks used: <date: hook (source)>
 Manifest: <batch-dir>/manifest.json

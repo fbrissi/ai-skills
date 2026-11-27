@@ -191,3 +191,21 @@ test("manifest check reads the text drawn in cards and videos from each item's s
   assert.equal(main(["--manifest", path], { out }), 1);
   assert.match(out.text(), /ERROR story\.spec:cards\[0\]\.kicker: relative-day/);
 });
+
+test("the same sentence or opening across three items of a batch is a template warning", () => {
+  const offer = "Em beta: grátis até 31/03/2027, sem cartão de crédito.";
+  const captions = [
+    `Recorrência programada. O Nota Profile emite no dia certo. ${offer} Link na bio.`,
+    `Lote do mês. O Nota Profile emite todas de uma vez. ${offer} Link na bio.`,
+    `Preset por cliente. O Nota Profile testa em homologação. ${offer} Link na bio.`,
+  ];
+  const data = manifest("instagram", captions.map((caption, index) => item({ id: `i${index}`, caption, hashtags: [] })));
+  const batch = checkManifest(data, { profile: null }).filter((f) => f.where === "batch");
+  assert.deepEqual(batch.map((f) => [f.level, f.rule, f.excerpt]), [["warn", "repeated-template", offer]]);
+  assert.match(batch[0].reason, /a mesma frase em 3 itens \(i0, i1, i2\)/);
+  const varied = manifest("instagram", [item({ id: "a", caption: `Dezembro aperta. ${offer}`, hashtags: [] }), item({ id: "b", caption: "O contrato mensal vira recorrência e a nota sai no dia.", hashtags: [] }), item({ id: "c", caption: "Antes de valer, o preset passa pela homologação.", hashtags: [] })]);
+  assert.deepEqual(checkManifest(varied, {}).filter((f) => f.where === "batch"), []);
+  const openers = manifest("instagram", ["No fechamento do mês, emita o lote.", "No fechamento do mês, revise os valores.", "No fechamento do mês, confira a numeração."].map((caption, index) => item({ id: `o${index}`, caption, hashtags: [] })));
+  assert.deepEqual(checkManifest(openers, {}).filter((f) => f.where === "batch").map((f) => f.excerpt), ["No fechamento do"]);
+  assert.deepEqual(checkManifest(data, { disabled: new Set(["repeated-template"]) }).filter((f) => f.where === "batch"), []);
+});
