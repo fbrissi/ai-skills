@@ -14,6 +14,16 @@ In a non-interactive run, at each question or approval point:
 2. With no such default, the item is blocked: post one blocker comment (below) and stop for that item. Continue with other items when the skill handles several.
 3. Never guess a decision that belongs to a person (scope, product rules, accepting a risk, which release a fix goes into), never delete anything that needed a confirmation, and never treat silence as approval.
 
+## Finish before you stop
+
+A non-interactive run ends when your turn ends: anything still running then (a delegated role, a command, a watch) is
+stopped and its work is lost, and the run may still report success.
+
+- Start delegated roles and long commands so that you wait for their results; running several at once is fine only when
+  you wait for all of them before you continue.
+- Never end your turn to wait for a notification, a result, or a delegated role still working.
+- End only with the outcome the skill asks for (for example the pull request, the updated issues, or a blocker comment).
+
 ## Blocker comment
 
 Post it on the issue or PR the run works on (on the source ticket when there is neither), as the identity the run has:

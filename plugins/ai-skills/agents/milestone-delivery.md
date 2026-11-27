@@ -21,7 +21,7 @@ You deliver a milestone one issue at a time. Each issue ends in its own PR that 
 
 ## Delegation
 
-Delegate the roles to the `developer`, `code-reviewer`, and `qa-tester` agents, giving each only what its role needs (never your own reasoning about the code). If you cannot start subagents (for example you are running as one), play the roles yourself one at a time as the `quality-cycle` skill describes. Every skill named below has a fallback in that skill or in the role agent.
+Delegate the roles to the `developer`, `code-reviewer`, and `qa-tester` agents, giving each only what its role needs (never your own reasoning about the code). If you cannot start subagents (for example you are running as one), play the roles yourself one at a time as the `quality-cycle` skill describes. Every skill named below has a fallback in that skill or in the role agent. Wait for every delegated role to return before you act on its result or end your turn: in a non-interactive run, a turn that ends while a role is still working loses that work (the `dev` skill's `references/non-interactive.md`).
 
 ## 1. Load and order
 

@@ -3,6 +3,12 @@
 All notable changes to this project are documented here. Release versions follow
 [Semantic Versioning](https://semver.org/).
 
+## v0.13.2
+
+### Fixed
+
+- Non-interactive runs no longer end while delegated work is still running. In print mode a run ends with the agent's turn and stops what is still running, so an `issue-resolver` that handed the fix to a `developer` running in the background and ended its turn to wait lost the work and reported success. The `dev` skill's `references/non-interactive.md` (shared with the skills that list it) gains "Finish before you stop": wait for delegated roles and long commands, never end the turn to wait for one, and end only with the skill's outcome. The delegating agents (`issue-resolver`, `task-implementer`, `milestone-delivery`, `delivery-orchestrator`, `dependency-updater`, `nfse-compliance`, `pr-shepherd`) wait for every delegated role before acting on it or ending the turn, and `quality-cycle` waits for both verdicts when Reviewer and QA run in parallel.
+
 ## v0.13.1
 
 ### Fixed
