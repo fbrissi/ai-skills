@@ -4,7 +4,9 @@
 // When the profile sets video.screen_disclaimer, every product screen gets it under it and the render stops when one
 // lacks it. Without it (opt-in) product screens render bare and the render warns.
 // Usage: render.mjs --spec <video.json> --out <file.mp4> [--profile <profile.md>] [--work .cache/video-shorts]
-//        [--studio <dir with node_modules>] [--no-music]
+//        [--studio <dir with node_modules>] [--no-music] [--allow-cut-edges]
+// Screen focus/pan_to frames whose edges slice UI text or controls are refused (luminance scan of the screenshot);
+// --allow-cut-edges skips that scan for a frame you checked by eye.
 // Prints {path, width, height, duration, synthetic_media, ai_audio, music} (music: the manifest entry with license
 // evidence, checked against its sha256). Paths in the spec are relative to the current
 // directory (the repository root).
@@ -54,6 +56,84 @@ export function boxFitError(where, name, box, image) {
   return `${where}: ${name} box ${box.w}x${box.h} does not fit the ${SCREEN_FRAME.width}x${SCREEN_FRAME.height} screen frame: the camera shows at most ${Math.round(camera.visibleWidth)}x${Math.round(camera.visibleHeight)} image pixels at that zoom, so the box edges (labels, sidebar items, buttons) would be cut; use a box with the frame's ${SCREEN_FRAME.width}:${SCREEN_FRAME.height} aspect inside the image`;
 }
 
+/** The image rectangle (in image pixels) the frame shows for a camera box, clamped to the image like Short.tsx. */
+export function visibleRect(box, image, frame = SCREEN_FRAME) {
+  const { scale } = screenCamera(box, image, frame);
+  const offsetX = Math.min(0, Math.max(frame.width - image.width * scale, frame.width / 2 - (box.x + box.w / 2) * scale));
+  const offsetY = Math.min(0, Math.max(frame.height - image.height * scale, frame.height / 2 - (box.y + box.h / 2) * scale));
+  return { x: -offsetX / scale + 0, y: -offsetY / scale + 0, w: frame.width / scale, h: frame.height / scale };
+}
+
+/** Edge check tuning, in image pixels and 0-255 luminance. */
+export const EDGE_CHECK = { margin: 6, span: 10, ink: 40, flat: 24, minHits: 3 };
+
+/**
+ * Frame edges that slice UI content. Each edge inside the image (an image edge is the screenshot's own end) and the
+ * `margin` pixels inward are scanned: a pixel off the line's background whose neighbourhood across the edge is not
+ * flat is a glyph or control being cut. Flat crossings (dividers, borders, filled panels) are allowed.
+ * gray: {width, height, data} with one luminance byte per pixel.
+ */
+export function edgeCuts(gray, rect, tuning = EDGE_CHECK) {
+  const { width, height, data } = gray;
+  const at = (x, y) => data[y * width + x];
+  const x0 = Math.round(rect.x);
+  const y0 = Math.round(rect.y);
+  const x1 = Math.min(width, Math.round(rect.x + rect.w)) - 1;
+  const y1 = Math.min(height, Math.round(rect.y + rect.h)) - 1;
+  const edges = [];
+  if (x0 > 0) edges.push({ edge: "left", vertical: true, pos: x0, step: 1 });
+  if (x1 < width - 1) edges.push({ edge: "right", vertical: true, pos: x1, step: -1 });
+  if (y0 > 0) edges.push({ edge: "top", vertical: false, pos: y0, step: 1 });
+  if (y1 < height - 1) edges.push({ edge: "bottom", vertical: false, pos: y1, step: -1 });
+  const cuts = [];
+  for (const { edge, vertical, pos, step } of edges) {
+    const [from, to] = vertical ? [Math.max(0, y0), y1] : [Math.max(0, x0), x1];
+    const hits = new Set();
+    for (let d = 0; d <= tuning.margin; d += 1) {
+      const line = pos + d * step;
+      const sample = (t) => (vertical ? at(line, t) : at(t, line));
+      const values = [];
+      for (let t = from; t <= to; t += 1) values.push(sample(t));
+      const background = [...values].sort((a, b) => a - b)[values.length >> 1];
+      for (let t = from; t <= to; t += 1) {
+        if (Math.abs(sample(t) - background) <= tuning.ink) continue;
+        let low = 255;
+        let high = 0;
+        const limit = vertical ? width : height;
+        for (let k = Math.max(0, line - tuning.span); k <= Math.min(limit - 1, line + tuning.span); k += 1) {
+          const value = vertical ? at(k, t) : at(t, k);
+          low = Math.min(low, value);
+          high = Math.max(high, value);
+        }
+        if (high - low >= tuning.flat) hits.add(t);
+      }
+    }
+    if (hits.size >= tuning.minHits) {
+      const sorted = [...hits].sort((a, b) => a - b);
+      cuts.push({ edge, at: pos, from: sorted[0], to: sorted.at(-1) });
+    }
+  }
+  return cuts;
+}
+
+/** Spec errors for camera boxes whose frame edges slice UI text or controls, given the screenshot's luminance. */
+export function cutEdgeErrors(where, name, box, gray) {
+  const rect = visibleRect(box, { width: gray.width, height: gray.height });
+  return edgeCuts(gray, rect).map((cut) => `${where}: ${name} frame ${cut.edge} edge (${cut.edge === "left" || cut.edge === "right" ? "x" : "y"}=${cut.at}) cuts UI content between ${cut.edge === "left" || cut.edge === "right" ? "y" : "x"}=${cut.from} and ${cut.to}; move or resize the box so the edge falls on empty background with a margin, make it span the full screenshot ${cut.edge === "left" || cut.edge === "right" ? "width" : "height"}, or crop the screenshot to the useful area when capturing it`);
+}
+
+/** Screenshot luminance through ffmpeg (already required for rendering), or null when it cannot be decoded. */
+export function readGray(path) {
+  const size = imageSize(path);
+  if (!size?.width || !size?.height) return null;
+  try {
+    const data = execFileSync("ffmpeg", ["-v", "error", "-i", path, "-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "gray", "pipe:1"], { maxBuffer: size.width * size.height + 1024 * 1024 });
+    return data.length >= size.width * size.height ? { width: size.width, height: size.height, data } : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Footage fills the frame with object-fit cover: a clip of another aspect loses its sides or its top and bottom. */
 export function footageFitError(where, width, height) {
   const target = SCREEN_FRAME.width / SCREEN_FRAME.height;
@@ -66,7 +146,7 @@ export function footageFitError(where, width, height) {
 }
 
 /** Spec checks that keep fake product UIs, missing files, cut screens, and an oversized disclaimer out before rendering. */
-export function specErrors(spec, root = process.cwd(), config = null) {
+export function specErrors(spec, root = process.cwd(), config = null, { pixels = null } = {}) {
   const errors = [];
   const disclaimer = screenDisclaimer(config);
   if (disclaimer && disclaimer.length > DISCLAIMER_MAX) errors.push(`video.screen_disclaimer has ${disclaimer.length} characters; keep it within ${DISCLAIMER_MAX} so it fits one line under the screen`);
@@ -83,9 +163,11 @@ export function specErrors(spec, root = process.cwd(), config = null) {
       const size = imageSize(resolve(root, scene.image));
       if (size?.width && size?.height) {
         const image = { width: size.width, height: size.height };
+        const gray = pixels ? pixels(resolve(root, scene.image)) : null;
         for (const [name, box] of [["focus", scene.focus ?? { x: 0, y: 0, w: image.width, h: image.height }], ["pan_to", scene.pan_to]]) {
           const error = box ? boxFitError(where, name, box, image) : null;
           if (error) errors.push(error);
+          else if (box && gray?.width === image.width && gray?.height === image.height) errors.push(...cutEdgeErrors(where, name, box, gray));
         }
       }
     }
@@ -190,11 +272,17 @@ export function main(argv) {
     const index = argv.indexOf(`--${name}`);
     return index >= 0 ? argv[index + 1] : undefined;
   };
-  if (!value("spec") || !value("out")) throw new RenderError("usage: render.mjs --spec <video.json> --out <file.mp4> [--profile <md>] [--work <dir>] [--studio <dir>] [--no-music]");
+  if (!value("spec") || !value("out")) throw new RenderError("usage: render.mjs --spec <video.json> --out <file.mp4> [--profile <md>] [--work <dir>] [--studio <dir>] [--no-music] [--allow-cut-edges]");
   const root = process.cwd();
   const spec = JSON.parse(readFileSync(value("spec"), "utf8"));
   const config = value("profile") ? readProfileConfig(value("profile")) : null;
-  const errors = specErrors(spec, root, config);
+  const allowCuts = argv.includes("--allow-cut-edges");
+  const pixels = (path) => {
+    const gray = readGray(path);
+    if (!gray) process.stderr.write(`warning: could not decode ${path} with ffmpeg; its frame edges were not scanned for cut UI text\n`);
+    return gray;
+  };
+  const errors = specErrors(spec, root, config, { pixels: allowCuts ? null : pixels });
   for (const scene of spec.scenes ?? []) {
     if (scene.kind !== "footage" || scene.crop || !scene.video || !existsSync(resolve(root, scene.video))) continue;
     const info = videoInfo(resolve(root, scene.video));

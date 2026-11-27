@@ -42,8 +42,10 @@ The profile's `video.screen_disclaimer` (for example "Alíquotas e tributação:
 
 Screens and footage show in a 1000x720 frame. The camera scales the `focus` box (default: the whole image) to fill the frame, but never zooms out past the image covering the frame, so a box with another aspect than 1000:720, or the whole of a wider or taller screenshot, loses its edges. `render.mjs` refuses a `focus` or `pan_to` box the frame cannot show whole, a box past the image, and footage (its `crop`, or the clip itself) whose aspect is more than 2% off 1000:720.
 
+- Prefer a screenshot captured or cropped to the useful area at the 1000:720 aspect (a Playwright `clip`, or `ffmpeg -i full.png -vf crop=w:h:x:y area.png`), so the scene needs no zoom box at all.
 - Draw each box at the 1000:720 aspect (for example 700x504 or 1000x720 image pixels), inside the image.
-- Keep whole UI elements in the box, with at least 24 px of margin around text; never put an edge through a sidebar label, menu item, column header, or button. The frame's rounded corners hide about 20 px at each corner.
+- Each box either spans the full screenshot width, or every edge falls on empty background with at least 24 px of margin from text and controls; never put an edge through a filter, sidebar label, menu item, column header, or button. The frame's rounded corners hide about 20 px at each corner.
+- `render.mjs` decodes the screenshot with `ffmpeg` and scans each frame edge that lies inside the image (plus 6 px inward) for the start (`focus`) and end (`pan_to`) views: a pixel off the edge's background whose neighbourhood across the edge is not flat counts as cut content (text, an icon, a control). Dividers, borders, and filled panels crossing the edge are flat and pass. It refuses the spec with the edge, its position, and the range it cuts; `--allow-cut-edges` skips the scan for a frame you checked by eye. The scan does not see the frames in the middle of a pan, nor low-contrast text, so still look at the frames from `frames.mjs`.
 - Zoom at most 2.4x the covering scale; a smaller box shows more context around it, never less of the box.
 - Crop footage with `crop: "w:h:x:y"` at the 1000:720 aspect (a 1920x1080 recording: `1500:1080:<x>:0`).
 

@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { credits, findTrack } from "../../.rulesync/skills/video-shorts/scripts/credits.mjs";
-import { buildProps, disclaimerErrors, footageFitError, specErrors, undisclaimedScreens } from "../../.rulesync/skills/video-shorts/scripts/render.mjs";
+import { buildProps, disclaimerErrors, edgeCuts, footageFitError, specErrors, undisclaimedScreens, visibleRect } from "../../.rulesync/skills/video-shorts/scripts/render.mjs";
+import { sceneFrames } from "../../.rulesync/skills/video-shorts/scripts/frames.mjs";
 import { sceneTiming } from "../../.rulesync/skills/video-shorts/scripts/timing.mjs";
 import { sceneKey, voiceSettings } from "../../.rulesync/skills/video-shorts/scripts/voice.mjs";
 import { join } from "node:path";
@@ -107,4 +108,36 @@ test("without a profile disclaimer, product screens render bare and are reported
   assert.deepEqual(undisclaimedScreens(props, { video: {} }), ["tela", "rec"]);
   assert.deepEqual(undisclaimedScreens(props, null), ["tela", "rec"]);
   assert.deepEqual(undisclaimedScreens(props, screenProfile), []);
+});
+
+/** Light screenshot (245) with dark text blocks (40) and a full-width divider line, as {width, height, data}. */
+function screenshot(width, height, blocks, dividers = []) {
+  const data = Buffer.alloc(width * height, 245);
+  for (const [x, y, w, h] of blocks) {
+    for (let row = y; row < y + h; row += 1) for (let col = x; col < x + w; col += 1) if ((col + row) % 3) data[row * width + col] = 40;
+  }
+  for (const row of dividers) data.fill(200, row * width, (row + 1) * width);
+  return { width, height, data };
+}
+
+test("frame edges that slice UI text are refused; flat dividers and full-width boxes pass", () => {
+  // A "Período" label at x 1290-1400 on a 1440x1037 screenshot, like the filter the reel cut to "Perí".
+  const gray = screenshot(1440, 1037, [[40, 60, 400, 24], [1290, 60, 110, 24], [40, 400, 600, 24]], [300]);
+  const cutting = { x: 0, y: 0, w: 1340, h: 965 };
+  assert.deepEqual(Object.values(visibleRect(cutting, gray)).map(Math.round), [0, 0, 1340, 965]);
+  assert.deepEqual(edgeCuts(gray, visibleRect(cutting, gray)).map((cut) => [cut.edge, cut.at, cut.from, cut.to]), [["right", 1339, 60, 83]]);
+  assert.deepEqual(edgeCuts(gray, { x: 0, y: 0, w: 1250, h: 900 }), []);
+  assert.deepEqual(edgeCuts(gray, { x: 0, y: 0, w: 1440, h: 1037 }), []);
+  assert.deepEqual(edgeCuts(gray, { x: 0, y: 200, w: 1250, h: 400 }), [], "a divider crossing the edge is not content");
+  assert.deepEqual(edgeCuts(gray, { x: 0, y: 410, w: 1250, h: 400 }).map((cut) => cut.edge), ["top"]);
+  const root = tempDir({ "shot.png": png(1440, 1037) });
+  const spec = { id: "v", scenes: [{ id: "tela", kind: "screen", image: "shot.png", focus: { x: 0, y: 0, w: 1340, h: 965 }, pan_to: { x: 0, y: 0, w: 1250, h: 900 } }] };
+  assert.deepEqual(specErrors(spec, root, null, { pixels: () => gray }), ["scene tela: focus frame right edge (x=1339) cuts UI content between y=60 and 83; move or resize the box so the edge falls on empty background with a margin, make it span the full screenshot width, or crop the screenshot to the useful area when capturing it"]);
+  assert.deepEqual(specErrors(spec, root, null, { pixels: () => null }), []);
+  assert.deepEqual(specErrors(spec, root), []);
+});
+
+test("frames: first settled and last frame of each screen and footage scene", () => {
+  const props = { scenes: [{ id: "hook", kind: "hook", durationInFrames: 72 }, { id: "tela", kind: "screen", durationInFrames: 120 }, { id: "rec", kind: "footage", durationInFrames: 105 }, { id: "cta", kind: "cta", durationInFrames: 183 }] };
+  assert.deepEqual(sceneFrames(props), [{ id: "tela", kind: "screen", first: 3, last: 6.333 }, { id: "rec", kind: "footage", first: 7, last: 9.833 }]);
 });
