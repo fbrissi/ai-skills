@@ -60,9 +60,31 @@ test("a failed thumbnail is a warning, not a failure, and the video is never upl
   const out = sink();
   await run(s, youtube({ failThumb: true }), { out });
   assert.match(out.text(), /warnings: thumbnail: thumbnails.set 403: channel not verified/);
+  assert.equal(JSON.parse(readFileSync(s.path, "utf8")).state.a.extra.pending_thumbnail, true);
   const again = youtube();
-  await run({ ...s, data: JSON.parse(readFileSync(s.path, "utf8")) }, again);
-  assert.equal(again.calls.length, 0);
+  const out2 = sink();
+  await run({ ...s, data: JSON.parse(readFileSync(s.path, "utf8")) }, again, { out: out2 });
+  assert.deepEqual(again.calls.map((call) => new URL(call.url).pathname), ["/upload/youtube/v3/thumbnails/set"], "only the pending thumbnail is retried; the video is not uploaded again");
+  assert.match(out2.text(), /thumbnail set: a/);
+  const saved = JSON.parse(readFileSync(s.path, "utf8")).state.a.extra;
+  assert.equal(saved.pending_thumbnail, false);
+  assert.deepEqual(saved.warnings, []);
+  const third = youtube();
+  await run({ ...s, data: JSON.parse(readFileSync(s.path, "utf8")) }, third);
+  assert.equal(third.calls.length, 0);
+});
+
+test("paid product placement is always declared", () => {
+  assert.deepEqual(videoResource(short("a")).paidProductPlacementDetails, { hasPaidProductPlacement: false });
+  assert.deepEqual(videoResource(short("b", { options: { paid_product_placement: true } })).paidProductPlacementDetails, { hasPaidProductPlacement: true });
+});
+
+test("the insert asks for the paidProductPlacementDetails part", async () => {
+  const s = setup([short("a")]);
+  const fetchImpl = youtube();
+  await run(s, fetchImpl);
+  assert.match(fetchImpl.calls[0].url, /part=snippet,status,paidProductPlacementDetails/);
+  assert.equal(JSON.parse(fetchImpl.calls[0].body).paidProductPlacementDetails.hasPaidProductPlacement, false);
 });
 
 test("the daily upload limit leaves the rest for the next run", async () => {

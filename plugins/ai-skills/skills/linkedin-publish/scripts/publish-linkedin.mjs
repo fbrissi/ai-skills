@@ -1,0 +1,174 @@
+#!/usr/bin/env node
+// Deterministic LinkedIn Page publisher (Community Management API) for an approved social manifest. LinkedIn has
+// no scheduling API: each run publishes the next due item (one by default), uploading its media through the Images
+// and Videos APIs (no public URL needed), and records the result in the manifest's state. Before the final POST it
+// saves the item as "unknown" with its media URNs; a later run resolves it by reading the Page's recent posts
+// (r_organization_social), so a lost response never posts twice. Never prints tokens.
+// Usage: publish-linkedin.mjs <manifest.json> [--execute] [--max N] [--item <id>] [--now ISO]
+//        [--call-budget N] [--daily-calls N] [--poll-seconds N] [--timeout-seconds N]
+// Env: LINKEDIN_ORGANIZATION_ID, LINKEDIN_CLIENT_ID, LINKEDIN_CLIENT_SECRET, LINKEDIN_REFRESH_TOKEN,
+//      LINKEDIN_API_VERSION (default 202610), LINKEDIN_DAILY_CALLS (default 500).
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { accessToken, LinkedInClient, linkedinEnv, littleText, postUrl } from "./linkedin.mjs";
+import { composeText, isDone, isMain, loadManifest, recordState, resolveMediaPath, saveManifest, validateManifest, zoneOffset } from "./social-manifest.mjs";
+
+export const DEFAULT_CALL_BUDGET = 100;
+export const DEFAULT_DAILY_CALLS = 500;
+const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
+
+export class PublishError extends Error {}
+
+function today(timeZone, now) {
+  const offset = zoneOffset(timeZone, now);
+  const sign = offset.startsWith("-") ? -1 : 1;
+  const [hours, minutes] = offset.slice(1).split(":").map(Number);
+  return new Date(now.getTime() + sign * (hours * 60 + minutes) * 60000).toISOString().slice(0, 10);
+}
+
+/** Items due now, in manifest order: not done, and dated today or earlier (or publish_at passed when set). */
+export function dueItems(manifest, now = new Date(), { item = null } = {}) {
+  const day = today(manifest.timezone, now);
+  return manifest.items.filter((entry) => {
+    if (isDone(manifest, entry.id)) return false;
+    if (item) return entry.id === item;
+    if (entry.publish_at) return Date.parse(entry.publish_at) <= now.getTime();
+    return entry.date <= day;
+  });
+}
+
+/** API calls this manifest recorded in the last 24 hours, against the app's daily limit. */
+export function callsInLast24h(manifest, now) {
+  return Object.values(manifest.state ?? {}).filter((entry) => now.getTime() - Date.parse(entry.at) < 24 * 3600 * 1000).reduce((sum, entry) => sum + (entry.extra?.api_calls ?? 0), 0);
+}
+
+/** Rough upper bound of calls an item needs (uploads, status polls, post, read-back). */
+export function estimateCalls(item) {
+  const images = item.media.filter((media) => media.kind === "image").length;
+  const videos = item.media.filter((media) => media.kind === "video").length;
+  return 2 + images * 4 + videos * 8;
+}
+
+export function postContent(item, mediaUrns) {
+  if (item.type === "post") return item.link ? { content: { article: { source: item.link, title: item.title ?? new URL(item.link).hostname } } } : {};
+  if (item.type === "photo") return { content: { media: { id: mediaUrns[0], ...(item.media[0].alt ? { altText: item.media[0].alt } : {}) } } };
+  if (item.type === "video") return { content: { media: { id: mediaUrns[0], ...(item.title ? { title: item.title } : {}) } } };
+  if (item.type === "carousel") return { content: { multiImage: { images: mediaUrns.map((id, index) => ({ id, ...(item.media[index].alt ? { altText: item.media[index].alt } : {}) })) } } };
+  throw new PublishError(`${item.id}: unsupported type ${item.type}`);
+}
+
+async function findExisting(client, commentary) {
+  const posts = await client.recentPosts(20);
+  return posts.find((post) => post.commentary === commentary) ?? null;
+}
+
+async function publishOne(item, { client, manifestDir, language, previous, checkpoint, pollMs, timeoutMs }) {
+  const commentary = littleText(composeText(item, "linkedin", language));
+  if (previous?.status === "unknown") {
+    const existing = await findExisting(client, commentary);
+    if (existing) return { remote_id: existing.id, url: postUrl(existing.id), extra: { resolved: "found by read-back" } };
+  }
+  let urns = previous?.status === "unknown" ? previous.extra?.media_urns ?? [] : [];
+  if (urns.length !== item.media.length) {
+    urns = [];
+    for (const media of item.media) {
+      const bytes = readFileSync(resolveMediaPath(manifestDir, media.path));
+      urns.push(media.kind === "video" ? await client.uploadVideo(bytes) : await client.uploadImage(bytes));
+    }
+  }
+  for (const urn of urns) await client.waitAvailable(urn, { pollMs, timeoutMs, sleep });
+  checkpoint({ extra: { media_urns: urns } });
+  let id;
+  try {
+    id = await client.createPost({ commentary, ...postContent(item, urns) });
+  } catch (error) {
+    // A 4xx answer is a definite refusal (nothing was posted); network errors and 5xx stay uncertain.
+    if (error.status >= 400 && error.status < 500) error.definite = true;
+    throw error;
+  }
+  return { remote_id: id, url: postUrl(id), extra: { media_urns: urns } };
+}
+
+export async function publish(manifest, { manifestDir, manifestPath, client, execute, now = new Date(), max = 1, item = null, callBudget = DEFAULT_CALL_BUDGET, dailyCalls = DEFAULT_DAILY_CALLS, pollMs = 5000, timeoutMs = 900000, out = process.stdout }) {
+  const errors = validateManifest(manifest, { manifestDir, forPublish: execute, now }).filter((error) => !manifest.items.some((entry) => error.startsWith(`${entry.id}:`) && isDone(manifest, entry.id)));
+  if (manifest.platform !== "linkedin") errors.unshift(`manifest platform is ${manifest.platform}, not linkedin`);
+  if (errors.length) throw new PublishError(`invalid batch:\n- ${errors.join("\n- ")}`);
+  const due = dueItems(manifest, now, { item }).slice(0, max);
+  if (!due.length) {
+    out.write("nothing due: every approved item is published or waits for its date\n");
+    return [];
+  }
+  const done = [];
+  for (const entry of due) {
+    if (!execute) {
+      out.write(`dry run: ${entry.id} ${entry.type}${entry.media.length ? ` with ${entry.media.length} file(s)` : ""} (about ${estimateCalls(entry)} API calls)\n`);
+      continue;
+    }
+    const spentToday = callsInLast24h(manifest, now);
+    if (client.calls + estimateCalls(entry) > callBudget || spentToday + client.calls + estimateCalls(entry) > dailyCalls) {
+      out.write(`call budget reached (run ${client.calls}/${callBudget}, 24 h ${spentToday + client.calls}/${dailyCalls}): ${entry.id} waits for the next run\n`);
+      break;
+    }
+    const previous = manifest.state[entry.id];
+    const before = client.calls;
+    const checkpoint = (extra) => {
+      recordState(manifest, entry.id, { status: "unknown", error: "post sent; waiting for the response", ...extra, extra: { ...extra.extra, api_calls: client.calls - before } }, now);
+      saveManifest(manifestPath, manifest);
+    };
+    try {
+      const result = await publishOne(entry, { client, manifestDir, language: manifest.language, previous, checkpoint, pollMs, timeoutMs });
+      recordState(manifest, entry.id, { status: "published", publish_at: now.toISOString(), error: null, ...result, extra: { ...result.extra, api_calls: client.calls - before } }, now);
+      saveManifest(manifestPath, manifest);
+      out.write(`published: ${entry.id} (${result.remote_id}) ${result.url}\n`);
+      done.push(entry.id);
+    } catch (error) {
+      // Once the post was sent (unknown), only the read-back may decide; before that, errors are plain failures.
+      const sent = manifest.state[entry.id]?.status === "unknown" && !error.definite;
+      recordState(manifest, entry.id, { status: sent ? "unknown" : "failed", error: error.message, extra: { ...(manifest.state[entry.id]?.extra ?? {}), api_calls: client.calls - before } }, now);
+      saveManifest(manifestPath, manifest);
+      throw new PublishError(`${entry.id}: ${error.message}`);
+    }
+  }
+  return done;
+}
+
+function flag(argv, name) {
+  const index = argv.indexOf(`--${name}`);
+  return index >= 0 ? argv[index + 1] : undefined;
+}
+
+export async function main(argv, { env = process.env, fetchImpl = fetch, out = process.stdout } = {}) {
+  const valued = new Set(["--max", "--item", "--now", "--call-budget", "--daily-calls", "--poll-seconds", "--timeout-seconds"]);
+  const manifestPath = argv.find((arg, index) => !arg.startsWith("--") && !valued.has(argv[index - 1]));
+  if (!manifestPath) throw new PublishError("usage: publish-linkedin.mjs <manifest.json> [--execute] [--max N] [--item <id>] [--call-budget N] [--daily-calls N] [--now ISO]");
+  const execute = argv.includes("--execute");
+  let client = null;
+  if (execute) {
+    const settings = linkedinEnv(env);
+    const auth = await accessToken(settings, fetchImpl);
+    if (auth.rotated) out.write("warning: LinkedIn returned a new refresh token; update LINKEDIN_REFRESH_TOKEN (value not printed)\n");
+    client = new LinkedInClient({ token: auth.token, version: settings.version, fetchImpl, organizationId: settings.organizationId });
+  }
+  return publish(loadManifest(manifestPath), {
+    manifestDir: dirname(resolve(manifestPath)),
+    manifestPath,
+    client,
+    execute,
+    now: flag(argv, "now") ? new Date(flag(argv, "now")) : new Date(),
+    max: Number(flag(argv, "max") ?? 1),
+    item: flag(argv, "item") ?? null,
+    callBudget: Number(flag(argv, "call-budget") ?? DEFAULT_CALL_BUDGET),
+    dailyCalls: Number(flag(argv, "daily-calls") ?? env.LINKEDIN_DAILY_CALLS ?? DEFAULT_DAILY_CALLS),
+    pollMs: Number(flag(argv, "poll-seconds") ?? 5) * 1000,
+    timeoutMs: Number(flag(argv, "timeout-seconds") ?? 900) * 1000,
+    out,
+  });
+}
+
+if (isMain(import.meta.url)) {
+  main(process.argv.slice(2)).catch((error) => {
+    process.stderr.write(`${error.message}\n`);
+    process.exitCode = 1;
+  });
+}
+

@@ -140,3 +140,20 @@ test("publishing requires the approval to match the current revision", async () 
   const { dir, data, path } = setup([item()], { review: { revision: 2 }, approval: { status: "approved", by: "ana", at: NOW.toISOString(), revision: 1 } });
   await assert.rejects(run(data, dir, path, new GraphClient({ token: TOKEN, fetchImpl: graph() })), /approval is for revision 1, but the batch is at revision 2/);
 });
+
+test("AI narration or footage sends is_ai_generated on the Reel, and copyright matches become warnings", async () => {
+  const reel = item({ type: "reel", ai_audio: true, media: [{ path: "media/reel.mp4", kind: "video", width: 1080, height: 1920, duration: 20 }] });
+  const { dir, data, path } = setup([reel]);
+  const base = graph();
+  const fetchImpl = async (url, init) => (String(url).includes("/v1?fields=copyright_check_information") ? new Response(JSON.stringify({ copyright_check_information: { status: { status: "complete", matches_found: true } } })) : base(url, init));
+  const out = sink();
+  await run(data, dir, path, new GraphClient({ token: TOKEN, fetchImpl }), { out });
+  const finish = base.calls.find((call) => call.body instanceof URLSearchParams && call.body.get("upload_phase") === "finish");
+  assert.equal(new URLSearchParams(finish.body).get("is_ai_generated"), "true");
+  const state = JSON.parse(readFileSync(path, "utf8")).state["2026-11-30-facebook-1"];
+  assert.equal(state.extra.copyright_check, "complete");
+  assert.match(state.extra.warnings[0], /copyright check found matches/);
+  assert.match(out.text(), /warnings: copyright check found matches/);
+  const plain = plan(item({ type: "reel", media: [{ path: "media/reel.mp4", kind: "video" }] }), { pageId: "123", manifestDir: dir });
+  assert.equal(plain.aiGenerated, false);
+});

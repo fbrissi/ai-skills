@@ -33,7 +33,7 @@ When the profile names a Drive folder, download the tracks once:
 node <skill-dir>/scripts/drive.mjs download-folder --folder <video.music.drive_folder_id> --out .cache/video-shorts/music
 ```
 
-Pick a track listed in `video.music.tracks` (its license feeds the credits) and set `music` in the spec. Without music, omit it.
+Pick a track listed in `video.music.tracks` and set `music` in the spec. Every track needs `license_url`, `evidence` (the Drive file id of the license evidence, such as the download page saved as PDF), and `sha256` of the file in the profile: `render.mjs` refuses music without them or whose file hash differs. A YouTube Short with music must stay at most 60 s. Without music, omit it.
 
 ## 3. Narration and render
 
@@ -52,7 +52,7 @@ Watch the video, or at least extract a frame per scene (`ffmpeg -ss <t> -i <mp4>
 node <skill-dir>/scripts/credits.mjs --profile docs/ai/social-content.md --music <track file> [--lang pt-BR]
 ```
 
-Put the output in the item's `credits` (it is appended to the caption or description). Add the MP4 to `media` with `kind: "video"`, `width`, `height`, `duration`; set `synthetic_media` from the render output and `spec` to the spec path. For YouTube, also render a thumbnail with `image-cards` (`yt-thumbnail`); if it is not installed, extract a clear frame of the video as a 1280x720 JPEG (`ffmpeg -ss <t> -i <mp4> -vf "scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720" -frames:v 1 thumb.jpg`) or leave `thumbnail` empty.
+Put the output in the item's `credits` (it is appended to the caption or description). Add the MP4 to `media` with `kind: "video"`, `width`, `height`, `duration`; set `synthetic_media`, `ai_audio` (true whenever narration was generated; Meta's AI label and LinkedIn's disclosure depend on it), and `music` (the license entry) from the render output, and `spec` to the spec path. For YouTube, also render a thumbnail with `image-cards` (`yt-thumbnail`); if it is not installed, extract a clear frame of the video as a 1280x720 JPEG (`ffmpeg -ss <t> -i <mp4> -vf "scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720" -frames:v 1 thumb.jpg`) or leave `thumbnail` empty.
 
 ## Output
 

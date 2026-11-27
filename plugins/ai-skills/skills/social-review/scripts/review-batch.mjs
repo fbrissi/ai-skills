@@ -20,15 +20,15 @@ import { gunzipSync, gzipSync } from "node:zlib";
 import { Drive, fileUrl, folderUrl, md5 } from "./drive.mjs";
 import { approveManifest, composeText, isMain, loadManifest, readProfileConfig, resolveMediaPath, saveManifest } from "./social-manifest.mjs";
 
-export const PLATFORM_NAMES = { facebook: "Facebook", instagram: "Instagram", youtube: "YouTube" };
+export const PLATFORM_NAMES = { facebook: "Facebook", instagram: "Instagram", youtube: "YouTube", linkedin: "LinkedIn" };
 export const MARKER = /<!-- social-content-manifest:v1:([A-Za-z0-9+/=]+) -->/g;
 export const MAX_BODY = 65000;
 
 export class ReviewError extends Error {}
 
 const LABELS = {
-  pt: { title: (p, d, n) => `${p}: lote de ${d} (${n} ${n === 1 ? "item" : "itens"})`, date: "Data", type: "Tipo", text: "Texto", drive: "Drive", folder: "pasta", how: "Como revisar", howText: (adjust, approve) => `Comente \`${adjust} <id>: <o que mudar>\` (um ou mais itens) para refazer só o que pedir, ou \`${approve}\` para aprovar e publicar o lote. Só comentários de quem tem permissão de escrita contam.`, full: "Textos completos", sources: "Fontes", credits: "Créditos", next: "próxima execução", revision: (n) => `Revisão ${n}`, changed: "Itens refeitos", synthetic: "contém mídia sintética (IA)" },
-  en: { title: (p, d, n) => `${p}: batch of ${d} (${n} ${n === 1 ? "item" : "items"})`, date: "Date", type: "Type", text: "Text", drive: "Drive", folder: "folder", how: "How to review", howText: (adjust, approve) => `Comment \`${adjust} <id>: <what to change>\` (one or more items) to redo only what you ask for, or \`${approve}\` to approve and publish the batch. Only comments from people with write access count.`, full: "Full copy", sources: "Sources", credits: "Credits", next: "next run", revision: (n) => `Revision ${n}`, changed: "Items redone", synthetic: "contains synthetic (AI) media" },
+  pt: { music: "Música", license: "licença", evidence: "evidência", ai: (item) => `IA: ${[item.ai_audio ? "narração sintética" : null, item.synthetic_media ? "imagens geradas por IA" : null].filter(Boolean).join(" e ")} (rótulo de IA na Meta${item.synthetic_media ? ", containsSyntheticMedia no YouTube" : ""}, aviso no texto do LinkedIn)`, title: (p, d, n) => `${p}: lote de ${d} (${n} ${n === 1 ? "item" : "itens"})`, date: "Data", type: "Tipo", text: "Texto", drive: "Drive", folder: "pasta", how: "Como revisar", howText: (adjust, approve) => `Comente \`${adjust} <id>: <o que mudar>\` (um ou mais itens) para refazer só o que pedir, ou \`${approve}\` para aprovar e publicar o lote. Só comentários de quem tem permissão de escrita contam.`, full: "Textos completos", sources: "Fontes", credits: "Créditos", next: "próxima execução", revision: (n) => `Revisão ${n}`, changed: "Itens refeitos", synthetic: "contém mídia sintética (IA)" },
+  en: { music: "Music", license: "license", evidence: "evidence", ai: (item) => `AI: ${[item.ai_audio ? "synthetic narration" : null, item.synthetic_media ? "AI-generated footage" : null].filter(Boolean).join(" and ")} (Meta AI label${item.synthetic_media ? ", YouTube containsSyntheticMedia" : ""}, LinkedIn text disclosure)`, title: (p, d, n) => `${p}: batch of ${d} (${n} ${n === 1 ? "item" : "items"})`, date: "Date", type: "Type", text: "Text", drive: "Drive", folder: "folder", how: "How to review", howText: (adjust, approve) => `Comment \`${adjust} <id>: <what to change>\` (one or more items) to redo only what you ask for, or \`${approve}\` to approve and publish the batch. Only comments from people with write access count.`, full: "Full copy", sources: "Sources", credits: "Credits", next: "next run", revision: (n) => `Revision ${n}`, changed: "Items redone", synthetic: "contains synthetic (AI) media" },
 };
 
 const labelsFor = (manifest) => (String(manifest.language).toLowerCase().startsWith("pt") ? LABELS.pt : LABELS.en);
@@ -63,6 +63,12 @@ function driveLinks(item, labels) {
   return [`[${labels.folder}](${item.drive.folder_url ?? folderUrl(item.drive.folder_id)})`, ...files].join(" · ");
 }
 
+/** Music line with its license and the Drive evidence, so the reviewer can check the license before approving. */
+export function musicLine(music, labels) {
+  const who = [music.author, music.source].filter(Boolean).join(", ");
+  return `${labels.music}: "${cell(music.title)}"${who ? `, ${cell(who)}` : ""} (${cell(music.license)}; [${labels.license}](${music.license_url}); [${labels.evidence}](${fileUrl(music.evidence)}); sha256 \`${music.sha256.slice(0, 12)}…\`)`;
+}
+
 export function issueBody(manifest, { review = {} } = {}) {
   const labels = labelsFor(manifest);
   const platform = PLATFORM_NAMES[manifest.platform];
@@ -74,7 +80,7 @@ export function issueBody(manifest, { review = {} } = {}) {
     "",
     `| ${labels.date} | ${labels.type} | id | ${labels.text} | ${labels.drive} |`,
     "|---|---|---|---|---|",
-    ...manifest.items.map((item) => `| ${when(item, labels)} | ${item.type}${item.synthetic_media ? " ⚠" : ""} | \`${item.id}\` | ${firstLine(item.title ? `${item.title}: ${composeText(item, manifest.platform)}` : composeText(item, manifest.platform))} | ${driveLinks(item, labels)} |`),
+    ...manifest.items.map((item) => `| ${when(item, labels)} | ${item.type}${item.synthetic_media ? " ⚠" : ""} | \`${item.id}\` | ${firstLine(item.title ? `${item.title}: ${composeText(item, manifest.platform, manifest.language)}` : composeText(item, manifest.platform, manifest.language))} | ${driveLinks(item, labels)} |`),
     "",
     `### ${labels.how}`,
     "",
@@ -83,12 +89,14 @@ export function issueBody(manifest, { review = {} } = {}) {
     `### ${labels.full}`,
   ];
   for (const item of manifest.items) {
-    const text = composeText(item, manifest.platform);
+    const text = composeText(item, manifest.platform, manifest.language);
     const mark = fence(text);
     lines.push("", `#### \`${item.id}\` (${item.type}, ${when(item, labels)}, ${item.visibility}${item.synthetic_media ? `, ${labels.synthetic}` : ""})`, "");
     if (item.title) lines.push(`**${cell(item.title)}**`, "");
     lines.push(`${mark}text`, text, mark);
     if (item.sources?.length) lines.push("", `${labels.sources}: ${item.sources.map(cell).join("; ")}`);
+    if (item.music) lines.push("", musicLine(item.music, labels));
+    if (item.ai_audio || item.synthetic_media) lines.push("", labels.ai(item));
   }
   lines.push("", encodeMarker(manifest), "");
   const body = lines.join("\n");
@@ -103,7 +111,7 @@ export function revisionComment(manifest, changed, { review = {}, note = null } 
   const lines = [`<!-- social-content:revision ${manifest.review?.revision ?? 1} -->`, `### ${labels.revision(manifest.review?.revision ?? 1)}`, ""];
   if (note) lines.push(note, "");
   lines.push(`${labels.changed}:`, "");
-  for (const item of items) lines.push(`- \`${item.id}\` (${item.type}, ${when(item, labels)}): ${firstLine(composeText(item, manifest.platform), 140)} ${driveLinks(item, labels)}`.trimEnd());
+  for (const item of items) lines.push(`- \`${item.id}\` (${item.type}, ${when(item, labels)}): ${firstLine(composeText(item, manifest.platform, manifest.language), 140)} ${driveLinks(item, labels)}`.trimEnd());
   lines.push("", labels === LABELS.pt ? `O corpo da issue tem o lote atualizado. \`${approve}\` aprova esta revisão.` : `The issue body has the updated batch. \`${approve}\` approves this revision.`, "");
   return lines.join("\n");
 }

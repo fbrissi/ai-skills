@@ -189,3 +189,10 @@ test("download-folder keeps Drive file names inside the output directory", async
   await main(["download-folder", "--folder", "F", "--out", join(dir, "music")], { env: { GOOGLE_API_KEY: "k" }, fetchImpl, out: { write() {} } });
   assert.equal(readFileSync(join(dir, "music", "evil.mp3"), "utf8"), "x");
 });
+
+test("the issue shows the music license evidence and the AI disclosure", () => {
+  const music = { file: "city.mp3", title: "City Sunshine", author: "Kevin MacLeod", source: "FreePD", license: "CC0", license_url: "https://freepd.com/", evidence: "EVID", sha256: "a".repeat(64) };
+  const body = issueBody(pending([item({ music, ai_audio: true })]));
+  assert.match(body, /Música: "City Sunshine", Kevin MacLeod, FreePD \(CC0; \[licença\]\(https:\/\/freepd.com\/\); \[evidência\]\(https:\/\/drive.google.com\/file\/d\/EVID\/view\); sha256 `aaaaaaaaaaaa…`\)/);
+  assert.match(body, /IA: narração sintética \(rótulo de IA na Meta, aviso no texto do LinkedIn\)/);
+});

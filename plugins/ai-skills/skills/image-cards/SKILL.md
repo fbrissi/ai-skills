@@ -30,6 +30,8 @@ Write `<batch-dir>/specs/<item-id>.cards.json` (format in [references/cards-spec
 | `fb-portrait` | 1080x1350 | PNG | Facebook feed |
 | `fb-landscape` | 1200x630 | PNG | Facebook link and landscape posts |
 | `yt-thumbnail` | 1280x720 | JPEG | YouTube custom thumbnail |
+| `li-landscape` | 1200x627 | PNG | LinkedIn single image and link posts |
+| `li-square` | 1200x1200 | PNG | LinkedIn square and multi-image posts |
 
 Instagram accepts only JPEG, so keep the default types. Text on the card follows the `copy-guard` rules too: run its checker on the headlines and leads (`--text -`).
 

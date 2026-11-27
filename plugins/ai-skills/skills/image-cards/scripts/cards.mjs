@@ -10,6 +10,8 @@ export const FORMATS = {
   "fb-portrait": { w: 1080, h: 1350, safe: [96, 96, 96, 96], type: "png", scale: 1 },
   "fb-landscape": { w: 1200, h: 630, safe: [56, 64, 56, 64], type: "png", scale: 0.62, row: true },
   "yt-thumbnail": { w: 1280, h: 720, safe: [56, 64, 56, 64], type: "jpeg", scale: 0.8, row: true },
+  "li-landscape": { w: 1200, h: 627, safe: [56, 64, 56, 64], type: "png", scale: 0.62, row: true },
+  "li-square": { w: 1200, h: 1200, safe: [88, 96, 88, 96], type: "png", scale: 0.95 },
 };
 
 export const TEMPLATES = ["headline", "statement", "slide", "thumbnail"];

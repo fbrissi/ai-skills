@@ -58,3 +58,9 @@ test("CLI --init writes the batch directory once", () => {
   assert.equal(JSON.parse(readFileSync(join(batch, "manifest.json"), "utf8")).items.length, 3);
   assert.equal(main(["--profile", join(dir, "p.md"), "--platform", "facebook", "--now", NOW.toISOString(), "--init", batch], { out: sink() }), 1);
 });
+
+test("LinkedIn slots, like Instagram, have no publish_at and are never scheduled", () => {
+  const plan = planSlots({ ...config, platforms: { linkedin: { days: ["tue"], times: ["09:00"], formats: ["photo"], scheduled: true } } }, "linkedin", { now: NOW });
+  assert.deepEqual(plan.slots.map((slot) => [slot.date, slot.publish_at]), [["2026-12-01", null]]);
+  assert.equal(plan.defaults.scheduled, false);
+});

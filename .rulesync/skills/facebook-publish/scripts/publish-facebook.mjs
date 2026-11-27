@@ -9,7 +9,7 @@
 import { readFileSync, statSync } from "node:fs";
 import { dirname, extname, resolve } from "node:path";
 import { GraphClient, GraphError, graphEnv } from "./graph.mjs";
-import { LIMITS, splitStale, composeText, finalCall, isDone, isMain, loadManifest, pendingItems, recordState, reportBlocked, resolveMediaPath, saveManifest, UncertainError, validateManifest } from "./social-manifest.mjs";
+import { LIMITS, splitStale, composeText, isAiGenerated, finalCall, isDone, isMain, loadManifest, pendingItems, recordState, reportBlocked, resolveMediaPath, saveManifest, UncertainError, validateManifest } from "./social-manifest.mjs";
 
 const IMAGE_TYPES = { ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg" };
 const RUPLOAD = "https://rupload.facebook.com/video-upload";
@@ -26,7 +26,7 @@ export function plan(item, { pageId, manifestDir }) {
     : { published: "true" };
   const media = item.media.map((entry) => ({ ...entry, full: resolveMediaPath(manifestDir, entry.path) }));
   if (item.type === "reel") {
-    return { kind: "reel", path: `${pageId}/video_reels`, video: media[0].full, description: message, title: item.title ?? undefined, scheduled: item.scheduled, publishTime: item.scheduled ? unix(item.publish_at) : undefined };
+    return { kind: "reel", path: `${pageId}/video_reels`, video: media[0].full, description: message, title: item.title ?? undefined, scheduled: item.scheduled, publishTime: item.scheduled ? unix(item.publish_at) : undefined, aiGenerated: isAiGenerated(item) };
   }
   const feed = { message, ...schedule };
   if (item.type === "post" && item.link) feed.link = item.link;
@@ -52,9 +52,22 @@ async function publishReel(client, step) {
     scheduled_publish_time: step.publishTime,
     description: step.description,
     title: step.title,
+    is_ai_generated: step.aiGenerated ? "true" : undefined,
   }));
   if (finish.success === false) throw new GraphError(`Reel ${start.video_id} was not accepted`);
-  return { remote_id: start.video_id, url: `https://www.facebook.com/reel/${start.video_id}` };
+  return { remote_id: start.video_id, url: `https://www.facebook.com/reel/${start.video_id}`, extra: await copyrightCheck(client, start.video_id) };
+}
+
+/** Reads the Reel's copyright check; matches or a failed read become warnings, never a failed publish. */
+export async function copyrightCheck(client, videoId) {
+  try {
+    const info = (await client.get(videoId, { fields: "copyright_check_information" })).copyright_check_information;
+    const status = info?.status?.status ?? info?.status ?? null;
+    const matches = info?.status?.matches_found ?? info?.matches_found ?? false;
+    return { copyright_check: status, ...(matches ? { warnings: [`copyright check found matches (${status}); review the Reel in Meta Business Suite`] } : {}) };
+  } catch (error) {
+    return { warnings: [`copyright check not read: ${error.message}`] };
+  }
 }
 
 async function publishFeed(client, step) {
@@ -88,7 +101,7 @@ export async function publish(manifest, { manifestDir, manifestPath, client, pag
       const result = step.kind === "reel" ? await publishReel(client, step) : await publishFeed(client, step);
       recordState(manifest, item.id, { status: item.scheduled ? "scheduled" : "published", publish_at: item.publish_at, error: null, ...result }, now);
       saveManifest(manifestPath, manifest);
-      out.write(`${item.scheduled ? "scheduled" : "published"}: ${item.id} ${when} (${result.remote_id})\n`);
+      out.write(`${item.scheduled ? "scheduled" : "published"}: ${item.id} ${when} (${result.remote_id})${result.extra?.warnings ? ` (warnings: ${result.extra.warnings.join("; ")})` : ""}\n`);
     } catch (error) {
       recordState(manifest, item.id, { status: error instanceof UncertainError ? "unknown" : "failed", error: error.message }, now);
       saveManifest(manifestPath, manifest);

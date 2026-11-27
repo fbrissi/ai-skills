@@ -6,7 +6,7 @@ import { png, tempDir } from "./helpers.mjs";
 
 test("formats cover every platform size", () => {
   const sizes = Object.fromEntries(Object.entries(FORMATS).map(([name, f]) => [name, `${f.w}x${f.h}:${f.type}`]));
-  assert.deepEqual(sizes, { "ig-portrait": "1080x1350:jpeg", "ig-square": "1080x1080:jpeg", story: "1080x1920:jpeg", "fb-portrait": "1080x1350:png", "fb-landscape": "1200x630:png", "yt-thumbnail": "1280x720:jpeg" });
+  assert.deepEqual(sizes, { "ig-portrait": "1080x1350:jpeg", "ig-square": "1080x1080:jpeg", story: "1080x1920:jpeg", "fb-portrait": "1080x1350:png", "fb-landscape": "1200x630:png", "yt-thumbnail": "1280x720:jpeg", "li-landscape": "1200x627:png", "li-square": "1200x1200:png" });
 });
 
 test("pages escape text, inline images and fonts, and use brand colors", () => {
@@ -23,7 +23,7 @@ test("pages escape text, inline images and fonts, and use brand colors", () => {
 });
 
 test("spec validation lists every problem; jobs expand card x format", () => {
-  assert.deepEqual(validateCard({ id: "Bad Id", template: "x", formats: ["nope"] }), ["card id must be kebab-case: Bad Id", "Bad Id: unknown template x", "Bad Id: headline is required", "Bad Id: unknown format nope (ig-portrait, ig-square, story, fb-portrait, fb-landscape, yt-thumbnail)"]);
+  assert.deepEqual(validateCard({ id: "Bad Id", template: "x", formats: ["nope"] }), ["card id must be kebab-case: Bad Id", "Bad Id: unknown template x", "Bad Id: headline is required", "Bad Id: unknown format nope (ig-portrait, ig-square, story, fb-portrait, fb-landscape, yt-thumbnail, li-landscape, li-square)"]);
   const jobs = jobsFor({ cards: [{ id: "a", headline: "h", formats: ["ig-portrait", "story"] }, { id: "b", headline: "h", formats: ["yt-thumbnail"] }] }, { only: "a" });
   assert.deepEqual(jobs.map((job) => job.format), ["ig-portrait", "story"]);
 });

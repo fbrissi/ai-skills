@@ -142,3 +142,20 @@ test("links to the profile's domains need the profile UTM", async () => {
   assert.match(errors[0], /^bad: link without the profile UTM \(utm_source=facebook&utm_medium=social&utm_campaign=organic-\{theme\}\)/);
   assert.deepEqual(utmErrors(manifest("facebook", [bad]), {}), []);
 });
+
+test("music Shorts over 60 s are refused; Facebook Reels schedule at most 29 days ahead", () => {
+  const dir = files();
+  const music = { title: "T", license: "CC0", license_url: "https://x.example", evidence: "E", sha256: "c".repeat(64) };
+  const short = (duration, extra = {}) => item({ type: "short", title: "T", caption: null, description: "D", media: [{ path: "media/reel.mp4", kind: "video", width: 1080, height: 1920, duration }], ...extra });
+  assert.ok(validate(manifest("youtube", [short(70, { music })]), dir).some((e) => e.includes("Shorts with music must be at most 60 s")));
+  assert.deepEqual(validate(manifest("youtube", [short(70)]), dir), []);
+  const reel = item({ type: "reel", date: "2026-12-27", publish_at: "2026-12-27T12:00:00-03:00", media: [{ path: "media/reel.mp4", kind: "video", width: 1080, height: 1920, duration: 30 }] });
+  assert.ok(validate(manifest("facebook", [reel]), dir, { forPublish: true }).some((e) => e.includes("10 minutes and 29 days")));
+  const photo = item({ date: "2026-12-27", publish_at: "2026-12-27T11:00:00-03:00" });
+  assert.deepEqual(validate(manifest("facebook", [photo]), dir, { forPublish: true }), []);
+});
+
+test("Instagram allows at most 5 hashtags", () => {
+  const data = manifest("instagram", [item({ publish_at: null, scheduled: false, media: [{ path: "media/card.jpg", kind: "image", width: 1080, height: 1350 }], hashtags: ["#a", "#b", "#c", "#d", "#e", "#f"] })]);
+  assert.ok(validate(data, files()).some((e) => e.includes("more than 5 hashtags")));
+});

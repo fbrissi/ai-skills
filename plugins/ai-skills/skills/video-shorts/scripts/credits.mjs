@@ -2,6 +2,8 @@
 // Credits text for a video description: the Piper voice's license chain and the music track.
 // Usage: credits.mjs [--profile <profile.md>] [--voice <id>] [--music <file or title>] [--lang pt-BR|en]
 // Voices other than the built-in ones need their credit in the profile (video.voice_credits[<voice>][<lang>]).
+import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { basename } from "node:path";
 import { isMain, readProfileConfig } from "./social-manifest.mjs";
 
@@ -32,8 +34,28 @@ export function findTrack(config, music) {
   const tracks = config?.video?.music?.tracks ?? [];
   const name = basename(music).toLowerCase();
   const track = tracks.find((entry) => [entry.file, entry.title].filter(Boolean).some((value) => value.toLowerCase() === name || basename(value).toLowerCase() === name));
-  if (!track) throw new CreditsError(`music ${music} is not listed in video.music.tracks of the profile; add its title, author, source and license`);
+  if (!track) throw new CreditsError(`music ${music} is not listed in video.music.tracks of the profile; add its title, author, source, license, license_url, evidence and sha256`);
+  const missing = MUSIC_EVIDENCE.filter((key) => !track[key]);
+  if (missing.length) throw new CreditsError(`music ${track.title ?? music} needs ${missing.join(", ")} in video.music.tracks: the license URL, the Drive file id of the license evidence, and the file's SHA-256`);
+  if (!/^[0-9a-f]{64}$/.test(track.sha256)) throw new CreditsError(`music ${track.title}: sha256 must be 64 lowercase hex characters`);
   return track;
+}
+
+export const MUSIC_EVIDENCE = ["title", "license", "license_url", "evidence", "sha256"];
+
+/** SHA-256 of a local file, to prove the track used is the one whose license evidence is on file. */
+export function sha256File(path) {
+  return createHash("sha256").update(readFileSync(path)).digest("hex");
+}
+
+/** The manifest's music entry for a track, after checking the local file against the recorded hash. */
+export function musicEntry(config, musicPath) {
+  const track = findTrack(config, musicPath);
+  if (!track) return null;
+  const actual = sha256File(musicPath);
+  if (actual !== track.sha256) throw new CreditsError(`music ${basename(musicPath)} does not match the sha256 in the profile (got ${actual}); download the licensed file again`);
+  const { file = basename(musicPath), title, author = null, source = null, license, license_url, evidence, sha256 } = track;
+  return { file, title, author, source, license, license_url, evidence, sha256 };
 }
 
 export function credits({ config = null, voice = null, music = null, lang = null } = {}) {

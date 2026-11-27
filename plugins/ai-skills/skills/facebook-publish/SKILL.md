@@ -34,6 +34,16 @@ Flags: `--only <item-id>`, `--retry <id,id>` (items left `unknown`, after a manu
 
 It checks the batch first (`validate --for-publish`): approval, the 10-minute to 30-day window, Reels 3–90 s and 9:16, at most 30 Reels a day. After each item it writes `state.<id>` (`scheduled`/`published`, the post or video id, URL) to the manifest, so a re-run skips done items and retries failed ones. The first API error stops the run, is recorded as `failed` (the next run retries it), and is printed with the Graph code and without the token. When the final call (`/feed` or the Reel `finish`) gets no response at all, the post may exist: the item becomes `unknown` and every later run skips it with `needs a manual check`. Look in Meta Business Suite > Planner; rerun with `--retry <id>` only if it is not there.
 
+## Policy
+
+- Meta labels AI content: when an item has `ai_audio` (TTS narration) or `synthetic_media` (realistic AI footage), the Reel's `finish` call sends `is_ai_generated=true`.
+- Reels schedule up to 29 days ahead; feed posts up to 30 days (validated).
+- After a Reel upload the script reads its `copyright_check_information`; matches (or a failed read) go to `state.<id>.extra.warnings`, never failing the publish. Check them in Meta Business Suite before the Reel goes out.
+
+## Platform setup
+
+- The Meta app must be in Live mode, with App Review approval for the permissions above. Use a system-user Page token (Business Manager > System users), not a user token: it does not expire with a person's session.
+
 ## After the run
 
 Persist the updated manifest where the batch lives (the workflow updates the review issue body with `review-batch.mjs issue-body`). Scheduled posts can be edited or deleted in Meta Business Suite > Planner before they go out. Never retry with another token or endpoint after an error; report it.

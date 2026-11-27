@@ -62,3 +62,22 @@ test("manifest check covers composed text and titles per item; CLI exits 1 on er
   assert.match(out.text(), /ERROR text: isca-de-engajamento/);
   assert.equal(main(["--text", join(dir, "ok.txt"), "--json"], { out: sink() }), 0);
 });
+
+test("fear, urgency and official-endorsement claims are errors in pt-BR", () => {
+  for (const text of ["Evite multa: emita hoje.", "Você pode ser multado se atrasar.", "Prazo final chegando.", "Todas as empresas são obrigadas a usar.", "Sistema aprovado pela Receita Federal.", "Emissor credenciado pela SEFIN.", "Conformidade garantida."]) {
+    assert.ok(rules(text).includes("error:medo-urgencia"), text);
+  }
+  assert.deepEqual(rules("O prazo do DAS vence em 21/12, segundo a Receita Federal."), []);
+});
+
+test("hashtag caps: Instagram allows 5 whatever the profile says; per-platform maps work", async () => {
+  const { hashtagCap } = await import("../../.rulesync/skills/copy-guard/scripts/copy-guard.mjs");
+  assert.equal(hashtagCap(null, "instagram"), 5);
+  assert.equal(hashtagCap(10, "instagram"), 5);
+  assert.equal(hashtagCap(3, "instagram"), 3);
+  assert.equal(hashtagCap({ facebook: 2, default: 4 }, "facebook"), 2);
+  assert.equal(hashtagCap({ default: 4 }, "youtube"), 4);
+  assert.equal(hashtagCap(null, "facebook"), null);
+  const data = manifest("instagram", [item({ publish_at: null, scheduled: false, caption: "Texto. #a #b #c #d #e #f" , hashtags: [] })]);
+  assert.ok(checkManifest(data).some((f) => f.rule === "hashtag-count"));
+});

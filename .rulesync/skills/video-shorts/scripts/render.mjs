@@ -3,7 +3,8 @@
 // -16 LUFS integrated (two-pass ffmpeg loudnorm, video stream copied). Run voice.mjs first.
 // Usage: render.mjs --spec <video.json> --out <file.mp4> [--profile <profile.md>] [--work .cache/video-shorts]
 //        [--studio <dir with node_modules>] [--no-music]
-// Prints {path, width, height, duration, synthetic_media, music}. Paths in the spec are relative to the current
+// Prints {path, width, height, duration, synthetic_media, ai_audio, music} (music: the manifest entry with license
+// evidence, checked against its sha256). Paths in the spec are relative to the current
 // directory (the repository root).
 import { execFileSync, spawnSync } from "node:child_process";
 import { copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -11,6 +12,7 @@ import { basename, dirname, extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { imageSize, isMain, readProfileConfig, videoInfo } from "./social-manifest.mjs";
 import { sceneTiming, totalSeconds } from "./timing.mjs";
+import { musicEntry } from "./credits.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const TEMPLATE = resolve(here, "../assets/studio");
@@ -130,6 +132,9 @@ export function main(argv) {
   const jobDir = join(studio, "public", jobPublic);
   rmSync(jobDir, { recursive: true, force: true });
   const music = argv.includes("--no-music") ? null : spec.music ?? null;
+  // Music needs license evidence in the profile and must match its recorded hash before anything renders.
+  const musicInfo = music ? (config ? musicEntry(config, resolve(root, music)) : null) : null;
+  if (music && !config) throw new RenderError("music needs --profile so its license evidence can be checked");
   const props = buildProps(spec, { config, root, jobDir, jobPublic, voice, music });
   const propsPath = join(work, `${spec.id}.props.json`);
   writeFileSync(propsPath, `${JSON.stringify(props, null, 2)}\n`);
@@ -146,7 +151,8 @@ export function main(argv) {
     height: info.height ?? 1920,
     duration: Math.round((info.duration ?? totalSeconds(props.scenes)) * 100) / 100,
     synthetic_media: spec.scenes.some((scene) => scene.synthetic === true),
-    music: music ? basename(music) : null,
+    ai_audio: props.scenes.some((scene) => scene.voiceFile),
+    music: musicInfo,
   };
   process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
   return 0;

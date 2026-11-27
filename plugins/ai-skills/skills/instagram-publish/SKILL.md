@@ -31,6 +31,18 @@ Due items, in manifest order: not yet published, not a story attached to another
 
 Per item: read `content_publishing_limit` and stop (exit 0) when the 24-hour quota cannot fit the item and its stories; upload each file to `<prefix><file>` with a signed PUT (JPEG `image/jpeg`, video `video/mp4`); create the container (`image_url`; `media_type=REELS` with `video_url` and `share_to_feed`; `media_type=STORIES`; carousel children with `is_carousel_item` then `media_type=CAROUSEL`); poll `status_code` until `FINISHED`; `media_publish`; read the permalink; write `state.<id>` (`published`, media id, permalink, public media URLs). Before `media_publish` it saves the container id with status `unknown`. If the call gets no response, the next run reads that container's `status_code`: `PUBLISHED` marks the item published, `FINISHED` publishes the same container, anything else redoes the item, so a post never goes out twice. Once the container id is saved, any error keeps the item `unknown`, so only the container's status decides what happens next. Other errors stop the run and are recorded as `failed`; the next run retries them first.
 
+## Policy
+
+- `is_ai_generated=true` goes on the container when the item has `ai_audio` or `synthetic_media` (carousels: on the parent container only).
+- Image posts and carousel images send `alt_text` from `media.alt`.
+- At most 5 hashtags per caption (validated).
+- Stories published through the API cannot have a link sticker; put links in the profile or in feed captions.
+
+## Platform setup
+
+- The Meta app must be in Live mode, with App Review approval for the permissions above. Use a system-user Page token (Business Manager > System users), not a user token: it does not expire with a person's session.
+- Instagram also needs Page Publishing Authorization completed for the Page, and a token with `instagram_basic` and `instagram_content_publish`.
+
 ## Rules
 
 - The media must be public direct URLs: Drive links do not work. Keep the bucket path public only for this prefix.
