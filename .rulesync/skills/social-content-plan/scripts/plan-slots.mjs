@@ -140,7 +140,7 @@ export function skeletonManifest(plan, { profile = null, generator = null, now =
     generator,
     items: withVoices(items, plan.defaults.tts),
     approval: { status: "pending", by: null, at: null, revision: null },
-    review: { issue_number: null, issue_url: null, revision: 1, drive_root_id: null, history: [] },
+    review: { issue_number: null, issue_url: null, revision: 1, drive_root_id: null, drive_run_folder: null, history: [] },
     state: {},
   };
 }

@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { Drive } from "../../.rulesync/skills/social-review/scripts/drive.mjs";
 import { composeText } from "../../.rulesync/skills/social-review/scripts/social-manifest.mjs";
-import { adjustRequests, bump, decodeMarker, encodeMarker, fetchMedia, issueBody, revisionComment, upload } from "../../.rulesync/skills/social-review/scripts/review-batch.mjs";
+import { adjustRequests, bump, decodeMarker, encodeMarker, fetchMedia, issueBody, localStamp, revisionComment, runFolderName, runReadme, upload } from "../../.rulesync/skills/social-review/scripts/review-batch.mjs";
 import { fakeFetch, item, json, manifest, png, tempDir, writeManifest } from "./helpers.mjs";
 
 const pending = (items) => manifest("facebook", items, { approval: { status: "pending", by: null, at: null, revision: null } });
@@ -65,7 +65,7 @@ test("adjust requests come only after the last revision, from writers, never bot
   assert.deepEqual(requests, [{ id: 3, login: "ana", created_at: "t", url: "u", body: "b: troque a imagem" }]);
 });
 
-test("upload creates <root>/<Platform>/<date>/, shares it, and records file ids", async () => {
+test("upload creates <root>/<Platform>/<run>/<date>/, shares it, and records file ids", async () => {
   const dir = tempDir({ "media/card.png": png(10, 10) });
   const data = pending([item()]);
   const folders = new Map();
@@ -90,8 +90,9 @@ test("upload creates <root>/<Platform>/<date>/, shares it, and records file ids"
   ]);
   const drive = new Drive({ token: "t", fetchImpl });
   await upload(data, { manifestDir: dir, drive, root: "Projeto X" });
-  assert.deepEqual([...folders.keys()], ["root/Projeto X", "fold1/Facebook", "fold2/2026-11-30"]);
-  assert.equal(data.items[0].drive.folder_id, "fold3");
+  assert.deepEqual([...folders.keys()], ["root/Projeto X", "fold1/Facebook", "fold2/2026-11-27 09-00", "fold3/2026-11-30"]);
+  assert.equal(data.items[0].drive.folder_id, "fold4");
+  assert.deepEqual(data.review.drive_run_folder, { id: "fold3", name: "2026-11-27 09-00", url: "https://drive.google.com/drive/folders/fold3" });
   assert.deepEqual(data.items[0].drive.files["media/card.png"], { id: "file1", url: "https://drive.google.com/file/d/file1/view", md5: "abc" });
   assert.equal(data.review.drive_root_id, "fold1");
   const start = fetchImpl.calls.find((call) => call.url.includes("uploadType=resumable"));
@@ -234,4 +235,120 @@ test("text drawn in the media (story and carousel cards, video scenes) is shown 
   assert.doesNotMatch(body, /#### `2026-12-07-story`[^#]*```text\n\n```/, "no empty caption block for a story");
   assert.match(body, /```text\nLegenda do carrossel\n```\n\nTexto na mídia[^`]*```text\nlote-1 \(1\/2\)\nTítulo: No fechamento, emita o lote\n\nlote-2 \(2\/2\)\nTítulo: Teste grátis\nSelo: Beta grátis até 31\/03\/2027\n```/);
   assert.doesNotMatch(body, /não aparece/);
+});
+
+/** In-memory Drive with the methods upload uses; records folders, shares, and uploaded files with their content. */
+function memoryDrive() {
+  const folders = new Map();
+  const files = new Map();
+  const shared = [];
+  let ids = 0;
+  return {
+    folders, files, shared,
+    async ensurePath(path, { parentId = "root" } = {}) {
+      let parent = parentId;
+      for (const name of path.split("/").filter(Boolean)) {
+        const key = `${parent}/${name}`;
+        if (!folders.has(key)) folders.set(key, `F${++ids}`);
+        parent = folders.get(key);
+      }
+      return { id: parent };
+    },
+    async share(id) { shared.push(id); },
+    async upload(localPath, folderId, { name }) {
+      const key = `${folderId}/${name}`;
+      const content = readFileSync(localPath, "utf8");
+      const existing = files.get(key);
+      if (existing?.content === content) return { id: existing.id, unchanged: true };
+      const id = existing?.id ?? `file${++ids}`;
+      files.set(key, { id, content });
+      return { id, md5Checksum: `md5-${id}` };
+    },
+  };
+}
+
+test("run folder names use the batch's creation time in its time zone, sortable and without colons", () => {
+  assert.equal(runFolderName("2026-11-28T07:47:12.000Z", "America/Sao_Paulo"), "2026-11-28 04-47");
+  assert.equal(runFolderName("2026-11-28T02:05:00.000Z", "America/Sao_Paulo"), "2026-11-27 23-05");
+  assert.equal(runFolderName("2026-11-28T02:05:00.000Z", "UTC"), "2026-11-28 02-05");
+  assert.deepEqual(localStamp("2026-07-01T12:00:00Z", "Europe/Lisbon"), { date: "2026-07-01", time: "13:00" });
+  assert.throws(() => runFolderName("2026-11-28T02:05:00Z", "Mars/Olympus"), /invalid time zone/);
+});
+
+test("each generate run gets its own folder; adjust uploads reuse the recorded one", async () => {
+  const dir = tempDir({ "media/card.png": png(10, 10) });
+  const drive = memoryDrive();
+  const first = pending([item()]);
+  first.created_at = "2026-11-28T07:47:00.000Z";
+  await upload(first, { manifestDir: dir, drive, root: "Projeto X" });
+  assert.equal(first.review.drive_run_folder.name, "2026-11-28 04-47");
+  const runId = first.review.drive_run_folder.id;
+  assert.ok(drive.shared.includes(runId));
+  assert.ok(drive.files.has(`${runId}/README.md`));
+  assert.equal(drive.folders.get(`${runId}/2026-11-30`), first.items[0].drive.folder_id);
+
+  const adjusted = bump(JSON.parse(JSON.stringify(first)), [first.items[0].id], { now: new Date("2026-11-29T10:00:00Z") });
+  writeFileSync(join(dir, "media/card.png"), png(20, 20));
+  const before = drive.folders.size;
+  await upload(adjusted, { manifestDir: dir, drive, root: "Projeto X", now: new Date("2026-11-29T10:00:00Z") });
+  assert.equal(adjusted.review.drive_run_folder.id, runId);
+  assert.equal(drive.folders.size, before);
+  assert.match(drive.files.get(`${runId}/README.md`).content, /- Revisão: 2/);
+
+  const second = pending([item()]);
+  second.created_at = "2026-12-05T07:47:00.000Z";
+  await upload(second, { manifestDir: dir, drive, root: "Projeto X" });
+  assert.equal(second.review.drive_run_folder.name, "2026-12-05 04-47");
+  assert.notEqual(second.review.drive_run_folder.id, runId);
+});
+
+test("the run README is in the batch language, sorted by publish time, with status, files, credits, and AI notes", () => {
+  const data = pending([
+    item({ id: "b-late", date: "2026-12-01", publish_at: "2026-12-01T18:00:00-03:00", caption: "Segundo post\nmais texto", drive: { folder_id: "F", files: { "media/b.png": { id: "1" } } } }),
+    item({ id: "a-early", date: "2026-12-01", publish_at: "2026-12-01T09:00:00-03:00", caption: "Primeiro | post", credits: "Voz: Azure AI Speech", ai_audio: true, ai_audio_engine: "azure" }),
+    item({ id: "c-next", type: "story", date: "2026-11-30", publish_at: null, scheduled: false, caption: "" }),
+  ]);
+  data.created_at = "2026-11-28T07:47:00.000Z";
+  data.review = { ...data.review, revision: 3, issue_url: "https://github.com/o/r/issues/7" };
+  data.state = { "b-late": { status: "published", at: "2026-12-01T21:00:00Z" } };
+  const readme = runReadme(data);
+  assert.match(readme, /^# Facebook: lote de 2026-11-30 \(3 itens\)/);
+  assert.match(readme, /- Criado em: 2026-11-28 04:47 \(America\/Sao_Paulo\)/);
+  assert.match(readme, /- Issue de revisão: https:\/\/github.com\/o\/r\/issues\/7/);
+  assert.match(readme, /- Revisão: 3/);
+  assert.match(readme, /- Aprovação: pendente/);
+  assert.match(readme, /\| Data \| Horário \| Tipo \| id \| Texto \| Arquivos \| Situação \|/);
+  const rows = readme.split("\n").filter((line) => /^\| 20/.test(line));
+  assert.deepEqual(rows.map((row) => row.split("|")[4].trim()), ["`c-next`", "`a-early`", "`b-late`"]);
+  assert.match(rows[0], /\| 2026-11-30 \| próxima execução \| story \|.*\| em revisão \|$/);
+  assert.match(rows[1], /\| 09:00 \| photo \| `a-early` \| Primeiro \\\| post \|/);
+  assert.match(rows[2], /\| Segundo post \| `b-late--b.png` \| publicado \|$/);
+  assert.match(readme, /## Créditos e avisos de IA\n\n- `a-early`\n  - Voz: Azure AI Speech\n  - IA: narração sintética/);
+  assert.ok(!readme.includes("social-content-manifest"));
+  data.language = "en";
+  data.approval = { status: "approved", by: "ana", at: "2026-11-29T00:00:00Z", revision: 3 };
+  data.state = {};
+  const en = runReadme(data);
+  assert.match(en, /- Approval: approved \(revision 3\)/);
+  assert.match(en, /\| next run \|/);
+  assert.match(en, /\| approved \|$/m);
+});
+
+test("set-issue refreshes the README with the issue link; readme uploads it on demand", async () => {
+  const { main } = await import("../../.rulesync/skills/social-review/scripts/review-batch.mjs");
+  const dir = tempDir({});
+  const drive = memoryDrive();
+  const data = pending([item()]);
+  data.review = { ...data.review, issue_number: null, drive_run_folder: { id: "RUN", name: "2026-11-27 09-00", url: "u" } };
+  const path = writeManifest(dir, data);
+  const out = { write: () => {} };
+  await main(["set-issue", path, "--issue", "12", "--url", "https://github.com/o/r/issues/12"], { out, driveFactory: async () => drive });
+  assert.match(drive.files.get("RUN/README.md").content, /issues\/12/);
+  const lines = [];
+  await main(["readme", path], { out: { write: (text) => lines.push(text) }, driveFactory: async () => drive });
+  assert.deepEqual(lines, ["unchanged: 2026-11-27 09-00/README.md\n"]);
+  const warnings = [];
+  await main(["set-issue", path, "--issue", "13"], { out, err: { write: (text) => warnings.push(text) }, driveFactory: async () => { throw new Error("no Drive credentials"); } });
+  assert.match(warnings.join(""), /README.md not updated \(no Drive credentials\)/);
+  assert.equal(JSON.parse(readFileSync(path, "utf8")).review.issue_number, 13);
 });

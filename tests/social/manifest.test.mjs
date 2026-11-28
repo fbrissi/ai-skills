@@ -202,3 +202,16 @@ test("voices alternate from the one the previous batch ended with", () => {
   assert.equal(ttsConfig({ video: { tts: { voices: ["a"], rotation: null } } }).rotation, null);
   assert.throws(() => ttsConfig({ video: { tts: { voices } } }), /several voices, so video\.tts\.rotation must be "alternate"/);
 });
+
+test("review.drive_run_folder records the run folder id and a YYYY-MM-DD HH-mm name", () => {
+  const ok = manifest("facebook", [item()]);
+  ok.review.drive_run_folder = { id: "F1", name: "2026-11-28 04-47", url: "https://drive.google.com/drive/folders/F1" };
+  assert.deepEqual(validate(ok, files()), []);
+  assert.deepEqual(validate(manifest("facebook", [item()], { review: { revision: 1, drive_run_folder: null } }), files()), []);
+  const bad = manifest("facebook", [item()]);
+  bad.review.drive_run_folder = { name: "2026-11-28 04:47", extra: true };
+  const errors = validate(bad, files());
+  assert.ok(errors.some((error) => error.includes("drive_run_folder: missing id")), errors.join("\n"));
+  assert.ok(errors.some((error) => error.includes("drive_run_folder.name: does not match")), errors.join("\n"));
+  assert.ok(errors.some((error) => error.includes("drive_run_folder: unknown property extra")), errors.join("\n"));
+});
