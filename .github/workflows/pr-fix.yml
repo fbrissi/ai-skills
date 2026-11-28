@@ -1,0 +1,41 @@
+name: PR Fix
+
+# Dispatched by the quality join (PR Feedback, QA, and Code Review) on the default branch, so a pull request cannot
+# change its own fixer.
+on:
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Pull request number to fix
+        required: true
+        type: string
+      instructions:
+        description: Extra instructions for this run only, appended to the agent prompt.
+        required: false
+        type: string
+
+permissions: {}
+
+jobs:
+  pr-fix:
+    name: PR Fix
+    if: github.ref == 'refs/heads/main'
+    uses: fbrissi/github-actions/.github/workflows/pr-fix.yml@v1
+    permissions:
+      checks: write
+      issues: read
+      pull-requests: read
+    with:
+      pr-number: ${{ inputs.pr_number }}
+      instructions: ${{ inputs.instructions }}
+      # The dependency updates (hotfix/ and bugfix/ into main); other pull requests opt in with the ai:auto-fix label.
+      branch-prefixes: hotfix/ bugfix/
+      max-rounds: 3
+      # Also fixes the QA report of the newest failing AI QA check run on the head commit (qa.yml).
+      qa-check-name: AI QA
+      environment: code-review
+      ai-skills-ref: v0.15.0
+      node-version: "24"
+      node-cache: npm
+      install-command: npm ci
+    secrets: inherit
