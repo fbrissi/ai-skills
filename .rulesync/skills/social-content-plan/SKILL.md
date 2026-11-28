@@ -23,10 +23,10 @@ Turn the profile into a dated, fact-checked plan and a skeleton manifest. Never 
 ## 1. Slots
 
 ```bash
-node <skill-dir>/scripts/plan-slots.mjs --profile docs/ai/social-content.md --platform <platform> [--start YYYY-MM-DD] [--days 7] --init <batch-dir>
+node <skill-dir>/scripts/plan-slots.mjs --profile docs/ai/social-content.md --platform <platform> [--start YYYY-MM-DD] [--days 7] --init <batch-dir> [--previous <previous batch>/manifest.json]
 ```
 
-It prints JSON with `slots` (date, time, `publish_at` with offset; `null` on Instagram), `skipped` (blackout dates and holidays the profile lists), `hooks` (calendar hooks in the window, with sources), `defaults` (scheduled, visibility, formats, images, video), and `warnings`, and writes `<batch-dir>/manifest.json` with one empty item per slot. It refuses to overwrite an existing manifest: adjust that batch instead. No slots means nothing to plan; report it and stop.
+It prints JSON with `slots` (date, time, `publish_at` with offset; `null` on Instagram), `skipped` (blackout dates and holidays the profile lists), `hooks` (calendar hooks in the window, with sources), `defaults` (scheduled, visibility, formats, images, video), and `warnings`, and writes `<batch-dir>/manifest.json` with one empty item per slot. It refuses to overwrite an existing manifest: adjust that batch instead. When the profile sets `video.tts.voices`, pass the most recent earlier batch manifest of the same platform as `--previous`: video items (`reel`, `short`, `video`) get a `voice` in publish order, and with several voices and `rotation: "alternate"` the first one is not the voice that batch's last narrated item used (the first batch starts with `voices[0]`). If you change an item's type, keep the alternation by hand; the video spec takes the item's `voice`. No slots means nothing to plan; report it and stop.
 
 ## 2. Briefs
 
