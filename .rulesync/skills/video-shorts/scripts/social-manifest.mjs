@@ -65,6 +65,7 @@ export function ttsConfig(config) {
   if (!TTS_ENGINES.includes(engine)) throw new ManifestError(`video.tts.engine must be one of ${TTS_ENGINES.join(", ")} (got ${engine})`);
   if (tts.rotation != null && !TTS_ROTATIONS.includes(tts.rotation)) throw new ManifestError(`video.tts.rotation must be ${TTS_ROTATIONS.join(" or ")} or omitted (got ${tts.rotation})`);
   if (tts.voices !== undefined && (!Array.isArray(tts.voices) || tts.voices.some((voice) => typeof voice !== "string" || !voice))) throw new ManifestError("video.tts.voices must be a list of voice ids");
+  if (tts.voices?.length > 1 && tts.rotation !== "alternate") throw new ManifestError("video.tts.voices lists several voices, so video.tts.rotation must be \"alternate\"; list one voice to always use it");
   return { engine, voices: tts.voices?.length ? [...tts.voices] : null, rotation: tts.rotation ?? null };
 }
 

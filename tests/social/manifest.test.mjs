@@ -199,5 +199,6 @@ test("voices alternate from the one the previous batch ended with", () => {
   assert.throws(() => ttsConfig({ video: { tts: { voices: "a" } } }), /list of voice ids/);
   assert.throws(() => ttsConfig({ video: { tts: { voices, rotation: "random" } } }), /video\.tts\.rotation must be alternate or omitted \(got random\)/);
   assert.throws(() => ttsConfig({ video: { tts: { engine: "polly" } } }), /video\.tts\.engine must be one of piper, azure/);
-  assert.equal(ttsConfig({ video: { tts: { voices, rotation: null } } }).rotation, null);
+  assert.equal(ttsConfig({ video: { tts: { voices: ["a"], rotation: null } } }).rotation, null);
+  assert.throws(() => ttsConfig({ video: { tts: { voices } } }), /several voices, so video\.tts\.rotation must be "alternate"/);
 });
