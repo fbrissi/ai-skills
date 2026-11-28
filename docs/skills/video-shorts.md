@@ -2,7 +2,7 @@
 
 Makes vertical 9:16 Shorts and Reels with Remotion: Piper or Azure AI Speech narration normalized to −16 LUFS, captions, real screenshots or recordings with pan and zoom, a ducked music bed from the project's Drive folder, an end card, and the voice and music credits for the description.
 
-**Requires:** Node.js 22+, `ffmpeg`/`ffprobe`, Python with `piper-tts`, network for the first studio install and voice download. Optional: Google Drive credentials for the music folder.
+**Requires:** Node.js 22+, `ffmpeg`/`ffprobe`, and network for the first studio install. Piper (default) needs Python with `piper-tts` and network for the voice download; Azure AI Speech needs only network plus `AZURE_SPEECH_KEY` and `AZURE_SPEECH_REGION`. Optional: Google Drive credentials for the music folder.
 
 ## Inputs
 
