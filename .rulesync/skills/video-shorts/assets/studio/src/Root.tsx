@@ -16,6 +16,7 @@ const placeholder: ShortProps = {
         logo: null,
     },
     music: null,
+    musicVolume: { bed: 0.18, ducked: 0.07 },
     footnote: null,
     scenes: [
         { id: "hook", kind: "hook", durationInFrames: 75, voiceFrom: 3, voiceFrames: 60, voiceFile: null, caption: "", title: "Render with props from render.mjs" },

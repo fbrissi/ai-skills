@@ -8,6 +8,7 @@ One `manifest.json` describes one batch for one platform. Content agents write i
 <batches-dir>/<platform>/<batch_id>/
   manifest.json
   media/            images and videos named in items[].media, thumbnails, caption files
+  usage.jsonl       paid generation calls of this run (voice.mjs --usage); merged into `usage` on upload
   specs/            generation specs (cards JSON, video JSON) named in items[].spec
 ```
 
@@ -24,7 +25,9 @@ Every path in the manifest is relative to its directory and must stay inside it.
 | `timezone`, `language` | IANA zone and `pt-BR`/`en`-style language of the copy |
 | `items` | the content, in publication order |
 | `approval` | `{status: pending|approved|rejected, by, at, revision}`; only the approval step sets `approved` |
-| `review` | `{issue_number, issue_url, revision, drive_root_id, history[]}` |
+| `review` | `{issue_number, issue_url, revision, drive_root_id, drive_run_folder, history[]}`; `drive_run_folder` is `{id, name, url}` of the batch's Drive run folder (`<root>/<Platform>/<YYYY-MM-DD HH-mm>`, the `created_at` time in `timezone`), written by the first `social-review` upload and reused by every later one (a same-minute folder of another batch gets a ` (2)` suffix) |
+| `usage` | ledger of paid generation calls (`{id, at, service, unit, quantity, revision, voice, spec, scene, item, detail}`), merged by `social-review` from `<batch-dir>/usage.jsonl` and tagged with the revision that spent it; feeds the generation-cost comment and the run README. Never AI harness tokens, subscriptions, or infrastructure |
+| `cost_prices` | snapshot of the profile's `costs.prices`, recorded by `social-review` when it runs with `--profile`, so README and costs rendered without the profile keep the prices |
 | `state` | `{<item id>: {status: scheduled|published|failed|unknown|skipped, remote_id, url, publish_at, at, attempts, error, media_urls, extra}}`, written only by publishers. `failed`: the platform refused it (safe to retry). `unknown`: the final publish call got no response, so it may be live; never retried automatically (Instagram resolves it from the saved container) |
 
 ## Item
@@ -33,7 +36,7 @@ Every path in the manifest is relative to its directory and must stay inside it.
 |---|---|
 | `id` | kebab-case, unique in the batch, usually `<date>-<slug>` |
 | `type` | `post`, `photo`, `carousel`, `reel` (Facebook); `photo`, `carousel`, `reel`, `story` (Instagram); `short`, `video` (YouTube); `post`, `photo`, `carousel`, `video` (LinkedIn) |
-| `date` | planned date; names the Drive and bucket folders |
+| `date` | planned date; names the item's Drive subfolder inside the run folder and the bucket folder |
 | `publish_at` | ISO 8601 with offset, or `null` for "the next publisher run" (Instagram) |
 | `scheduled` | `true`: the platform schedules it at `publish_at`; `false`: published when the publisher runs |
 | `visibility` | `public`, `private`, `unlisted` (YouTube only; Facebook and Instagram are public) |
@@ -56,7 +59,7 @@ Every path in the manifest is relative to its directory and must stay inside it.
 | `with_stories` | Instagram: story item ids published in the same run as this item |
 | `options` | `playlist_id`, `category_id`, `made_for_kids`, `default_language`, `captions` (file), `captions_language`, `share_to_feed`, `first_comment`, `paid_product_placement` (YouTube, default false), `ai_disclosure` (LinkedIn) |
 | `notes` | note for the reviewer |
-| `drive` | `{folder_id, folder_url, files: {<path>: {id, url, md5}}}`, written by `social-review` |
+| `drive` | `{folder_id, folder_url, files: {<path>: {id, url, md5}}}`, written by `social-review`; publishers restore media by these file ids (`review-batch.mjs fetch`), never by folder path |
 
 The text a publisher sends is `composeText(item, platform)`: the caption (or description), then the link when it applies and is not in the text, then the credits, then the hashtags not already in the text. The review issue shows exactly this text.
 
@@ -72,7 +75,7 @@ The text a publisher sends is `composeText(item, platform)`: the caption (or des
 ## Lifecycle
 
 1. Agent (generate): `plan-slots.mjs --init` writes the skeleton; the agent fills items and media, runs the copy guard, `probe`, and `validate`.
-2. `social-review`: uploads media to Drive, opens the issue with the marker. Adjust: `bump`, regenerate the changed items, upload again, update the issue body, comment.
+2. `social-review`: uploads media to a new Drive run folder with a README, opens the issue with the marker. Adjust: `bump`, regenerate the changed items, upload again into the recorded run folder, update the issue body, comment.
 3. Approval (a deterministic workflow, on a `/aprove` comment): `review-batch.mjs approve --issue <n> --comment-id <id> --out manifest.json` checks the comment (writer, not a bot, newer than the last revision) and that the issue body is at the same revision, then stamps `approval` with that revision. Publishers refuse an approval whose revision differs from `review.revision`.
 4. Publishers: `validate --for-publish`, then publish and record `state`. Re-runs skip done items, retry `failed` ones, and skip `unknown` ones until a person checks the platform and passes `--retry <id>` (Facebook, YouTube).
 

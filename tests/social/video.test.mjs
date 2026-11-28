@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { credits, findTrack } from "../../.rulesync/skills/video-shorts/scripts/credits.mjs";
-import { buildProps, disclaimerErrors, edgeCuts, footageFitError, narrationInfo, specErrors, undisclaimedScreens, visibleRect } from "../../.rulesync/skills/video-shorts/scripts/render.mjs";
+import { buildProps, DEFAULT_MUSIC_VOLUME, musicVolume, disclaimerErrors, edgeCuts, footageFitError, narrationInfo, specErrors, undisclaimedScreens, visibleRect } from "../../.rulesync/skills/video-shorts/scripts/render.mjs";
 import { sceneFrames } from "../../.rulesync/skills/video-shorts/scripts/frames.mjs";
 import { sceneTiming } from "../../.rulesync/skills/video-shorts/scripts/timing.mjs";
 import { azureRequest, escapeXml, main as voiceMain, sceneKey, synthesizeAzure, voiceSettings } from "../../.rulesync/skills/video-shorts/scripts/voice.mjs";
@@ -233,4 +233,72 @@ test("voice.json is saved after each line, so an Azure failure midway keeps the 
   assert.equal(saved.a.engine, "azure");
   assert.equal(saved.a.voice, "pt-BR-FranciscaNeural");
   assert.ok(existsSync(join(dir, "work", "voice", "v", "a.wav")));
+});
+
+test("music volume: defaults stay 0.18 and 0.07; the profile and then the spec override them", () => {
+  assert.deepEqual(DEFAULT_MUSIC_VOLUME, { bed: 0.18, ducked: 0.07 });
+  assert.deepEqual(musicVolume({}, null), { volume: { bed: 0.18, ducked: 0.07 }, errors: [] });
+  const profile = { video: { music: { bed_volume: 0.25, ducked_volume: 0.1 } } };
+  assert.deepEqual(musicVolume({}, profile).volume, { bed: 0.25, ducked: 0.1 });
+  assert.deepEqual(musicVolume({ music_volume: { ducked: 0.05 } }, profile).volume, { bed: 0.25, ducked: 0.05 });
+  assert.deepEqual(musicVolume({ music_volume: { bed: 1, ducked: 1 } }, null), { volume: { bed: 1, ducked: 1 }, errors: [] });
+});
+
+test("music volume: out of (0, 1], not a number, or ducked louder than the bed is refused with the key", () => {
+  assert.deepEqual(musicVolume({}, { video: { music: { bed_volume: 0 } } }).errors, ["video.music.bed_volume must be a number greater than 0 and at most 1 (got 0)"]);
+  assert.deepEqual(musicVolume({ music_volume: { ducked: 1.5 } }, null).errors, ["music_volume.ducked must be a number greater than 0 and at most 1 (got 1.5)"]);
+  assert.deepEqual(musicVolume({}, { video: { music: { ducked_volume: "0.1" } } }).errors, ['video.music.ducked_volume must be a number greater than 0 and at most 1 (got "0.1")']);
+  assert.deepEqual(musicVolume({}, { video: { music: { ducked_volume: 0.3 } } }).errors, ["video.music.ducked_volume (0.3) must not be louder than the default bed volume (0.18): the music ducks under the voice"]);
+  assert.deepEqual(musicVolume({ music_volume: 0.2 }, null).errors, ["music_volume must be an object {bed, ducked}"]);
+  assert.deepEqual(specErrors({ id: "v", scenes: [{ id: "a", kind: "hook" }], music_volume: { bed: 0.1, ducked: 0.2 } }, tempDir({})), ["music_volume.ducked (0.2) must not be louder than music_volume.bed (0.1): the music ducks under the voice"]);
+});
+
+test("buildProps passes the music volume to the Remotion props and refuses an invalid one", () => {
+  const root = tempDir({});
+  const spec = { id: "v", scenes: [{ id: "hook", kind: "hook", title: "Oi" }] };
+  const base = { root, jobPublic: "job/v", voice: {}, music: null };
+  assert.deepEqual(buildProps(spec, { ...base, config: null, jobDir: join(root, "a") }).musicVolume, { bed: 0.18, ducked: 0.07 });
+  assert.deepEqual(buildProps({ ...spec, music_volume: { bed: 0.3 } }, { ...base, config: { video: { music: { ducked_volume: 0.12 } } }, jobDir: join(root, "b") }).musicVolume, { bed: 0.3, ducked: 0.12 });
+  assert.throws(() => buildProps({ ...spec, music_volume: { bed: 2 } }, { ...base, config: null, jobDir: join(root, "c") }), /invalid music volume/);
+});
+
+test("the studio reads the music volume from props, with the old levels as Root defaults", () => {
+  const studio = ".rulesync/skills/video-shorts/assets/studio/src";
+  const short = readFileSync(`${studio}/Short.tsx`, "utf8");
+  assert.ok(!/BED_VOLUME|DUCKED_VOLUME/.test(short));
+  assert.match(short, /\[volume\.ducked, volume\.bed\]/);
+  assert.match(readFileSync(`${studio}/schema.ts`, "utf8"), /musicVolume: z\.object\(\{ bed: z\.number\(\)\.gt\(0\)\.lte\(1\), ducked: z\.number\(\)\.gt\(0\)\.lte\(1\) \}\)/);
+  assert.match(readFileSync(`${studio}/Root.tsx`, "utf8"), /musicVolume: \{ bed: 0\.18, ducked: 0\.07 \}/);
+});
+
+test("voice.mjs logs one azure-speech ledger line per synthesized line, nothing for unchanged lines or Piper", async () => {
+  const { readUsage } = await import("../../.rulesync/skills/video-shorts/scripts/social-manifest.mjs");
+  const profile = (tts) => `## Parameters\n\n\`\`\`json\n${JSON.stringify({ video: { tts } })}\n\`\`\`\n`;
+  const dir = tempDir({ "azure.md": profile({ engine: "azure", voices: ["pt-BR-FranciscaNeural"] }), "piper.md": profile({ engine: "piper", voices: ["pt_BR-faber-medium"] }), "models/pt_BR-faber-medium.onnx": "m", "models/pt_BR-faber-medium.onnx.json": "{}" });
+  const spec = join(dir, "spec.json");
+  writeFileSync(spec, JSON.stringify({ id: "v", scenes: [{ id: "a", kind: "hook", voice: "Olá & até já", say: "Olá & até já!" }, { id: "b", kind: "cta", voice: "Teste <grátis>." }, { id: "c", kind: "screen", image: "x.png" }] }));
+  const fetch = async () => new Response(new Uint8Array([1]), { status: 200 });
+  const exec = (command, args) => { if (command === "ffmpeg") writeFileSync(args.at(-1), "wav"); return command === "ffprobe" ? "1.5\n" : ""; };
+  const usage = join(dir, "batch", "usage.jsonl");
+  const run = (args) => voiceMain(["--spec", spec, "--work", join(dir, "work"), "--usage", usage, ...args], { env: ENV, fetch, exec, now: () => new Date("2026-11-28T07:47:00Z") });
+  const stdout = process.stdout.write;
+  const stderr = process.stderr.write;
+  process.stdout.write = () => true;
+  process.stderr.write = () => true;
+  try {
+    await run(["--profile", join(dir, "azure.md"), "--item", "2026-12-03-v", "--revision", "2"]);
+    await run(["--profile", join(dir, "azure.md")]);
+    writeFileSync(spec, JSON.stringify({ id: "p", scenes: [{ id: "a", kind: "hook", voice: "Piper é local." }] }));
+    await voiceMain(["--spec", spec, "--profile", join(dir, "piper.md"), "--work", join(dir, "work"), "--usage", usage], { env: { PIPER_MODEL_DIR: join(dir, "models") }, exec });
+  } finally {
+    process.stdout.write = stdout;
+    process.stderr.write = stderr;
+  }
+  const entries = readUsage(usage);
+  assert.deepEqual(entries.map(({ id, ...rest }) => rest), [
+    { at: "2026-11-28T07:47:00.000Z", service: "azure-speech", unit: "characters", quantity: 17, voice: "pt-BR-FranciscaNeural", spec: "v", scene: "a", item: "2026-12-03-v", revision: 2 },
+    { at: "2026-11-28T07:47:00.000Z", service: "azure-speech", unit: "characters", quantity: 21, voice: "pt-BR-FranciscaNeural", spec: "v", scene: "b", item: "2026-12-03-v", revision: 2 },
+  ]);
+  assert.ok(entries.every((entry) => typeof entry.id === "string" && entry.id.length > 8));
+  await assert.rejects(voiceMain(["--spec", spec, "--usage", usage, "--revision", "0"]), /--revision must be an integer >= 1/);
 });

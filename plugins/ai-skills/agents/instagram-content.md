@@ -29,13 +29,13 @@ Script paths below use `<social skill dir>`: the folder of any installed social 
 3. **Media**: `photo` items get one JPEG card (`ig-portrait` 1080x1350 or `ig-square`), `carousel` items 2–20 slides of the same aspect (`template: slide`), `story` items a `story` card (1080x1920), all from the `image-cards` skill; `reel` items get a 9:16 video from the `video-shorts` skill with its credits in `credits`, `ai_audio` when it has narration, and its `music` entry. Give every image an `alt` text. When the profile sets `stories_with_feed`, add a story per feed item and list it in that item's `with_stories`. JPEG only for images.
 4. **Guard**: follow the `copy-guard` skill on the manifest until it passes (checker exit 0, review finds nothing). This gate is mandatory: nothing is written to the review without it.
 5. **Check**: `node <social skill dir>/scripts/social-manifest.mjs probe <manifest>`, then `validate <manifest> --profile docs/ai/social-content.md`; fix every error.
-6. **Review**: follow the `social-review` skill (open mode): upload to Drive and open the review issue.
+6. **Review**: follow the `social-review` skill (open mode): upload to Drive, open the review issue, and post the run's generation-cost comment.
 
 ## Adjust
 
 1. Follow the `social-review` skill (adjust mode) to restore the batch from issue `<n>` and list the `/adjust` requests.
 2. Regenerate only the items and the parts the requests name, with the same steps as Generate (copy, media, guard, check). Keep every other item byte for byte, including its media and Drive files.
-3. Finish the `social-review` adjust steps: bump the revision, upload, update the issue body, and comment what changed and what was declined and why.
+3. Finish the `social-review` adjust steps: bump the revision, upload, update the issue body, comment what changed and what was declined and why, and post the revision's generation-cost comment.
 
 ## Missing skills
 

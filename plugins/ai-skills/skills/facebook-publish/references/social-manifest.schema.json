@@ -79,6 +79,20 @@
     "review": {
       "$ref": "#/$defs/review"
     },
+    "usage": {
+      "type": "array",
+      "description": "Ledger of paid generation calls (TTS, image, or video APIs; never LLM tokens, subscriptions, or infrastructure), merged by social-review upload from <batch-dir>/usage.jsonl and tagged with the revision that spent it.",
+      "items": {
+        "$ref": "#/$defs/usage"
+      }
+    },
+    "cost_prices": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "description": "Snapshot of the profile's costs.prices taken by social-review (upload, set-issue, readme, costs with --profile), so the run README and costs comment keep the same prices when rendered without the profile."
+    },
     "state": {
       "type": "object",
       "additionalProperties": {
@@ -119,7 +133,7 @@
         "date": {
           "type": "string",
           "format": "date",
-          "description": "Planned publication date (YYYY-MM-DD); names the Drive and bucket folders."
+          "description": "Planned publication date (YYYY-MM-DD); names the item's Drive subfolder inside the run folder and the bucket folder."
         },
         "publish_at": {
           "type": [
@@ -509,11 +523,110 @@
             "null"
           ]
         },
+        "drive_run_folder": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "description": "Drive folder of the generate run that holds this batch (<root>/<Platform>/<YYYY-MM-DD HH-mm>), written by the first upload; later uploads (adjust revisions) reuse it.",
+          "required": [
+            "id",
+            "name"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2} \\d{2}-\\d{2}( \\(\\d+\\))?$"
+            },
+            "url": {
+              "type": "string"
+            }
+          }
+        },
         "history": {
           "type": "array",
           "items": {
             "type": "object"
           }
+        }
+      }
+    },
+    "usage": {
+      "type": "object",
+      "required": [
+        "id",
+        "service",
+        "unit",
+        "quantity"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "service": {
+          "type": "string",
+          "description": "Paid tool, for example azure-speech; the key of costs.prices in the profile."
+        },
+        "unit": {
+          "type": "string",
+          "description": "Billed unit, for example characters."
+        },
+        "quantity": {
+          "type": "number",
+          "minimum": 0
+        },
+        "revision": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "detail": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "voice": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "spec": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "scene": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "item": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sources": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Ledger ids folded into this per-revision aggregate by the issue marker; merging the same ledger again skips them."
         }
       }
     },

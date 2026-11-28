@@ -42,6 +42,7 @@ export const shortSchema = z.object({
         logo: z.string().nullable(),
     }),
     music: z.string().nullable(),
+    musicVolume: z.object({ bed: z.number().gt(0).lte(1), ducked: z.number().gt(0).lte(1) }),
     footnote: z.string().nullable(),
     scenes: z.array(sceneSchema),
 });

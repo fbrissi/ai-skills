@@ -3,7 +3,7 @@
 // Auth: GOOGLE_DRIVE_CLIENT_ID, GOOGLE_DRIVE_CLIENT_SECRET, GOOGLE_DRIVE_REFRESH_TOKEN (OAuth, scope drive.file).
 // For a public folder the app did not create, GOOGLE_API_KEY lists and downloads it instead.
 // Usage:
-//   drive.mjs ensure-folder --path "<Root>/<Platform>/<YYYY-MM-DD>" [--share]
+//   drive.mjs ensure-folder --path "<Root>/<Platform>/<YYYY-MM-DD HH-mm>" [--share]
 //   drive.mjs upload <file> --folder <id> [--name <name>] [--share]
 //   drive.mjs list --folder <id>
 //   drive.mjs download <fileId> --out <path>
@@ -83,9 +83,9 @@ export class Drive {
     return this.json(this.url(`${API}/files`, { fields: "id,name,webViewLink" }), { method: "POST", body: { name, mimeType: FOLDER_MIME, parents: [parentId] } });
   }
 
-  /** Folder id for "A/B/C" under My Drive, creating missing folders. */
-  async ensurePath(path) {
-    let parent = { id: "root", webViewLink: null };
+  /** Folder for "A/B/C" under My Drive (or under parentId), creating missing folders. */
+  async ensurePath(path, { parentId = "root" } = {}) {
+    let parent = { id: parentId, webViewLink: null };
     for (const name of path.split("/").map((segment) => segment.trim()).filter(Boolean)) {
       parent = (await this.findFolder(name, parent.id)) ?? (await this.createFolder(name, parent.id));
     }

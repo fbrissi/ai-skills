@@ -8,6 +8,7 @@ A JSON file per video. Paths are relative to the repository root (the directory 
   "voice": "pt_BR-faber-medium",
   "length_scale": 0.92,
   "music": ".cache/video-shorts/music/city-sunshine.mp3",
+  "music_volume": { "bed": 0.18, "ducked": 0.07 },
   "footnote": "Telas reais com dados fictícios",
   "scenes": [
     { "id": "hook", "kind": "hook", "title": "Todo mês, a mesma nota?", "highlight": "a mesma nota?", "voice": "Todo mês, a mesma nota para o mesmo cliente?" },
@@ -31,6 +32,8 @@ A JSON file per video. Paths are relative to the repository root (the directory 
 | `label` | screen, footage | source chip ("Tela real · dados fictícios", "Clipe gerado com IA") |
 | `synthetic` | footage | `true` for realistic AI-generated footage (sets `synthetic_media`) |
 | `min_seconds` | all | longer hold for a scene |
+
+`music_volume` is optional: `bed` (between lines) and `ducked` (under the voice) override the profile's `video.music.bed_volume` and `ducked_volume` for this video (defaults 0.18 and 0.07; each in (0, 1], `ducked` at most `bed`).
 
 `render.mjs` refuses a `screen` without `image`, a `footage` without `video`, missing files, and any scene with `generated_ui`.
 

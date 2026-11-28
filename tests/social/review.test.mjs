@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { Drive } from "../../.rulesync/skills/social-review/scripts/drive.mjs";
 import { composeText } from "../../.rulesync/skills/social-review/scripts/social-manifest.mjs";
-import { adjustRequests, bump, decodeMarker, encodeMarker, fetchMedia, issueBody, revisionComment, upload } from "../../.rulesync/skills/social-review/scripts/review-batch.mjs";
+import { adjustRequests, bump, compactUsage, costsComment, decodeMarker, encodeMarker, fetchMedia, issueBody, localStamp, mergeUsage, revisionComment, runFolderName, runReadme, upload } from "../../.rulesync/skills/social-review/scripts/review-batch.mjs";
 import { fakeFetch, item, json, manifest, png, tempDir, writeManifest } from "./helpers.mjs";
 
 const pending = (items) => manifest("facebook", items, { approval: { status: "pending", by: null, at: null, revision: null } });
@@ -65,7 +65,7 @@ test("adjust requests come only after the last revision, from writers, never bot
   assert.deepEqual(requests, [{ id: 3, login: "ana", created_at: "t", url: "u", body: "b: troque a imagem" }]);
 });
 
-test("upload creates <root>/<Platform>/<date>/, shares it, and records file ids", async () => {
+test("upload creates <root>/<Platform>/<run>/<date>/, shares it, and records file ids", async () => {
   const dir = tempDir({ "media/card.png": png(10, 10) });
   const data = pending([item()]);
   const folders = new Map();
@@ -90,8 +90,9 @@ test("upload creates <root>/<Platform>/<date>/, shares it, and records file ids"
   ]);
   const drive = new Drive({ token: "t", fetchImpl });
   await upload(data, { manifestDir: dir, drive, root: "Projeto X" });
-  assert.deepEqual([...folders.keys()], ["root/Projeto X", "fold1/Facebook", "fold2/2026-11-30"]);
-  assert.equal(data.items[0].drive.folder_id, "fold3");
+  assert.deepEqual([...folders.keys()], ["root/Projeto X", "fold1/Facebook", "fold2/2026-11-27 09-00", "fold3/2026-11-30"]);
+  assert.equal(data.items[0].drive.folder_id, "fold4");
+  assert.deepEqual(data.review.drive_run_folder, { id: "fold3", name: "2026-11-27 09-00", url: "https://drive.google.com/drive/folders/fold3" });
   assert.deepEqual(data.items[0].drive.files["media/card.png"], { id: "file1", url: "https://drive.google.com/file/d/file1/view", md5: "abc" });
   assert.equal(data.review.drive_root_id, "fold1");
   const start = fetchImpl.calls.find((call) => call.url.includes("uploadType=resumable"));
@@ -234,4 +235,318 @@ test("text drawn in the media (story and carousel cards, video scenes) is shown 
   assert.doesNotMatch(body, /#### `2026-12-07-story`[^#]*```text\n\n```/, "no empty caption block for a story");
   assert.match(body, /```text\nLegenda do carrossel\n```\n\nTexto na mídia[^`]*```text\nlote-1 \(1\/2\)\nTítulo: No fechamento, emita o lote\n\nlote-2 \(2\/2\)\nTítulo: Teste grátis\nSelo: Beta grátis até 31\/03\/2027\n```/);
   assert.doesNotMatch(body, /não aparece/);
+});
+
+/** In-memory Drive with the methods upload uses; records folders, shares, and uploaded files with their content. */
+function memoryDrive() {
+  const folders = new Map();
+  const files = new Map();
+  const shared = [];
+  let ids = 0;
+  return {
+    folders, files, shared,
+    async ensurePath(path, { parentId = "root" } = {}) {
+      let parent = parentId;
+      for (const name of path.split("/").filter(Boolean)) {
+        const key = `${parent}/${name}`;
+        if (!folders.has(key)) folders.set(key, `F${++ids}`);
+        parent = folders.get(key);
+      }
+      return { id: parent };
+    },
+    async findFolder(name, parentId) {
+      const id = folders.get(`${parentId}/${name}`);
+      return id ? { id, name } : null;
+    },
+    async createFolder(name, parentId) {
+      const id = `F${++ids}`;
+      folders.set(`${parentId}/${name}`, id);
+      return { id, name };
+    },
+    async children(folderId) {
+      return [...files.entries()].filter(([key]) => key.startsWith(`${folderId}/`)).map(([key, file]) => ({ id: file.id, name: key.slice(folderId.length + 1) }));
+    },
+    async download(fileId, outPath) {
+      const file = [...files.values()].find((entry) => entry.id === fileId);
+      writeFileSync(outPath, file.content);
+      return outPath;
+    },
+    async share(id) { shared.push(id); },
+    async upload(localPath, folderId, { name }) {
+      const key = `${folderId}/${name}`;
+      const content = readFileSync(localPath, "utf8");
+      const existing = files.get(key);
+      if (existing?.content === content) return { id: existing.id, unchanged: true };
+      const id = existing?.id ?? `file${++ids}`;
+      files.set(key, { id, content });
+      return { id, md5Checksum: `md5-${id}` };
+    },
+  };
+}
+
+test("run folder names use the batch's creation time in its time zone, sortable and without colons", () => {
+  assert.equal(runFolderName("2026-11-28T07:47:12.000Z", "America/Sao_Paulo"), "2026-11-28 04-47");
+  assert.equal(runFolderName("2026-11-28T02:05:00.000Z", "America/Sao_Paulo"), "2026-11-27 23-05");
+  assert.equal(runFolderName("2026-11-28T02:05:00.000Z", "UTC"), "2026-11-28 02-05");
+  assert.deepEqual(localStamp("2026-07-01T12:00:00Z", "Europe/Lisbon"), { date: "2026-07-01", time: "13:00" });
+  assert.throws(() => runFolderName("2026-11-28T02:05:00Z", "Mars/Olympus"), /invalid time zone/);
+});
+
+test("each generate run gets its own folder; adjust uploads reuse the recorded one", async () => {
+  const dir = tempDir({ "media/card.png": png(10, 10) });
+  const drive = memoryDrive();
+  const first = pending([item()]);
+  first.created_at = "2026-11-28T07:47:00.000Z";
+  await upload(first, { manifestDir: dir, drive, root: "Projeto X" });
+  assert.equal(first.review.drive_run_folder.name, "2026-11-28 04-47");
+  const runId = first.review.drive_run_folder.id;
+  assert.ok(drive.shared.includes(runId));
+  assert.ok(drive.files.has(`${runId}/README.md`));
+  assert.equal(drive.folders.get(`${runId}/2026-11-30`), first.items[0].drive.folder_id);
+
+  const adjusted = bump(JSON.parse(JSON.stringify(first)), [first.items[0].id], { now: new Date("2026-11-29T10:00:00Z") });
+  writeFileSync(join(dir, "media/card.png"), png(20, 20));
+  const before = drive.folders.size;
+  await upload(adjusted, { manifestDir: dir, drive, root: "Projeto X", now: new Date("2026-11-29T10:00:00Z") });
+  assert.equal(adjusted.review.drive_run_folder.id, runId);
+  assert.equal(drive.folders.size, before);
+  assert.match(drive.files.get(`${runId}/README.md`).content, /- Revisão: 2/);
+
+  const second = pending([item()]);
+  second.created_at = "2026-12-05T07:47:00.000Z";
+  await upload(second, { manifestDir: dir, drive, root: "Projeto X" });
+  assert.equal(second.review.drive_run_folder.name, "2026-12-05 04-47");
+  assert.notEqual(second.review.drive_run_folder.id, runId);
+});
+
+test("the run README is in the batch language, sorted by publish time, with status, files, credits, and AI notes", () => {
+  const data = pending([
+    item({ id: "b-late", date: "2026-12-01", publish_at: "2026-12-01T18:00:00-03:00", caption: "Segundo post\nmais texto", drive: { folder_id: "F", files: { "media/b.png": { id: "1" } } } }),
+    item({ id: "a-early", date: "2026-12-01", publish_at: "2026-12-01T09:00:00-03:00", caption: "Primeiro | post", credits: "Voz: Azure AI Speech", ai_audio: true, ai_audio_engine: "azure" }),
+    item({ id: "c-next", type: "story", date: "2026-11-30", publish_at: null, scheduled: false, caption: "" }),
+  ]);
+  data.created_at = "2026-11-28T07:47:00.000Z";
+  data.review = { ...data.review, revision: 3, issue_url: "https://github.com/o/r/issues/7" };
+  data.state = { "b-late": { status: "published", at: "2026-12-01T21:00:00Z" } };
+  const readme = runReadme(data);
+  assert.match(readme, /^# Facebook: lote de 2026-11-30 \(3 itens\)/);
+  assert.match(readme, /- Criado em: 2026-11-28 04:47 \(America\/Sao_Paulo\)/);
+  assert.match(readme, /- Issue de revisão: https:\/\/github.com\/o\/r\/issues\/7/);
+  assert.match(readme, /- Revisão: 3/);
+  assert.match(readme, /- Aprovação: pendente/);
+  assert.match(readme, /\| Data \| Horário \| Tipo \| id \| Texto \| Arquivos \| Situação \|/);
+  const rows = readme.split("\n").filter((line) => /^\| 20/.test(line));
+  assert.deepEqual(rows.map((row) => row.split("|")[4].trim()), ["`c-next`", "`a-early`", "`b-late`"]);
+  assert.match(rows[0], /\| 2026-11-30 \| próxima execução \| story \|.*\| em revisão \|$/);
+  assert.match(rows[1], /\| 09:00 \| photo \| `a-early` \| Primeiro \\\| post \|/);
+  assert.match(rows[2], /\| Segundo post \| `b-late--b.png` \| publicado \|$/);
+  assert.match(readme, /## Créditos e avisos de IA\n\n- `a-early`\n  - Voz: Azure AI Speech\n  - IA: narração sintética/);
+  assert.ok(!readme.includes("social-content-manifest"));
+  data.language = "en";
+  data.approval = { status: "approved", by: "ana", at: "2026-11-29T00:00:00Z", revision: 3 };
+  data.state = {};
+  const en = runReadme(data);
+  assert.match(en, /- Approval: approved \(revision 3\)/);
+  assert.match(en, /\| next run \|/);
+  assert.match(en, /\| approved \|$/m);
+});
+
+test("set-issue refreshes the README with the issue link; readme uploads it on demand", async () => {
+  const { main } = await import("../../.rulesync/skills/social-review/scripts/review-batch.mjs");
+  const dir = tempDir({});
+  const drive = memoryDrive();
+  const data = pending([item()]);
+  data.review = { ...data.review, issue_number: null, drive_run_folder: { id: "RUN", name: "2026-11-27 09-00", url: "u" } };
+  const path = writeManifest(dir, data);
+  const out = { write: () => {} };
+  await main(["set-issue", path, "--issue", "12", "--url", "https://github.com/o/r/issues/12"], { out, driveFactory: async () => drive });
+  assert.match(drive.files.get("RUN/README.md").content, /issues\/12/);
+  const lines = [];
+  await main(["readme", path], { out: { write: (text) => lines.push(text) }, driveFactory: async () => drive });
+  assert.deepEqual(lines, ["unchanged: 2026-11-27 09-00/README.md\n"]);
+  const warnings = [];
+  await main(["set-issue", path, "--issue", "13"], { out, err: { write: (text) => warnings.push(text) }, driveFactory: async () => { throw new Error("no Drive credentials"); } });
+  assert.match(warnings.join(""), /README.md not updated \(no Drive credentials\)/);
+  assert.equal(JSON.parse(readFileSync(path, "utf8")).review.issue_number, 13);
+});
+
+const PRICES = { costs: { prices: { "azure-speech": { unit: "characters", per_million_usd: 16, voices: { "pt-BR-Macerio:DragonHDLatestNeural": 30 } } } } };
+const speech = (id, quantity, revision, voice = "pt-BR-FranciscaNeural") => ({ id, at: "2026-11-28T07:47:00.000Z", service: "azure-speech", unit: "characters", quantity, voice, revision });
+
+test("generation price resolution: voice override, service default, missing price, and invalid prices", async () => {
+  const { costSummary, priceErrors, unitPrice } = await import("../../.rulesync/skills/social-review/scripts/social-manifest.mjs");
+  assert.equal(unitPrice(PRICES, speech("a", 1, 1)), 16);
+  assert.equal(unitPrice(PRICES, speech("a", 1, 1, "pt-BR-Macerio:DragonHDLatestNeural")), 30);
+  assert.equal(unitPrice(PRICES, { ...speech("a", 1, 1), unit: "requests" }), null);
+  assert.equal(unitPrice(PRICES, { ...speech("a", 1, 1), service: "image-api" }), null);
+  assert.equal(unitPrice(null, speech("a", 1, 1)), null);
+  const summary = costSummary([speech("a", 500000, 1), speech("b", 500000, 2), { ...speech("c", 3, 1), service: "image-api", unit: "images", voice: undefined, detail: "flux" }], PRICES);
+  assert.deepEqual(summary.rows, [{ service: "azure-speech", detail: "pt-BR-FranciscaNeural", unit: "characters", quantity: 1000000, cost: 16 }, { service: "image-api", detail: "flux", unit: "images", quantity: 3, cost: null }]);
+  assert.equal(summary.total, 16);
+  assert.equal(summary.unpriced, true);
+  assert.deepEqual(priceErrors({}), []);
+  assert.deepEqual(priceErrors({ costs: { prices: [] } }), ["costs.prices must be an object keyed by service"]);
+  assert.deepEqual(priceErrors({ costs: { prices: { "azure-speech": { per_million_usd: -1, voices: { x: "1" }, extra: 1 } } } }), [
+    'costs.prices.azure-speech.unit must name the billed unit (for example "characters")',
+    "costs.prices.azure-speech.per_million_usd must be a number >= 0",
+    "costs.prices.azure-speech.voices.x must be a number >= 0 (USD per million units)",
+    "costs.prices.azure-speech: unknown property extra",
+  ]);
+  assert.deepEqual(priceErrors({ costs: { prices: { tts: { unit: "characters" } } } }), ["costs.prices.tts needs per_million_usd or voices"]);
+});
+
+test("billable characters count every code point sent inside <voice>, escapes included, CJK twice", async () => {
+  const { billableCharacters } = await import("../../.rulesync/skills/social-review/scripts/social-manifest.mjs");
+  assert.equal(billableCharacters("Olá, até já!"), 12);
+  assert.equal(billableCharacters("A &amp; B &lt;c&gt;"), 19, "escapes sent inside <voice> count");
+  assert.equal(billableCharacters("你好, ok"), 8, "CJK characters count twice");
+  assert.equal(billableCharacters(""), 0);
+});
+
+test("the costs comment shows only this revision, the campaign total, missing prices, and pt-BR labels", () => {
+  const data = pending([item()]);
+  data.review.revision = 2;
+  data.usage = [speech("a", 1000, 1), speech("b", 2000, 2, "pt-BR-Macerio:DragonHDLatestNeural"), speech("c", 500, 2)];
+  const comment = costsComment(data, PRICES);
+  assert.match(comment, /^<!-- social-content:costs revision=2 -->\n### Custos de geração\n\nRevisão 2 \(esta execução\):/);
+  assert.match(comment, /\| Ferramenta \| Detalhe \| Quantidade \| Custo estimado \(USD\) \|/);
+  assert.match(comment, /\| azure-speech \| pt-BR-FranciscaNeural \| 500 caracteres \| 0,008 \|/);
+  assert.match(comment, /\| azure-speech \| pt-BR-Macerio:DragonHDLatestNeural \| 2\.000 caracteres \| 0,06 \|/);
+  assert.match(comment, /\| \*\*Total\*\* \| \| \| \*\*0,068\*\* \|/);
+  assert.ok(!comment.includes("1.000 caracteres |"), "revision 1 usage stays out of the run table");
+  assert.match(comment, /Campanha até agora \(revisões 1 a 2\): US\$ 0,084; azure-speech \(pt-BR-FranciscaNeural\): 1\.500 caracteres, US\$ 0,024; azure-speech \(pt-BR-Macerio:DragonHDLatestNeural\): 2\.000 caracteres, US\$ 0,06/);
+  assert.match(comment, /sem tokens de IA, assinaturas ou infraestrutura/);
+  assert.match(costsComment(data, PRICES, { revision: 1 }), /Campanha até agora \(revisões 1 a 1\): US\$ 0,016;/);
+  const unpriced = costsComment(data, null);
+  assert.match(unpriced, /\| 500 caracteres \| preço não configurado \|/);
+  assert.match(unpriced, /\| \*\*Total\*\* \| \| \| - \|/);
+  assert.match(unpriced, /Campanha até agora \(revisões 1 a 2\): -; azure-speech \(pt-BR-FranciscaNeural\): 1\.500 caracteres, preço não configurado/);
+  assert.throws(() => costsComment(data, { costs: { prices: { "azure-speech": {} } } }), /invalid costs in the profile/);
+});
+
+test("a run with no paid tool says so, and English batches get English labels", () => {
+  const free = pending([item()]);
+  const comment = costsComment(free, PRICES);
+  assert.match(comment, /Revisão 1 \(esta execução\):\n\nNenhuma ferramenta paga usada nesta execução\.\n\nCampanha até agora \(revisões 1 a 1\): nenhuma ferramenta paga/);
+  free.language = "en";
+  free.review.revision = 3;
+  free.usage = [speech("a", 1000, 1)];
+  const en = costsComment(free, PRICES);
+  assert.match(en, /### Generation costs\n\nRevision 3 \(this run\):\n\nNo paid tool used in this run\./);
+  assert.match(en, /Campaign so far \(revisions 1 to 3\): US\$ 0\.016; azure-speech \(pt-BR-FranciscaNeural\): 1,000 characters, US\$ 0\.016/);
+});
+
+test("upload merges the ledger once, tags it with the revision, and the README shows the campaign cost", async () => {
+  const dir = tempDir({ "media/card.png": png(10, 10) });
+  const drive = memoryDrive();
+  const data = pending([item()]);
+  await upload(data, { manifestDir: dir, drive, root: "P", config: PRICES, usage: [{ ...speech("a", 1000, null), revision: undefined }] });
+  assert.deepEqual(data.usage.map((entry) => [entry.id, entry.revision]), [["a", 1]]);
+  bump(data, [data.items[0].id]);
+  await upload(data, { manifestDir: dir, drive, root: "P", config: PRICES, usage: [{ ...speech("a", 1000, null), revision: undefined }, { ...speech("b", 1000, null), revision: undefined }] });
+  assert.deepEqual(data.usage.map((entry) => [entry.id, entry.revision]), [["a", 1], ["b", 2]]);
+  assert.equal(mergeUsage(data, [speech("b", 1000, 2)]), 0);
+  const readme = drive.files.get(`${data.review.drive_run_folder.id}/README.md`).content;
+  assert.match(readme, /- Custo de geração \(campanha\): US\$ 0,032; azure-speech \(pt-BR-FranciscaNeural\): 2\.000 caracteres, US\$ 0,032/);
+  assert.match(runReadme(pending([item()])), /- Custo de geração \(campanha\): nenhuma ferramenta paga/);
+  await assert.rejects(upload(pending([item()]), { manifestDir: dir, drive, root: "P", config: { costs: { prices: { x: 1 } } } }), /invalid costs in the profile/);
+});
+
+test("costs command reads <batch-dir>/usage.jsonl, records it in the manifest, and prints the comment", async () => {
+  const { main } = await import("../../.rulesync/skills/social-review/scripts/review-batch.mjs");
+  const { appendUsage } = await import("../../.rulesync/skills/social-review/scripts/social-manifest.mjs");
+  const dir = tempDir({ "p.md": `## Parameters\n\n\`\`\`json\n${JSON.stringify(PRICES)}\n\`\`\`\n` });
+  const path = writeManifest(dir, pending([item()]));
+  appendUsage(join(dir, "usage.jsonl"), { service: "azure-speech", unit: "characters", quantity: 250, voice: "pt-BR-FranciscaNeural" }, { id: "u1" });
+  const lines = [];
+  await main(["costs", path, "--profile", join(dir, "p.md")], { out: { write: (text) => lines.push(text) } });
+  assert.match(lines.join(""), /\| 250 caracteres \| 0,004 \|/);
+  assert.deepEqual(JSON.parse(readFileSync(path, "utf8")).usage.map((entry) => [entry.id, entry.revision]), [["u1", 1]]);
+  await assert.rejects(main(["costs", path, "--revision", "x"], { out: { write: () => {} } }), /--revision must be an integer/);
+});
+
+test("README and costs keep the upload's prices when later rendered without --profile", async () => {
+  const { main } = await import("../../.rulesync/skills/social-review/scripts/review-batch.mjs");
+  const dir = tempDir({ "media/card.png": png(10, 10) });
+  const drive = memoryDrive();
+  const data = pending([item()]);
+  await upload(data, { manifestDir: dir, drive, root: "P", config: PRICES, usage: [speech("a", 1000, 1)] });
+  assert.deepEqual(data.cost_prices, PRICES.costs.prices);
+  const path = writeManifest(dir, data);
+  const out = { write: () => {} };
+  await main(["set-issue", path, "--issue", "12", "--url", "https://github.com/o/r/issues/12"], { out, driveFactory: async () => drive });
+  const readme = () => drive.files.get(`${data.review.drive_run_folder.id}/README.md`).content;
+  assert.match(readme(), /- Custo de geração \(campanha\): US\$ 0,016; azure-speech \(pt-BR-FranciscaNeural\): 1\.000 caracteres, US\$ 0,016/);
+  await main(["readme", path], { out, driveFactory: async () => drive });
+  assert.match(readme(), /US\$ 0,016/);
+  assert.ok(!readme().includes("preço não configurado"));
+  const lines = [];
+  await main(["costs", path, "--usage", join(dir, "none.jsonl")], { out: { write: (text) => lines.push(text) } });
+  assert.match(lines.join(""), /\| 1\.000 caracteres \| 0,016 \|/);
+  const bad = { ...data, cost_prices: { x: 1 } };
+  assert.throws(() => runReadme(bad), /invalid costs in the manifest's cost_prices/);
+});
+
+test("a run folder of the same minute that belongs to another batch gets a numbered name", async () => {
+  const dir = tempDir({ "media/card.png": png(10, 10) });
+  const drive = memoryDrive();
+  const first = pending([item()]);
+  await upload(first, { manifestDir: dir, drive, root: "P" });
+  assert.equal(first.review.drive_run_folder.name, "2026-11-27 09-00");
+  assert.match(drive.files.get(`${first.review.drive_run_folder.id}/README.md`).content, /- Lote: `2026-11-30-facebook`/);
+  const other = pending([item()], {});
+  other.batch_id = "2026-12-07-facebook";
+  await upload(other, { manifestDir: dir, drive, root: "P" });
+  assert.equal(other.review.drive_run_folder.name, "2026-11-27 09-00 (2)");
+  assert.notEqual(other.review.drive_run_folder.id, first.review.drive_run_folder.id);
+  const third = pending([item()]);
+  third.batch_id = "2026-12-14-facebook";
+  await upload(third, { manifestDir: dir, drive, root: "P" });
+  assert.equal(third.review.drive_run_folder.name, "2026-11-27 09-00 (3)");
+  const retry = pending([item()]);
+  await upload(retry, { manifestDir: dir, drive, root: "P" });
+  assert.equal(retry.review.drive_run_folder.id, first.review.drive_run_folder.id, "the same batch without a recorded folder finds its own");
+});
+
+test("the marker folds earlier revisions' usage per revision and keeps the totals", () => {
+  const data = pending([item()]);
+  data.review.revision = 3;
+  data.usage = [speech("a", 100, 1), speech("b", 200, 1), speech("c", 50, 1, "pt-BR-Macerio:DragonHDLatestNeural"), speech("d", 300, 2), speech("e", 10, 3), speech("f", 20, 3)];
+  const decoded = decodeMarker(encodeMarker(data));
+  assert.deepEqual(decoded.usage, [
+    { id: "r1:azure-speech:pt-BR-FranciscaNeural:characters", service: "azure-speech", unit: "characters", quantity: 300, revision: 1, voice: "pt-BR-FranciscaNeural", sources: ["a", "b"] },
+    { id: "r1:azure-speech:pt-BR-Macerio:DragonHDLatestNeural:characters", service: "azure-speech", unit: "characters", quantity: 50, revision: 1, voice: "pt-BR-Macerio:DragonHDLatestNeural", sources: ["c"] },
+    { id: "r2:azure-speech:pt-BR-FranciscaNeural:characters", service: "azure-speech", unit: "characters", quantity: 300, revision: 2, voice: "pt-BR-FranciscaNeural", sources: ["d"] },
+    speech("e", 10, 3),
+    speech("f", 20, 3),
+  ]);
+  assert.deepEqual(compactUsage(decoded.usage, 3), decoded.usage, "folding again changes nothing");
+  for (const revision of [1, 2, 3]) assert.equal(costsComment(decoded, PRICES, { revision }), costsComment(data, PRICES, { revision }));
+  assert.equal(runReadme(decoded, { config: PRICES }), runReadme(data, { config: PRICES }));
+  assert.equal(data.usage.length, 6, "the manifest itself keeps every entry");
+});
+
+test("re-merging the original ledger after a marker restore adds nothing and re-tags nothing", async () => {
+  const { appendUsage, readUsage } = await import("../../.rulesync/skills/social-review/scripts/social-manifest.mjs");
+  const dir = tempDir({ "media/card.png": png(10, 10) });
+  const ledger = join(dir, "usage.jsonl");
+  appendUsage(ledger, { service: "azure-speech", unit: "characters", quantity: 1000, voice: "pt-BR-FranciscaNeural" }, { id: "u1" });
+  appendUsage(ledger, { service: "azure-speech", unit: "characters", quantity: 500, voice: "pt-BR-FranciscaNeural" }, { id: "u2" });
+  const drive = memoryDrive();
+  const data = pending([item()]);
+  await upload(data, { manifestDir: dir, drive, root: "P", config: PRICES, usage: readUsage(ledger) });
+  bump(data, [data.items[0].id]);
+  appendUsage(ledger, { service: "azure-speech", unit: "characters", quantity: 200, voice: "pt-BR-FranciscaNeural" }, { id: "u3" });
+  await upload(data, { manifestDir: dir, drive, root: "P", config: PRICES, usage: readUsage(ledger) });
+  bump(data, [data.items[0].id]);
+  const before = { comment: costsComment(data, PRICES, { revision: 3 }), readme: runReadme(data, { config: PRICES }) };
+  const restored = decodeMarker(encodeMarker(data));
+  assert.deepEqual(restored.usage.map((entry) => [entry.id, entry.revision, entry.quantity]), [["r1:azure-speech:pt-BR-FranciscaNeural:characters", 1, 1500], ["r2:azure-speech:pt-BR-FranciscaNeural:characters", 2, 200]]);
+  assert.equal(mergeUsage(restored, readUsage(ledger)), 0);
+  await upload(restored, { manifestDir: dir, drive, root: "P", config: PRICES, usage: readUsage(ledger) });
+  assert.deepEqual(restored.usage.map((entry) => [entry.revision, entry.quantity]), [[1, 1500], [2, 200]]);
+  assert.equal(costsComment(restored, PRICES, { revision: 3 }), before.comment);
+  assert.equal(runReadme(restored, { config: PRICES }), before.readme);
+  const again = decodeMarker(encodeMarker(restored));
+  assert.equal(mergeUsage(again, readUsage(ledger)), 0, "a second round trip still skips the folded ids");
 });

@@ -3,6 +3,18 @@
 All notable changes to this project are documented here. Release versions follow
 [Semantic Versioning](https://semver.org/).
 
+## v0.17.0
+
+### Added
+
+- Generation-cost reporting for social batches. Paid generators append one line per billable call to `<batch-dir>/usage.jsonl` (`video-shorts` `voice.mjs --usage`: `azure-speech`, the billable characters as Azure counts them, every code point of the escaped text inside `<voice>` with CJK counted twice; unchanged lines and Piper log nothing). `social-review` merges the ledger into the manifest's new `usage` field, tagged with the revision, and `review-batch.mjs costs` renders a "Custos de geração" / "Generation costs" comment with this run's tools, quantities, and estimated USD from the profile's new `costs.prices` (service default plus per-voice overrides; "preço não configurado" when missing), and the campaign's total so far. A run without paid tools says so. With `--profile`, `upload`, `set-issue`, `readme`, and `costs` record the prices in the manifest's `cost_prices`, so a later render without the profile keeps them; the issue marker folds earlier revisions' usage into per-revision totals. The content agents post it at the end of generate and adjust. Only paid generation tools count, never AI tokens, subscriptions, or infrastructure.
+- Run folder README. Each Drive run folder holds a `README.md` for people, in the batch language: batch, platform, creation time, review issue, revision, approval, campaign generation cost, the schedule sorted by publish time with file names and status, and the credits and AI notices. `upload`, `set-issue`, and the new `review-batch.mjs readme` regenerate it from the manifest.
+- Configurable music levels in `video-shorts`: `video.music.bed_volume` and `video.music.ducked_volume` in the profile, overridable per spec with `music_volume: {bed, ducked}`; each in (0, 1] and ducked at most bed. Defaults stay 0.18 and 0.07.
+
+### Changed
+
+- `social-review` uploads each generate run to its own Drive folder, `<drive_root>/<Platform>/<YYYY-MM-DD HH-mm>/<item date>/` (the batch's `created_at` in its time zone), instead of shared `<Platform>/<date>/` folders that mixed files of superseded runs. The manifest records it in `review.drive_run_folder`, and adjust revisions upload into the same folder. Two batches created in the same minute get `<name> (2)` instead of sharing a folder. A batch opened before this version gets a new run folder on its next upload, which uploads every file again under new Drive ids: links in older revision comments still open the old files in the old date folders, and the issue body links the new ones. Publishers keep restoring media by file id.
+
 ## v0.16.0
 
 ### Added

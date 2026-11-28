@@ -202,3 +202,32 @@ test("voices alternate from the one the previous batch ended with", () => {
   assert.equal(ttsConfig({ video: { tts: { voices: ["a"], rotation: null } } }).rotation, null);
   assert.throws(() => ttsConfig({ video: { tts: { voices } } }), /several voices, so video\.tts\.rotation must be "alternate"/);
 });
+
+test("review.drive_run_folder records the run folder id and a YYYY-MM-DD HH-mm name", () => {
+  const ok = manifest("facebook", [item()]);
+  ok.review.drive_run_folder = { id: "F1", name: "2026-11-28 04-47", url: "https://drive.google.com/drive/folders/F1" };
+  assert.deepEqual(validate(ok, files()), []);
+  assert.deepEqual(validate(manifest("facebook", [item()], { review: { revision: 1, drive_run_folder: null } }), files()), []);
+  const bad = manifest("facebook", [item()]);
+  bad.review.drive_run_folder = { name: "2026-11-28 04:47", extra: true };
+  const errors = validate(bad, files());
+  assert.ok(errors.some((error) => error.includes("drive_run_folder: missing id")), errors.join("\n"));
+  assert.ok(errors.some((error) => error.includes("drive_run_folder.name: does not match")), errors.join("\n"));
+  assert.ok(errors.some((error) => error.includes("drive_run_folder: unknown property extra")), errors.join("\n"));
+});
+
+test("usage ledger entries validate in the manifest and in usage.jsonl", async () => {
+  const { appendUsage, readUsage } = await import("../../shared/scripts/social-manifest.mjs");
+  const ok = manifest("facebook", [item()], { usage: [{ id: "u1", at: "2026-11-28T07:47:00.000Z", service: "azure-speech", unit: "characters", quantity: 12, voice: "pt-BR-FranciscaNeural", revision: 1 }] });
+  assert.deepEqual(validate(ok, files()), []);
+  const bad = manifest("facebook", [item()], { usage: [{ id: "u1", service: "azure-speech", unit: "characters", quantity: -1, tokens: 3 }] });
+  assert.deepEqual(validate(bad, files()).filter((error) => error.includes("usage")), ["$.usage[0].quantity: below 0", "$.usage[0]: unknown property tokens"]);
+  const dir = tempDir({});
+  const ledger = join(dir, "batch", "usage.jsonl");
+  assert.deepEqual(readUsage(ledger), []);
+  appendUsage(ledger, { service: "azure-speech", unit: "characters", quantity: 3 }, { id: "a", now: NOW });
+  assert.deepEqual(readUsage(ledger), [{ id: "a", at: "2026-11-27T15:00:00.000Z", service: "azure-speech", unit: "characters", quantity: 3 }]);
+  assert.throws(() => appendUsage(ledger, { service: "azure-speech", unit: "characters", quantity: "3" }), /quantity must be a number >= 0/);
+  writeFileSync(ledger, "{nope\n");
+  assert.throws(() => readUsage(ledger), /usage.jsonl:1: invalid JSON/);
+});
