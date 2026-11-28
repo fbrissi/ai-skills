@@ -296,8 +296,8 @@ test("voice.mjs logs one azure-speech ledger line per synthesized line, nothing 
   }
   const entries = readUsage(usage);
   assert.deepEqual(entries.map(({ id, ...rest }) => rest), [
-    { at: "2026-11-28T07:47:00.000Z", service: "azure-speech", unit: "characters", quantity: 13, voice: "pt-BR-FranciscaNeural", spec: "v", scene: "a", item: "2026-12-03-v", revision: 2 },
-    { at: "2026-11-28T07:47:00.000Z", service: "azure-speech", unit: "characters", quantity: 15, voice: "pt-BR-FranciscaNeural", spec: "v", scene: "b", item: "2026-12-03-v", revision: 2 },
+    { at: "2026-11-28T07:47:00.000Z", service: "azure-speech", unit: "characters", quantity: 17, voice: "pt-BR-FranciscaNeural", spec: "v", scene: "a", item: "2026-12-03-v", revision: 2 },
+    { at: "2026-11-28T07:47:00.000Z", service: "azure-speech", unit: "characters", quantity: 21, voice: "pt-BR-FranciscaNeural", spec: "v", scene: "b", item: "2026-12-03-v", revision: 2 },
   ]);
   assert.ok(entries.every((entry) => typeof entry.id === "string" && entry.id.length > 8));
   await assert.rejects(voiceMain(["--spec", spec, "--usage", usage, "--revision", "0"]), /--revision must be an integer >= 1/);

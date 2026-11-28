@@ -9,7 +9,8 @@
 // Env (Azure): AZURE_SPEECH_KEY and AZURE_SPEECH_REGION.
 // Writes <work>/voice/<video id>/<scene>.wav and voice.json ({scene: {duration, text, key, engine, voice}}).
 // With --usage, appends one ledger line per Azure call (service azure-speech, unit characters, the billable characters
-// sent); unchanged lines are not synthesized and not logged, and Piper (local, free) logs nothing.
+// sent inside <voice>: XML-escaped text, CJK twice); unchanged lines are not synthesized and not logged, and Piper
+// (local, free) logs nothing.
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -145,7 +146,7 @@ export async function main(argv, { env = process.env, fetch = globalThis.fetch, 
     const raw = join(dir, `${scene.id}.raw.wav`);
     if (settings.engine === "azure") {
       writeFileSync(raw, await synthesizeAzure(spoken, settings.voice, { env, fetch }));
-      if (usage) appendUsage(usage, { service: "azure-speech", unit: "characters", quantity: billableCharacters(spoken), voice: settings.voice, spec: spec.id, scene: scene.id, item: value("item") ?? null, revision }, { now: now() });
+      if (usage) appendUsage(usage, { service: "azure-speech", unit: "characters", quantity: billableCharacters(escapeXml(spoken)), voice: settings.voice, spec: spec.id, scene: scene.id, item: value("item") ?? null, revision }, { now: now() });
     }
     else exec(python, ["-I", "-m", "piper", "-m", model, "--length-scale", settings.lengthScale, "--sentence-silence", "0.18", "-f", raw], { input: spoken, stdio: ["pipe", "ignore", "inherit"] });
     exec("ffmpeg", ["-v", "error", "-y", "-i", raw, "-af", VOICE_FILTER, "-ar", "48000", "-ac", "2", output]);

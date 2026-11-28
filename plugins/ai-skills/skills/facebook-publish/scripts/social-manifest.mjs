@@ -516,12 +516,15 @@ export function getPath(object, dotted) {
 
 // ---------- generation usage and costs ----------
 
+const DOUBLE_WIDTH = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u;
+
 /**
- * Billable characters of a text-to-speech line: the Unicode code points of the text sent, spaces and punctuation
- * included, SSML markup and XML escaping excluded (how Azure AI Speech counts characters for pt and en text).
+ * Billable characters of the text sent to a text-to-speech API, following Azure AI Speech's rule: every Unicode code
+ * point counts (spaces, punctuation, and SSML markup and escapes such as &amp;), except the <speak> and <voice> tags,
+ * and Chinese, Japanese, and Korean characters count twice. Pass the XML-escaped text sent inside <voice>.
  */
 export function billableCharacters(text) {
-  return [...String(text ?? "")].length;
+  return [...String(text ?? "")].reduce((sum, char) => sum + (DOUBLE_WIDTH.test(char) ? 2 : 1), 0);
 }
 
 const USAGE_KEYS = ["id", "at", "service", "unit", "quantity", "revision", "detail", "voice", "spec", "scene", "item"];
