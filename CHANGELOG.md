@@ -3,6 +3,17 @@
 All notable changes to this project are documented here. Release versions follow
 [Semantic Versioning](https://semver.org/).
 
+## v0.15.0
+
+### Added
+
+- Separate quality mode for the `task-implementer` agent. When the caller runs the code review and QA in their own workflows (`quality-mode: separate` of `fbrissi/github-actions` `ai-task.yml` v1.20.0), the agent only develops: it runs the narrow checks of the change, pushes, opens the pull request, and stops, and the review and QA findings come back to a PR fix pass. The default `cycle` mode keeps the quality cycle in the run.
+- Size for one implement run. `triage.md` sizes each issue for one implement run (the content to write, the areas, and the scenarios count, not only the code), and the delivery profile gains `Largest size per issue` (default `S`). `business-refinement` makes deliverables as small as they can be while each stays acceptable on its own, and `technical-refinement` splits an issue above that size unless it cannot be split, and says why. A content-heavy issue sized S had run out of time in one implement run.
+
+### Changed
+
+- This repository's pull requests run the full AI loop with review and QA in separate jobs (`fbrissi/github-actions` v1.20.0): Quality Checks dispatches Code Review and the new QA workflow (`qa.yml`, the `AI QA` check) in parallel; `code-review.yml`, QA, and the new `pr-feedback.yml` join both verdicts and dispatch the new PR Fix (`pr-fix.yml`, `hotfix/` and `bugfix/` branches or the `ai:auto-fix` label) or Merge Decision (`merge-decision.yml`, rates the risk and holds; a person merges). The weekly AI dependency update only develops and opens its pull requests (`quality-mode: separate`, ai-skills v0.15.0) and the loop follows up.
+
 ## v0.14.1
 
 ### Fixed

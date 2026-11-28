@@ -14,6 +14,14 @@ Apply these fields only when the request, a calling agent, or a profile asks for
 | Start date / Target date | When the source has no due date or deadline: Start today (or the day after the latest Target of the issues it depends on); Target the Start plus the working days the Estimate implies (from similar past work, else one working day per point), or 10 working days when there is no Estimate yet | Start: when the work can begin (after its dependencies and earlier work in the same milestone). Target: the deadline, or the plan's recommended date that leaves its buffers. Always absolute (`YYYY-MM-DD`), and never a target before the start. When the profile defines these fields, never leave them empty: use the default and say so in the output. |
 | Owner | the caller's assignee (for example `requested-by`), else the profile's owner, otherwise `@me` (none when the profile says so, or with a GitHub App or bot token, where `@me` fails) | |
 
+### Size for one implement run
+
+Each issue of a delivery milestone is implemented in one non-interactive run with a time limit, and its review and QA follow in their own runs. Smaller issues finish sooner, fail less, and are cheaper to review and test, so refinement makes them as small as they can be while each stays acceptable on its own:
+
+- Keep every issue at or below the profile's `Largest size per issue` (default `S`). Split an issue above it, unless it cannot be split without leaving a part that is not acceptable on its own: then keep it, and say why in the issue and the output.
+- Size the whole run, not only the code: the volume of content to write (a long page, a guide, legal or marketing text, many translations), the number of areas and files, and the scenarios and checks it needs. Content-heavy work is larger than its code suggests.
+- Prefer vertical slices (each part delivers a working piece end to end) over layers, and one area per issue when the parts can be accepted separately.
+
 When a profile defines the triage fields (for example the `## Triage` section of the delivery profile), a field whose profile key is missing is skipped: say which ones in the output.
 
 ## Estimating from history

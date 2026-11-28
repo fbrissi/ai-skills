@@ -71,8 +71,13 @@ Why the copies: the `skills` CLI and `rulesync install` fetch one skill director
 
 | Workflow | Trigger | What it does |
 | --- | --- | --- |
-| `quality-checks.yml` | PRs, pushes to `main` | `npm run check`, `npm run doctor`, `bash -n` and `ruby -c` on scripts, `check:discovery`, `npm audit`; on PRs to `main`, the release-note check; then dispatches Code Review |
-| `code-review.yml` | dispatched by Quality Checks on `main` | Calls the shared [Code Review](https://github.com/fbrissi/github-actions#code-review) workflow: OpenCode or Claude Code (`AI_HARNESS`) with this repo's `review-changes` skill (taken from the base commit) publishes a PR review |
+| `quality-checks.yml` | PRs, pushes to `main` | `npm run check`, `npm run doctor`, `bash -n` and `ruby -c` on scripts, `check:discovery`, `npm audit`; on PRs to `main`, the release-note check; then dispatches Code Review and QA in parallel |
+| `code-review.yml` | dispatched by Quality Checks on `main` | Calls the shared [Code Review](https://github.com/fbrissi/github-actions#code-review) workflow: OpenCode or Claude Code (`AI_HARNESS`) with this repo's `review-changes` skill (taken from the base commit) publishes a PR review; its `join` job then joins it with QA |
+| `qa.yml` | dispatched by Quality Checks on `main` | Calls the shared [QA](https://github.com/fbrissi/github-actions#review-and-qa-in-separate-jobs) workflow (`qa-e2e`, targeted validation): publishes the `AI QA` check and joins it with the review |
+| `pr-feedback.yml` | PR review submitted | Calls the shared quality join: once the `Code Review` and `AI QA` checks of the head have completed, dispatches PR Fix when either asks for changes and Merge Decision when both approve |
+| `pr-fix.yml` | dispatched by the quality join on `main` | Calls the shared [PR Fix](https://github.com/fbrissi/github-actions#pr-fix) workflow on `hotfix/` and `bugfix/` branches or PRs labeled `ai:auto-fix`: fixes the review threads and the QA report and pushes; after 3 passes it adds `ai:needs-human` |
+| `merge-decision.yml` | dispatched by the quality join on `main` | Calls the shared [Merge Decision](https://github.com/fbrissi/github-actions#merge-decision) workflow on the same branches with `auto-merge: false`: rates the risk with `merge-risk` and holds; a person merges after approving the head commit |
+| `ai-dependency-update.yml` | weekly, Monday 15:00 UTC, or manually | Runs the shared `dependency-update` AI task (profile [`docs/ai/dependency-updates.md`](ai/dependency-updates.md)) with `quality-mode: separate`: it only develops and opens the `hotfix/` and `bugfix/` PRs, and the loop above follows up |
 | `release-orchestrator.yml` | PR merged into `main` | Calls the shared [release](https://github.com/fbrissi/github-actions#release) workflow, which tags the top `## vX.Y.Z` of `CHANGELOG.md` and creates the GitHub release |
 | `release.yml` | run manually | Runs the same shared release workflow for a given version |
 
@@ -83,7 +88,7 @@ Why the copies: the `skills` CLI and `rulesync install` fetch one skill director
 | Name | Kind | Purpose |
 | --- | --- | --- |
 | `AI_HARNESS` | variable | `claude` (default when empty) or `opencode` |
-| `AGENT_APP_ID`, `AGENT_APP_PRIVATE_KEY` | variable, secret | GitHub App that publishes the review |
+| `AGENT_APP_CLIENT_ID`, `AGENT_APP_PRIVATE_KEY` | variable, secret | GitHub App that reviews, tests, fixes, and rates: Contents and Pull requests read and write, Issues read, Checks read, Actions read, and Commit statuses read; never Workflows |
 | `OPENCODE_MODEL`, `OPENCODE_VARIANT` | variables | OpenCode model (`provider/model`) and variant; `OPENCODE_MODEL` is required for `opencode` |
 | `OPEN_AI_TOKEN` | secret | Provider key used by OpenCode |
 | `CLAUDE_MODEL`, `CLAUDE_EFFORT` | variables | Optional Claude Code model and effort |
@@ -91,7 +96,7 @@ Why the copies: the `skills` CLI and `rulesync install` fetch one skill director
 | `CODE_REVIEW_ENABLED` | variable | `false` skips the review |
 | `CI_RUNNER` | variable | Optional runner label |
 
-The review job runs in the `code-review` environment, which GitHub creates on the first run; add protection rules there if you want them. A review that ends with `Published: skipped (...)` passes without publishing.
+The review, QA, fix, and merge decision jobs run in the `code-review` environment, which GitHub creates on the first run; add protection rules there if you want them. A review that ends with `Published: skipped (...)` passes without publishing. The labels `ai:auto-fix` (opts a PR into PR Fix), `ai:needs-human` (PR Fix escalation), and `ai:needs-approval` (a sign-off before the merge decision) must exist.
 
 ## Commands
 

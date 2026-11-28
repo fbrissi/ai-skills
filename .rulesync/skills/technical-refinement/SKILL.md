@@ -61,7 +61,7 @@ Issues in a milestone are implemented in parallel, each on its own branch from t
 
 With [references/triage.md](references/triage.md) and the profile's `## Triage` section, for each planned issue (including issues created by a split):
 
-1. Revise Size, Estimate, and Effort from its technical plan and similar past work. Split an issue above the largest size (step 3's split rules; each part gets its own triage).
+1. Revise Size, Estimate, and Effort from its technical plan and similar past work. Split an issue above the profile's `Largest size per issue` (default `S`), sized for one implement run as [references/triage.md](references/triage.md) (Size for one implement run) says: content volume, areas, and scenarios count, not only the code. Use step 3's split rules; each part gets its own triage. Keep an issue that cannot be split without a part that is not acceptable on its own, and say why.
 2. When dependencies move its Start date or Target date, update them.
 3. Fill empty Start and Target dates: when the profile defines them and either is still empty, set it now with the no-deadline defaults of `triage.md` and the revised Estimate, even when no dependency moved it. Readiness review sends back an issue with an empty required date.
 4. Set any other required triage field that is still empty.
