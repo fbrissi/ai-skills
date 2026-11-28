@@ -10,6 +10,7 @@
 //   review-batch.mjs bump <manifest.json> --changed <id,id> [--note <text>]
 //   review-batch.mjs set-issue <manifest.json> --issue <n> --url <issue URL> [--profile <md>]
 //   review-batch.mjs readme <manifest.json> [--profile <md>]
+//   review-batch.mjs costs <manifest.json> [--profile <md>] [--usage <usage.jsonl>] [--revision <n>]
 //   review-batch.mjs marker <issue-body.md|-> [--out <manifest.json>]
 //   review-batch.mjs adjust-requests --issue <n> [--repo owner/name]
 //   review-batch.mjs approve --issue <n> --comment-id <id> --out <manifest.json> [--repo owner/name] [--profile <md>]
@@ -21,7 +22,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { gunzipSync, gzipSync } from "node:zlib";
 import { Drive, fileUrl, folderUrl, md5 } from "./drive.mjs";
-import { approveManifest, composeText, isMain, loadManifest, readProfileConfig, resolveMediaPath, saveManifest } from "./social-manifest.mjs";
+import { approveManifest, composeText, costSummary, isMain, loadManifest, priceErrors, readProfileConfig, readUsage, resolveMediaPath, saveManifest } from "./social-manifest.mjs";
 
 export const PLATFORM_NAMES = { facebook: "Facebook", instagram: "Instagram", youtube: "YouTube", linkedin: "LinkedIn" };
 export const MARKER = /<!-- social-content-manifest:v1:([A-Za-z0-9+/=]+) -->/g;
@@ -30,12 +31,11 @@ export const MAX_BODY = 65000;
 export class ReviewError extends Error {}
 
 const LABELS = {
-  pt: { music: "Música", license: "licença", evidence: "evidência", ai: (item) => `IA: ${[item.ai_audio ? "narração sintética" : null, item.synthetic_media ? "imagens geradas por IA" : null].filter(Boolean).join(" e ")} (rótulo de IA na Meta${item.synthetic_media ? ", containsSyntheticMedia no YouTube" : ""}, aviso no texto do LinkedIn)`, title: (p, d, n) => `${p}: lote de ${d} (${n} ${n === 1 ? "item" : "itens"})`, date: "Data", type: "Tipo", text: "Texto", drive: "Drive", folder: "pasta", how: "Como revisar", howText: (adjust, approve) => `Comente \`${adjust} <id>: <o que mudar>\` (um ou mais itens) para refazer só o que pedir, ou \`${approve}\` para aprovar e publicar o lote. Só comentários de quem tem permissão de escrita contam.`, full: "Textos completos", sources: "Fontes", credits: "Créditos", next: "próxima execução", revision: (n) => `Revisão ${n}`, changed: "Itens refeitos", synthetic: "contém mídia sintética (IA)", link: "Link", sent: { preview: "prévia do link", text: "no fim do texto", inText: "no texto", none: "não enviado: o Instagram não tem link clicável; use o link na bio" }, noUtm: "nenhuma", inMedia: "Texto na mídia (do spec; revise como a legenda)", fields: { kicker: "Chamada", headline: "Título", title: "Título", lead: "Texto", body: "Texto", badge: "Selo", voice: "Narração" }, readme: { platform: "Plataforma", created: "Criado em", issue: "Issue de revisão", noIssue: "ainda não aberta", revision: "Revisão", approval: "Aprovação", schedule: "Agenda", time: "Horário", files: "Arquivos", status: "Situação", notes: "Créditos e avisos de IA", none: "Nenhum item com créditos, música ou IA.", generated: "Gerado a partir do manifest.json do lote a cada envio ou revisão. Não edite: a próxima atualização substitui este arquivo.", approvalStatus: { pending: "pendente", approved: "aprovado", rejected: "rejeitado" }, itemStatus: { review: "em revisão", approved: "aprovado", scheduled: "agendado", published: "publicado", failed: "falhou", unknown: "a verificar", skipped: "ignorado" } } },
-  en: { music: "Music", license: "license", evidence: "evidence", ai: (item) => `AI: ${[item.ai_audio ? "synthetic narration" : null, item.synthetic_media ? "AI-generated footage" : null].filter(Boolean).join(" and ")} (Meta AI label${item.synthetic_media ? ", YouTube containsSyntheticMedia" : ""}, LinkedIn text disclosure)`, title: (p, d, n) => `${p}: batch of ${d} (${n} ${n === 1 ? "item" : "items"})`, date: "Date", type: "Type", text: "Text", drive: "Drive", folder: "folder", how: "How to review", howText: (adjust, approve) => `Comment \`${adjust} <id>: <what to change>\` (one or more items) to redo only what you ask for, or \`${approve}\` to approve and publish the batch. Only comments from people with write access count.`, full: "Full copy", sources: "Sources", credits: "Credits", next: "next run", revision: (n) => `Revision ${n}`, changed: "Items redone", synthetic: "contains synthetic (AI) media", link: "Link", sent: { preview: "link preview", text: "at the end of the text", inText: "in the text", none: "not sent: Instagram links are not clickable; use the link in bio" }, noUtm: "none", inMedia: "Text in the media (from the spec; review it like the caption)", fields: { kicker: "Kicker", headline: "Headline", title: "Title", lead: "Lead", body: "Body", badge: "Badge", voice: "Narration" }, readme: { platform: "Platform", created: "Created at", issue: "Review issue", noIssue: "not open yet", revision: "Revision", approval: "Approval", schedule: "Schedule", time: "Time", files: "Files", status: "Status", notes: "Credits and AI notices", none: "No item has credits, music, or AI.", generated: "Generated from the batch's manifest.json on every upload or revision. Do not edit: the next update replaces this file.", approvalStatus: { pending: "pending", approved: "approved", rejected: "rejected" }, itemStatus: { review: "in review", approved: "approved", scheduled: "scheduled", published: "published", failed: "failed", unknown: "to check", skipped: "skipped" } } },
+  pt: { music: "Música", license: "licença", evidence: "evidência", ai: (item) => `IA: ${[item.ai_audio ? "narração sintética" : null, item.synthetic_media ? "imagens geradas por IA" : null].filter(Boolean).join(" e ")} (rótulo de IA na Meta${item.synthetic_media ? ", containsSyntheticMedia no YouTube" : ""}, aviso no texto do LinkedIn)`, title: (p, d, n) => `${p}: lote de ${d} (${n} ${n === 1 ? "item" : "itens"})`, date: "Data", type: "Tipo", text: "Texto", drive: "Drive", folder: "pasta", how: "Como revisar", howText: (adjust, approve) => `Comente \`${adjust} <id>: <o que mudar>\` (um ou mais itens) para refazer só o que pedir, ou \`${approve}\` para aprovar e publicar o lote. Só comentários de quem tem permissão de escrita contam.`, full: "Textos completos", sources: "Fontes", credits: "Créditos", next: "próxima execução", revision: (n) => `Revisão ${n}`, changed: "Itens refeitos", synthetic: "contém mídia sintética (IA)", link: "Link", sent: { preview: "prévia do link", text: "no fim do texto", inText: "no texto", none: "não enviado: o Instagram não tem link clicável; use o link na bio" }, noUtm: "nenhuma", inMedia: "Texto na mídia (do spec; revise como a legenda)", fields: { kicker: "Chamada", headline: "Título", title: "Título", lead: "Texto", body: "Texto", badge: "Selo", voice: "Narração" }, readme: { platform: "Plataforma", created: "Criado em", issue: "Issue de revisão", noIssue: "ainda não aberta", revision: "Revisão", approval: "Aprovação", schedule: "Agenda", time: "Horário", files: "Arquivos", status: "Situação", notes: "Créditos e avisos de IA", none: "Nenhum item com créditos, música ou IA.", generated: "Gerado a partir do manifest.json do lote a cada envio ou revisão. Não edite: a próxima atualização substitui este arquivo.", cost: "Custo de geração (campanha)", approvalStatus: { pending: "pendente", approved: "aprovado", rejected: "rejeitado" }, itemStatus: { review: "em revisão", approved: "aprovado", scheduled: "agendado", published: "publicado", failed: "falhou", unknown: "a verificar", skipped: "ignorado" } }, costs: { heading: "Custos de geração", thisRun: (n) => `Revisão ${n} (esta execução)`, tool: "Ferramenta", detail: "Detalhe", quantity: "Quantidade", cost: "Custo estimado (USD)", total: "Total", noPrice: "preço não configurado", unpriced: "sem os itens sem preço", none: "Nenhuma ferramenta paga usada nesta execução.", campaign: (n) => `Campanha até agora (revisões 1 a ${n})`, campaignNone: "nenhuma ferramenta paga", note: "Estimativas com os preços do perfil (`costs.prices`). Só ferramentas pagas usadas para gerar o conteúdo; sem tokens de IA, assinaturas ou infraestrutura.", units: { characters: "caracteres" } } },
+  en: { music: "Music", license: "license", evidence: "evidence", ai: (item) => `AI: ${[item.ai_audio ? "synthetic narration" : null, item.synthetic_media ? "AI-generated footage" : null].filter(Boolean).join(" and ")} (Meta AI label${item.synthetic_media ? ", YouTube containsSyntheticMedia" : ""}, LinkedIn text disclosure)`, title: (p, d, n) => `${p}: batch of ${d} (${n} ${n === 1 ? "item" : "items"})`, date: "Date", type: "Type", text: "Text", drive: "Drive", folder: "folder", how: "How to review", howText: (adjust, approve) => `Comment \`${adjust} <id>: <what to change>\` (one or more items) to redo only what you ask for, or \`${approve}\` to approve and publish the batch. Only comments from people with write access count.`, full: "Full copy", sources: "Sources", credits: "Credits", next: "next run", revision: (n) => `Revision ${n}`, changed: "Items redone", synthetic: "contains synthetic (AI) media", link: "Link", sent: { preview: "link preview", text: "at the end of the text", inText: "in the text", none: "not sent: Instagram links are not clickable; use the link in bio" }, noUtm: "none", inMedia: "Text in the media (from the spec; review it like the caption)", fields: { kicker: "Kicker", headline: "Headline", title: "Title", lead: "Lead", body: "Body", badge: "Badge", voice: "Narration" }, readme: { platform: "Platform", created: "Created at", issue: "Review issue", noIssue: "not open yet", revision: "Revision", approval: "Approval", schedule: "Schedule", time: "Time", files: "Files", status: "Status", notes: "Credits and AI notices", none: "No item has credits, music, or AI.", generated: "Generated from the batch's manifest.json on every upload or revision. Do not edit: the next update replaces this file.", cost: "Generation cost (campaign)", approvalStatus: { pending: "pending", approved: "approved", rejected: "rejected" }, itemStatus: { review: "in review", approved: "approved", scheduled: "scheduled", published: "published", failed: "failed", unknown: "to check", skipped: "skipped" } }, costs: { heading: "Generation costs", thisRun: (n) => `Revision ${n} (this run)`, tool: "Tool", detail: "Detail", quantity: "Quantity", cost: "Estimated cost (USD)", total: "Total", noPrice: "price not configured", unpriced: "excluding unpriced rows", none: "No paid tool used in this run.", campaign: (n) => `Campaign so far (revisions 1 to ${n})`, campaignNone: "no paid tool", note: "Estimates from the profile prices (`costs.prices`). Only paid tools used to generate the content; no AI tokens, subscriptions, or infrastructure.", units: { characters: "characters" } } },
 };
 
 const labelsFor = (manifest) => (String(manifest.language).toLowerCase().startsWith("pt") ? LABELS.pt : LABELS.en);
-const reviewConfig = (profile) => (profile ? readProfileConfig(profile).review ?? {} : {});
 const commands = (review) => ({ adjust: review.commands?.adjust ?? "/adjust", approve: review.commands?.approve ?? "/aprove" });
 
 export function encodeMarker(manifest) {
@@ -172,6 +172,53 @@ export function bump(manifest, changed, { note = null, now = new Date() } = {}) 
   return manifest;
 }
 
+/** Adds ledger entries not yet in manifest.usage (by id), tagging untagged ones with the current revision. */
+export function mergeUsage(manifest, entries) {
+  const known = new Set((manifest.usage ?? []).map((entry) => entry.id));
+  const revision = manifest.review?.revision ?? 1;
+  const added = entries.filter((entry) => !known.has(entry.id)).map((entry) => ({ ...entry, revision: entry.revision ?? revision }));
+  if (added.length || manifest.usage) manifest.usage = [...(manifest.usage ?? []), ...added];
+  return added.length;
+}
+
+function checkPrices(config) {
+  const errors = priceErrors(config);
+  if (errors.length) throw new ReviewError(`invalid costs in the profile:\n- ${errors.join("\n- ")}`);
+}
+
+const money = (value, language) => new Intl.NumberFormat(language, { minimumFractionDigits: 2, maximumFractionDigits: 4 }).format(value);
+const count = (value, language) => new Intl.NumberFormat(language, { maximumFractionDigits: 2 }).format(value);
+
+function costLine(summary, manifest, labels) {
+  const c = labels.costs;
+  if (!summary.rows.length) return c.campaignNone;
+  const parts = summary.rows.map((row) => `${row.service}${row.detail ? ` (${row.detail})` : ""}: ${count(row.quantity, manifest.language)} ${c.units[row.unit] ?? row.unit}, ${row.cost === null ? c.noPrice : `US$ ${money(row.cost, manifest.language)}`}`);
+  return `US$ ${money(summary.total, manifest.language)}${summary.unpriced ? ` (${c.unpriced})` : ""}; ${parts.join("; ")}`;
+}
+
+/**
+ * The "Generation costs" comment of one run or revision: the paid generation calls tagged with that revision
+ * (quantity, unit, estimated USD from the profile's costs.prices, "price not configured" when missing), and the
+ * campaign's cumulative total across revisions. Says so when no paid tool was used, so the free path is visible.
+ */
+export function costsComment(manifest, config, { revision = manifest.review?.revision ?? 1 } = {}) {
+  checkPrices(config);
+  const labels = labelsFor(manifest);
+  const c = labels.costs;
+  const usage = manifest.usage ?? [];
+  const run = costSummary(usage.filter((entry) => (entry.revision ?? 1) === revision), config);
+  const campaign = costSummary(usage.filter((entry) => (entry.revision ?? 1) <= revision), config);
+  const lines = [`<!-- social-content:costs revision=${revision} -->`, `### ${c.heading}`, "", `${c.thisRun(revision)}:`, ""];
+  if (!run.rows.length) lines.push(c.none);
+  else {
+    lines.push(`| ${c.tool} | ${c.detail} | ${c.quantity} | ${c.cost} |`, "|---|---|---:|---:|");
+    for (const row of run.rows) lines.push(`| ${cell(row.service)} | ${cell(row.detail ?? "-")} | ${count(row.quantity, manifest.language)} ${c.units[row.unit] ?? row.unit} | ${row.cost === null ? c.noPrice : money(row.cost, manifest.language)} |`);
+    lines.push(`| **${c.total}** | | | **${money(run.total, manifest.language)}**${run.unpriced ? ` (${c.unpriced})` : ""} |`);
+  }
+  lines.push("", `${c.campaign(revision)}: ${costLine(campaign, manifest, labels)}`, "", `_${c.note}_`, "");
+  return lines.join("\n");
+}
+
 /** {date: "YYYY-MM-DD", time: "HH:mm"} of an instant in an IANA time zone. */
 export function localStamp(instant, timeZone) {
   const date = new Date(instant);
@@ -216,7 +263,7 @@ function itemStatus(manifest, item, labels) {
  * approval, the schedule sorted by publish time, and the credits and AI notices. Generated from the manifest; never
  * parsed back (the manifest stays the automation source).
  */
-export function runReadme(manifest) {
+export function runReadme(manifest, { config = null } = {}) {
   const labels = labelsFor(manifest);
   const r = labels.readme;
   const platform = PLATFORM_NAMES[manifest.platform];
@@ -233,6 +280,7 @@ export function runReadme(manifest) {
     `- ${r.issue}: ${issue}`,
     `- ${r.revision}: ${revision}`,
     `- ${r.approval}: ${approval}${manifest.approval?.status === "approved" && manifest.approval.revision ? ` (${r.revision.toLowerCase()} ${manifest.approval.revision})` : ""}`,
+    `- ${r.cost}: ${costLine(costSummary(manifest.usage ?? [], config), manifest, labels)}`,
     "",
     `## ${r.schedule}`,
     "",
@@ -261,21 +309,24 @@ export function runReadme(manifest) {
 }
 
 /** Writes runReadme to the run folder as README.md (replaced in place, so its link survives). */
-export async function uploadReadme(manifest, { drive }) {
+export async function uploadReadme(manifest, { drive, config = null }) {
+  checkPrices(config);
   const folder = manifest.review?.drive_run_folder;
   if (!folder?.id) throw new ReviewError("the manifest has no review.drive_run_folder; run upload first");
   const dir = mkdtempSync(join(tmpdir(), "social-readme-"));
   try {
     const path = join(dir, "README.md");
-    writeFileSync(path, runReadme(manifest));
+    writeFileSync(path, runReadme(manifest, { config }));
     return await drive.upload(path, folder.id, { name: "README.md" });
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
 }
 
-export async function upload(manifest, { manifestDir, drive, root, share = true, now = new Date() }) {
+export async function upload(manifest, { manifestDir, drive, root, share = true, now = new Date(), config = null, usage = [] }) {
   if (!root) throw new ReviewError("set review.drive_root in the profile or pass --root");
+  checkPrices(config);
+  mergeUsage(manifest, usage);
   const rootFolder = await drive.ensurePath(root);
   manifest.review = { revision: 1, history: [], ...(manifest.review ?? {}), drive_root_id: rootFolder.id };
   const run = await runFolder(manifest, { drive, root, share, now });
@@ -296,7 +347,7 @@ export async function upload(manifest, { manifestDir, drive, root, share = true,
     for (const path of Object.keys(files)) if (!paths.includes(path)) delete files[path];
     item.drive = { folder_id: folder.id, folder_url: folderUrl(folder.id), files };
   }
-  const readme = await uploadReadme(manifest, { drive });
+  const readme = await uploadReadme(manifest, { drive, config });
   report.push(`${readme.unchanged ? "unchanged" : "uploaded"}: ${run.name}/README.md`);
   return report;
 }
@@ -419,7 +470,8 @@ function args(argv) {
 export async function main(argv, { env = process.env, fetchImpl = fetch, out = process.stdout, err = process.stderr, readStdin = () => readFileSync(0, "utf8"), driveFactory = () => Drive.fromEnv(env, fetchImpl) } = {}) {
   const { positional, flags } = args(argv);
   const [command, target] = positional;
-  const review = reviewConfig(flags.profile);
+  const config = flags.profile ? readProfileConfig(flags.profile) : null;
+  const review = config?.review ?? {};
   if (command === "marker") {
     const manifest = decodeMarker(target === "-" || !target ? readStdin() : readFileSync(target, "utf8"));
     if (!manifest) throw new ReviewError("no social-content-manifest marker found");
@@ -444,7 +496,7 @@ export async function main(argv, { env = process.env, fetchImpl = fetch, out = p
     out.write(`${JSON.stringify(await adjustRequests({ repo, issue: flags.issue, token, fetchImpl, command: commands(review).adjust }), null, 2)}\n`);
     return;
   }
-  if (!target) throw new ReviewError("usage: review-batch.mjs <upload|issue-body|revision-comment|bump|set-issue|readme|marker|adjust-requests|approve|fetch> ...");
+  if (!target) throw new ReviewError("usage: review-batch.mjs <upload|issue-body|revision-comment|bump|set-issue|readme|costs|marker|adjust-requests|approve|fetch> ...");
   const manifest = loadManifest(target);
   const manifestDir = dirname(resolve(target));
   const changed = String(flags.changed ?? "").split(",").map((id) => id.trim()).filter(Boolean);
@@ -467,12 +519,19 @@ export async function main(argv, { env = process.env, fetchImpl = fetch, out = p
     // The README gets the issue link now; the issue is already recorded, so a Drive failure is only a warning.
     if (manifest.review.drive_run_folder?.id) {
       try {
-        await uploadReadme(manifest, { drive: await driveFactory() });
+        await uploadReadme(manifest, { drive: await driveFactory(), config });
       } catch (error) {
         err.write(`warning: README.md not updated (${error.message}); run review-batch.mjs readme ${target}\n`);
       }
     }
     return;
+  }
+  const usagePath = flags.usage ? resolve(flags.usage) : join(manifestDir, "usage.jsonl");
+  if (command === "costs") {
+    const revision = flags.revision !== undefined ? Number(flags.revision) : undefined;
+    if (revision !== undefined && (!Number.isInteger(revision) || revision < 1)) throw new ReviewError("--revision must be an integer >= 1");
+    if (mergeUsage(manifest, readUsage(usagePath))) saveManifest(target, manifest);
+    return void out.write(costsComment(manifest, config, { revision }));
   }
   if (command === "bump") {
     if (!changed.length) throw new ReviewError("bump needs --changed <id,id>");
@@ -481,12 +540,12 @@ export async function main(argv, { env = process.env, fetchImpl = fetch, out = p
   }
   const drive = await driveFactory();
   if (command === "upload") {
-    const report = await upload(manifest, { manifestDir, drive, root: flags.root ?? review.drive_root, share: !flags["no-share"] && review.drive_share !== false });
+    const report = await upload(manifest, { manifestDir, drive, root: flags.root ?? review.drive_root, share: !flags["no-share"] && review.drive_share !== false, config, usage: readUsage(usagePath) });
     saveManifest(target, manifest);
     return void out.write(`${report.join("\n")}\n`);
   }
   if (command === "readme") {
-    const file = await uploadReadme(manifest, { drive });
+    const file = await uploadReadme(manifest, { drive, config });
     return void out.write(`${file.unchanged ? "unchanged" : "uploaded"}: ${manifest.review.drive_run_folder.name}/README.md\n`);
   }
   if (command === "fetch") return void out.write(`${(await fetchMedia(manifest, { manifestDir, drive })).join("\n")}\n`);

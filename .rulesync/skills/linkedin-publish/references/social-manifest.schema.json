@@ -79,6 +79,13 @@
     "review": {
       "$ref": "#/$defs/review"
     },
+    "usage": {
+      "type": "array",
+      "description": "Ledger of paid generation calls (TTS, image, or video APIs; never LLM tokens, subscriptions, or infrastructure), merged by social-review upload from <batch-dir>/usage.jsonl and tagged with the revision that spent it.",
+      "items": {
+        "$ref": "#/$defs/usage"
+      }
+    },
     "state": {
       "type": "object",
       "additionalProperties": {
@@ -538,6 +545,74 @@
           "items": {
             "type": "object"
           }
+        }
+      }
+    },
+    "usage": {
+      "type": "object",
+      "required": [
+        "id",
+        "service",
+        "unit",
+        "quantity"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "service": {
+          "type": "string",
+          "description": "Paid tool, for example azure-speech; the key of costs.prices in the profile."
+        },
+        "unit": {
+          "type": "string",
+          "description": "Billed unit, for example characters."
+        },
+        "quantity": {
+          "type": "number",
+          "minimum": 0
+        },
+        "revision": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "detail": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "voice": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "spec": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "scene": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "item": {
+          "type": [
+            "string",
+            "null"
+          ]
         }
       }
     },

@@ -1,17 +1,20 @@
 #!/usr/bin/env node
 // Narration with Piper TTS (default) or Azure AI Speech: one WAV per scene with a voice line, silence trimmed, light
 // EQ and loudness normalized to -16 LUFS (48 kHz stereo). Skips scenes whose text, engine, voice and speed did not change.
-// Usage: voice.mjs --spec <video.json> [--profile <profile.md>] [--work .cache/video-shorts]
+// Usage: voice.mjs --spec <video.json> [--profile <profile.md>] [--work .cache/video-shorts] [--usage <batch-dir>/usage.jsonl]
+//        [--item <manifest item id>] [--revision <n>]
 // Engine and voices: video.tts ({engine, voices, rotation}) in the profile; without it Piper with video.voice.
 // Env (Piper): PIPER_PYTHON (python with piper-tts, default python3), PIPER_MODEL_DIR (default <work>/models),
 //      PIPER_LENGTH_SCALE (default from the spec or profile, else 0.92).
 // Env (Azure): AZURE_SPEECH_KEY and AZURE_SPEECH_REGION.
 // Writes <work>/voice/<video id>/<scene>.wav and voice.json ({scene: {duration, text, key, engine, voice}}).
+// With --usage, appends one ledger line per Azure call (service azure-speech, unit characters, the billable characters
+// sent); unchanged lines are not synthesized and not logged, and Piper (local, free) logs nothing.
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { isMain, readProfileConfig, ttsConfig } from "./social-manifest.mjs";
+import { appendUsage, billableCharacters, isMain, readProfileConfig, ttsConfig } from "./social-manifest.mjs";
 
 export const VOICE_FILTER = "silenceremove=start_periods=1:start_threshold=-50dB,areverse,silenceremove=start_periods=1:start_threshold=-50dB,areverse,highpass=f=70,equalizer=f=180:t=q:w=1:g=2,loudnorm=I=-16:TP=-1.5:LRA=7";
 
@@ -113,12 +116,15 @@ function ensureModel(python, modelDir, voice) {
   return model;
 }
 
-export async function main(argv, { env = process.env, fetch = globalThis.fetch, exec = execFileSync } = {}) {
+export async function main(argv, { env = process.env, fetch = globalThis.fetch, exec = execFileSync, now = () => new Date() } = {}) {
   const value = (name) => {
     const index = argv.indexOf(`--${name}`);
     return index >= 0 ? argv[index + 1] : undefined;
   };
-  if (!value("spec")) throw new Error("usage: voice.mjs --spec <video.json> [--profile <md>] [--work <dir>]");
+  if (!value("spec")) throw new Error("usage: voice.mjs --spec <video.json> [--profile <md>] [--work <dir>] [--usage <file>] [--item <id>] [--revision <n>]");
+  const usage = value("usage") ? resolve(value("usage")) : null;
+  const revision = value("revision") !== undefined ? Number(value("revision")) : null;
+  if (revision !== null && (!Number.isInteger(revision) || revision < 1)) throw new VoiceError("--revision must be an integer >= 1");
   const spec = JSON.parse(readFileSync(value("spec"), "utf8"));
   const config = value("profile") ? readProfileConfig(value("profile")) : null;
   const work = resolve(value("work") ?? ".cache/video-shorts");
@@ -137,7 +143,10 @@ export async function main(argv, { env = process.env, fetch = globalThis.fetch, 
     const output = join(dir, `${scene.id}.wav`);
     if (manifest[scene.id]?.key === key && existsSync(output)) { process.stderr.write(`voice ${scene.id}: unchanged\n`); continue; }
     const raw = join(dir, `${scene.id}.raw.wav`);
-    if (settings.engine === "azure") writeFileSync(raw, await synthesizeAzure(spoken, settings.voice, { env, fetch }));
+    if (settings.engine === "azure") {
+      writeFileSync(raw, await synthesizeAzure(spoken, settings.voice, { env, fetch }));
+      if (usage) appendUsage(usage, { service: "azure-speech", unit: "characters", quantity: billableCharacters(spoken), voice: settings.voice, spec: spec.id, scene: scene.id, item: value("item") ?? null, revision }, { now: now() });
+    }
     else exec(python, ["-I", "-m", "piper", "-m", model, "--length-scale", settings.lengthScale, "--sentence-silence", "0.18", "-f", raw], { input: spoken, stdio: ["pipe", "ignore", "inherit"] });
     exec("ffmpeg", ["-v", "error", "-y", "-i", raw, "-af", VOICE_FILTER, "-ar", "48000", "-ac", "2", output]);
     rmSync(raw, { force: true });

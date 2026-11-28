@@ -270,3 +270,35 @@ test("the studio reads the music volume from props, with the old levels as Root 
   assert.match(readFileSync(`${studio}/schema.ts`, "utf8"), /musicVolume: z\.object\(\{ bed: z\.number\(\)\.gt\(0\)\.lte\(1\), ducked: z\.number\(\)\.gt\(0\)\.lte\(1\) \}\)/);
   assert.match(readFileSync(`${studio}/Root.tsx`, "utf8"), /musicVolume: \{ bed: 0\.18, ducked: 0\.07 \}/);
 });
+
+test("voice.mjs logs one azure-speech ledger line per synthesized line, nothing for unchanged lines or Piper", async () => {
+  const { readUsage } = await import("../../.rulesync/skills/video-shorts/scripts/social-manifest.mjs");
+  const profile = (tts) => `## Parameters\n\n\`\`\`json\n${JSON.stringify({ video: { tts } })}\n\`\`\`\n`;
+  const dir = tempDir({ "azure.md": profile({ engine: "azure", voices: ["pt-BR-FranciscaNeural"] }), "piper.md": profile({ engine: "piper", voices: ["pt_BR-faber-medium"] }), "models/pt_BR-faber-medium.onnx": "m", "models/pt_BR-faber-medium.onnx.json": "{}" });
+  const spec = join(dir, "spec.json");
+  writeFileSync(spec, JSON.stringify({ id: "v", scenes: [{ id: "a", kind: "hook", voice: "Olá & até já", say: "Olá & até já!" }, { id: "b", kind: "cta", voice: "Teste <grátis>." }, { id: "c", kind: "screen", image: "x.png" }] }));
+  const fetch = async () => new Response(new Uint8Array([1]), { status: 200 });
+  const exec = (command, args) => { if (command === "ffmpeg") writeFileSync(args.at(-1), "wav"); return command === "ffprobe" ? "1.5\n" : ""; };
+  const usage = join(dir, "batch", "usage.jsonl");
+  const run = (args) => voiceMain(["--spec", spec, "--work", join(dir, "work"), "--usage", usage, ...args], { env: ENV, fetch, exec, now: () => new Date("2026-11-28T07:47:00Z") });
+  const stdout = process.stdout.write;
+  const stderr = process.stderr.write;
+  process.stdout.write = () => true;
+  process.stderr.write = () => true;
+  try {
+    await run(["--profile", join(dir, "azure.md"), "--item", "2026-12-03-v", "--revision", "2"]);
+    await run(["--profile", join(dir, "azure.md")]);
+    writeFileSync(spec, JSON.stringify({ id: "p", scenes: [{ id: "a", kind: "hook", voice: "Piper é local." }] }));
+    await voiceMain(["--spec", spec, "--profile", join(dir, "piper.md"), "--work", join(dir, "work"), "--usage", usage], { env: { PIPER_MODEL_DIR: join(dir, "models") }, exec });
+  } finally {
+    process.stdout.write = stdout;
+    process.stderr.write = stderr;
+  }
+  const entries = readUsage(usage);
+  assert.deepEqual(entries.map(({ id, ...rest }) => rest), [
+    { at: "2026-11-28T07:47:00.000Z", service: "azure-speech", unit: "characters", quantity: 13, voice: "pt-BR-FranciscaNeural", spec: "v", scene: "a", item: "2026-12-03-v", revision: 2 },
+    { at: "2026-11-28T07:47:00.000Z", service: "azure-speech", unit: "characters", quantity: 15, voice: "pt-BR-FranciscaNeural", spec: "v", scene: "b", item: "2026-12-03-v", revision: 2 },
+  ]);
+  assert.ok(entries.every((entry) => typeof entry.id === "string" && entry.id.length > 8));
+  await assert.rejects(voiceMain(["--spec", spec, "--usage", usage, "--revision", "0"]), /--revision must be an integer >= 1/);
+});

@@ -25,6 +25,7 @@ Puts a batch up for human review: uploads its media to Google Drive in one folde
 1. Uploads media, thumbnails, captions, and specs into the batch's run folder (replacing files in place so links survive), shares it by link, records it in `review.drive_run_folder`, and writes the run folder's README (schedule, status, credits, AI notices) in the batch language.
 2. Opens the issue (label `marketing-content` by default) with the table, the exact text each platform will receive, the text drawn in each item's cards or video scenes (from its spec), each item's link with how it is sent and its UTM, and `<!-- social-content-manifest:v1:… -->`.
 3. Adjust: restores the batch from the marker and Drive, lists `/adjust` requests from writers only, bumps the revision, re-uploads into the same run folder, updates the body and README, and comments.
+4. Posts a "Custos de geração" comment after every run and revision: the paid generation tools of that revision from the batch's usage ledger, priced from the profile's `costs.prices`, and the campaign total so far (or that no paid tool was used).
 
 ## Side effects
 

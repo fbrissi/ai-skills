@@ -8,6 +8,7 @@ One `manifest.json` describes one batch for one platform. Content agents write i
 <batches-dir>/<platform>/<batch_id>/
   manifest.json
   media/            images and videos named in items[].media, thumbnails, caption files
+  usage.jsonl       paid generation calls of this run (voice.mjs --usage); merged into `usage` on upload
   specs/            generation specs (cards JSON, video JSON) named in items[].spec
 ```
 
@@ -25,6 +26,7 @@ Every path in the manifest is relative to its directory and must stay inside it.
 | `items` | the content, in publication order |
 | `approval` | `{status: pending|approved|rejected, by, at, revision}`; only the approval step sets `approved` |
 | `review` | `{issue_number, issue_url, revision, drive_root_id, drive_run_folder, history[]}`; `drive_run_folder` is `{id, name, url}` of the batch's Drive run folder (`<root>/<Platform>/<YYYY-MM-DD HH-mm>`, the `created_at` time in `timezone`), written by the first `social-review` upload and reused by every later one |
+| `usage` | ledger of paid generation calls (`{id, at, service, unit, quantity, revision, voice, spec, scene, item, detail}`), merged by `social-review` from `<batch-dir>/usage.jsonl` and tagged with the revision that spent it; feeds the generation-cost comment and the run README. Never AI harness tokens, subscriptions, or infrastructure |
 | `state` | `{<item id>: {status: scheduled|published|failed|unknown|skipped, remote_id, url, publish_at, at, attempts, error, media_urls, extra}}`, written only by publishers. `failed`: the platform refused it (safe to retry). `unknown`: the final publish call got no response, so it may be live; never retried automatically (Instagram resolves it from the saved container) |
 
 ## Item

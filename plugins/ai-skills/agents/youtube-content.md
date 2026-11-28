@@ -29,13 +29,13 @@ Script paths below use `<social skill dir>`: the folder of any installed social 
 3. **Media**: each `short` gets a 1080x1920 video from the `video-shorts` skill (at most 180 s; the profile's voice and a music track from its Drive folder), its credits in `credits`, its `music` entry (a Short with music stays at most 60 s), `ai_audio` when it has narration, `synthetic_media: true` when it uses realistic AI footage, and a `yt-thumbnail` card from the `image-cards` skill in `thumbnail`. Set `options` (`category_id`, `playlist_id`, `made_for_kids`, `default_language`, and `paid_product_placement`, true only when the video promotes a paid partner) from the profile.
 4. **Guard**: follow the `copy-guard` skill on the manifest until it passes (checker exit 0, review finds nothing). This gate is mandatory: nothing is written to the review without it.
 5. **Check**: `node <social skill dir>/scripts/social-manifest.mjs probe <manifest>`, then `validate <manifest> --profile docs/ai/social-content.md`; fix every error.
-6. **Review**: follow the `social-review` skill (open mode): upload to Drive and open the review issue.
+6. **Review**: follow the `social-review` skill (open mode): upload to Drive, open the review issue, and post the run's generation-cost comment.
 
 ## Adjust
 
 1. Follow the `social-review` skill (adjust mode) to restore the batch from issue `<n>` and list the `/adjust` requests.
 2. Regenerate only the items and the parts the requests name, with the same steps as Generate (copy, media, guard, check). Keep every other item byte for byte, including its media and Drive files.
-3. Finish the `social-review` adjust steps: bump the revision, upload, update the issue body, and comment what changed and what was declined and why.
+3. Finish the `social-review` adjust steps: bump the revision, upload, update the issue body, comment what changed and what was declined and why, and post the revision's generation-cost comment.
 
 ## Missing skills
 

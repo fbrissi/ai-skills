@@ -8,7 +8,8 @@
 //   social-manifest.mjs text <manifest.json> [--item <id>]
 //   social-manifest.mjs config <profile.md> [--platform <name>] [--key <dotted.path>]
 import { execFileSync } from "node:child_process";
-import { closeSync, existsSync, openSync, readFileSync, readSync, realpathSync, renameSync, statSync, writeFileSync } from "node:fs";
+import { randomUUID } from "node:crypto";
+import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, readSync, realpathSync, renameSync, statSync, writeFileSync } from "node:fs";
 import { dirname, extname, isAbsolute, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -513,6 +514,111 @@ export function getPath(object, dotted) {
   return dotted.split(".").reduce((node, key) => (node === undefined || node === null ? undefined : node[key]), object);
 }
 
+// ---------- generation usage and costs ----------
+
+/**
+ * Billable characters of a text-to-speech line: the Unicode code points of the text sent, spaces and punctuation
+ * included, SSML markup and XML escaping excluded (how Azure AI Speech counts characters for pt and en text).
+ */
+export function billableCharacters(text) {
+  return [...String(text ?? "")].length;
+}
+
+const USAGE_KEYS = ["id", "at", "service", "unit", "quantity", "revision", "detail", "voice", "spec", "scene", "item"];
+
+/** Errors of one usage ledger entry (a paid generation call). */
+export function usageErrors(entry, where = "usage") {
+  if (!entry || typeof entry !== "object" || Array.isArray(entry)) return [`${where}: must be an object`];
+  const errors = [];
+  for (const key of ["id", "service", "unit"]) if (typeof entry[key] !== "string" || !entry[key]) errors.push(`${where}: ${key} must be a non-empty string`);
+  if (typeof entry.quantity !== "number" || !Number.isFinite(entry.quantity) || entry.quantity < 0) errors.push(`${where}: quantity must be a number >= 0`);
+  if (entry.revision !== undefined && entry.revision !== null && (!Number.isInteger(entry.revision) || entry.revision < 1)) errors.push(`${where}: revision must be an integer >= 1`);
+  for (const key of Object.keys(entry)) if (!USAGE_KEYS.includes(key)) errors.push(`${where}: unknown property ${key}`);
+  return errors;
+}
+
+/**
+ * Appends one paid generation call to a JSON Lines ledger: {id, at, service, unit, quantity, revision?, voice?,
+ * spec?, scene?, item?, detail?}. Any paid generator (TTS, image, or video API) logs the same way; free local tools
+ * (Piper) log nothing.
+ */
+export function appendUsage(path, entry, { now = new Date(), id = randomUUID() } = {}) {
+  const record = { id, at: now.toISOString(), ...entry };
+  const errors = usageErrors(record);
+  if (errors.length) throw new ManifestError(errors.join("; "));
+  mkdirSync(dirname(path), { recursive: true });
+  appendFileSync(path, `${JSON.stringify(record)}\n`);
+  return record;
+}
+
+/** The entries of a JSON Lines ledger ([] when the file does not exist). */
+export function readUsage(path) {
+  if (!path || !existsSync(path)) return [];
+  const entries = [];
+  readFileSync(path, "utf8").split("\n").forEach((line, index) => {
+    if (!line.trim()) return;
+    let entry;
+    try {
+      entry = JSON.parse(line);
+    } catch {
+      throw new ManifestError(`${path}:${index + 1}: invalid JSON`);
+    }
+    const errors = usageErrors(entry, `${path}:${index + 1}`);
+    if (errors.length) throw new ManifestError(errors.join("; "));
+    entries.push(entry);
+  });
+  return entries;
+}
+
+/**
+ * Errors of the profile's costs.prices: {<service>: {unit, per_million_usd?, voices?: {<voice>: <per_million_usd>}}}.
+ * A voice price overrides the service price for that voice.
+ */
+export function priceErrors(config) {
+  const prices = config?.costs?.prices;
+  if (prices === undefined || prices === null) return [];
+  if (typeof prices !== "object" || Array.isArray(prices)) return ["costs.prices must be an object keyed by service"];
+  const errors = [];
+  const amount = (value) => typeof value === "number" && Number.isFinite(value) && value >= 0;
+  for (const [service, price] of Object.entries(prices)) {
+    const where = `costs.prices.${service}`;
+    if (!price || typeof price !== "object" || Array.isArray(price)) { errors.push(`${where} must be an object {unit, per_million_usd, voices}`); continue; }
+    if (typeof price.unit !== "string" || !price.unit) errors.push(`${where}.unit must name the billed unit (for example "characters")`);
+    if (price.per_million_usd !== undefined && !amount(price.per_million_usd)) errors.push(`${where}.per_million_usd must be a number >= 0`);
+    if (price.voices !== undefined && (!price.voices || typeof price.voices !== "object" || Array.isArray(price.voices))) errors.push(`${where}.voices must be an object {<voice>: <per_million_usd>}`);
+    else for (const [voice, value] of Object.entries(price.voices ?? {})) if (!amount(value)) errors.push(`${where}.voices.${voice} must be a number >= 0 (USD per million ${price.unit ?? "units"})`);
+    if (price.per_million_usd === undefined && !Object.keys(price.voices ?? {}).length) errors.push(`${where} needs per_million_usd or voices`);
+    for (const key of Object.keys(price)) if (!["unit", "per_million_usd", "voices", "note"].includes(key)) errors.push(`${where}: unknown property ${key}`);
+  }
+  return errors;
+}
+
+/** USD per million units for a usage entry, or null when the profile has no price for it (never guessed). */
+export function unitPrice(config, entry) {
+  const price = config?.costs?.prices?.[entry.service];
+  if (!price || price.unit !== entry.unit) return null;
+  return price.voices?.[entry.voice] ?? price.per_million_usd ?? null;
+}
+
+/**
+ * Usage grouped by service and detail (the voice, or detail): [{service, detail, unit, quantity, cost}] where cost is
+ * null when a price is missing, plus the total of the priced rows and whether any row lacks a price.
+ */
+export function costSummary(entries, config) {
+  const rows = new Map();
+  for (const entry of entries) {
+    const detail = entry.voice ?? entry.detail ?? null;
+    const key = JSON.stringify([entry.service, detail, entry.unit]);
+    const row = rows.get(key) ?? { service: entry.service, detail, unit: entry.unit, quantity: 0, cost: 0 };
+    const price = unitPrice(config, entry);
+    row.quantity += entry.quantity;
+    row.cost = row.cost === null || price === null ? null : row.cost + (entry.quantity * price) / 1e6;
+    rows.set(key, row);
+  }
+  const list = [...rows.values()].sort((a, b) => a.service.localeCompare(b.service) || String(a.detail).localeCompare(String(b.detail)));
+  return { rows: list, total: list.reduce((sum, row) => sum + (row.cost ?? 0), 0), unpriced: list.some((row) => row.cost === null) };
+}
+
 // ---------- time zones ----------
 
 /** "+HH:MM" offset of an IANA zone at a given instant. */
@@ -572,7 +678,10 @@ export function main(argv, { out = process.stdout, err = process.stderr } = {}) 
     if (command === "validate") {
       const now = flags.now ? new Date(flags.now) : new Date();
       const errors = validateManifest(manifest, { manifestDir, checkFiles: !flags["no-files"], forPublish: Boolean(flags["for-publish"]), now });
-      if (flags.profile) errors.push(...utmErrors(manifest, readProfileConfig(flags.profile)));
+      if (flags.profile) {
+        const config = readProfileConfig(flags.profile);
+        errors.push(...utmErrors(manifest, config), ...priceErrors(config));
+      }
       if (errors.length) { err.write(`invalid manifest ${target}:\n- ${errors.join("\n- ")}\n`); return 1; }
       out.write(`ok: ${target} (${manifest.platform}, ${manifest.items.length} items)\n`);
       return 0;

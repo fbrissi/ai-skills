@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { Drive } from "../../.rulesync/skills/social-review/scripts/drive.mjs";
 import { composeText } from "../../.rulesync/skills/social-review/scripts/social-manifest.mjs";
-import { adjustRequests, bump, decodeMarker, encodeMarker, fetchMedia, issueBody, localStamp, revisionComment, runFolderName, runReadme, upload } from "../../.rulesync/skills/social-review/scripts/review-batch.mjs";
+import { adjustRequests, bump, costsComment, decodeMarker, encodeMarker, fetchMedia, issueBody, localStamp, mergeUsage, revisionComment, runFolderName, runReadme, upload } from "../../.rulesync/skills/social-review/scripts/review-batch.mjs";
 import { fakeFetch, item, json, manifest, png, tempDir, writeManifest } from "./helpers.mjs";
 
 const pending = (items) => manifest("facebook", items, { approval: { status: "pending", by: null, at: null, revision: null } });
@@ -351,4 +351,97 @@ test("set-issue refreshes the README with the issue link; readme uploads it on d
   await main(["set-issue", path, "--issue", "13"], { out, err: { write: (text) => warnings.push(text) }, driveFactory: async () => { throw new Error("no Drive credentials"); } });
   assert.match(warnings.join(""), /README.md not updated \(no Drive credentials\)/);
   assert.equal(JSON.parse(readFileSync(path, "utf8")).review.issue_number, 13);
+});
+
+const PRICES = { costs: { prices: { "azure-speech": { unit: "characters", per_million_usd: 16, voices: { "pt-BR-Macerio:DragonHDLatestNeural": 30 } } } } };
+const speech = (id, quantity, revision, voice = "pt-BR-FranciscaNeural") => ({ id, at: "2026-11-28T07:47:00.000Z", service: "azure-speech", unit: "characters", quantity, voice, revision });
+
+test("generation price resolution: voice override, service default, missing price, and invalid prices", async () => {
+  const { costSummary, priceErrors, unitPrice } = await import("../../.rulesync/skills/social-review/scripts/social-manifest.mjs");
+  assert.equal(unitPrice(PRICES, speech("a", 1, 1)), 16);
+  assert.equal(unitPrice(PRICES, speech("a", 1, 1, "pt-BR-Macerio:DragonHDLatestNeural")), 30);
+  assert.equal(unitPrice(PRICES, { ...speech("a", 1, 1), unit: "requests" }), null);
+  assert.equal(unitPrice(PRICES, { ...speech("a", 1, 1), service: "image-api" }), null);
+  assert.equal(unitPrice(null, speech("a", 1, 1)), null);
+  const summary = costSummary([speech("a", 500000, 1), speech("b", 500000, 2), { ...speech("c", 3, 1), service: "image-api", unit: "images", voice: undefined, detail: "flux" }], PRICES);
+  assert.deepEqual(summary.rows, [{ service: "azure-speech", detail: "pt-BR-FranciscaNeural", unit: "characters", quantity: 1000000, cost: 16 }, { service: "image-api", detail: "flux", unit: "images", quantity: 3, cost: null }]);
+  assert.equal(summary.total, 16);
+  assert.equal(summary.unpriced, true);
+  assert.deepEqual(priceErrors({}), []);
+  assert.deepEqual(priceErrors({ costs: { prices: [] } }), ["costs.prices must be an object keyed by service"]);
+  assert.deepEqual(priceErrors({ costs: { prices: { "azure-speech": { per_million_usd: -1, voices: { x: "1" }, extra: 1 } } } }), [
+    'costs.prices.azure-speech.unit must name the billed unit (for example "characters")',
+    "costs.prices.azure-speech.per_million_usd must be a number >= 0",
+    "costs.prices.azure-speech.voices.x must be a number >= 0 (USD per million units)",
+    "costs.prices.azure-speech: unknown property extra",
+  ]);
+  assert.deepEqual(priceErrors({ costs: { prices: { tts: { unit: "characters" } } } }), ["costs.prices.tts needs per_million_usd or voices"]);
+});
+
+test("billable characters count the text sent, not SSML markup or escaping", async () => {
+  const { billableCharacters } = await import("../../.rulesync/skills/social-review/scripts/social-manifest.mjs");
+  assert.equal(billableCharacters("Olá, até já!"), 12);
+  assert.equal(billableCharacters("A & B <c>"), 9);
+  assert.equal(billableCharacters(""), 0);
+});
+
+test("the costs comment shows only this revision, the campaign total, missing prices, and pt-BR labels", () => {
+  const data = pending([item()]);
+  data.review.revision = 2;
+  data.usage = [speech("a", 1000, 1), speech("b", 2000, 2, "pt-BR-Macerio:DragonHDLatestNeural"), speech("c", 500, 2)];
+  const comment = costsComment(data, PRICES);
+  assert.match(comment, /^<!-- social-content:costs revision=2 -->\n### Custos de geração\n\nRevisão 2 \(esta execução\):/);
+  assert.match(comment, /\| Ferramenta \| Detalhe \| Quantidade \| Custo estimado \(USD\) \|/);
+  assert.match(comment, /\| azure-speech \| pt-BR-FranciscaNeural \| 500 caracteres \| 0,008 \|/);
+  assert.match(comment, /\| azure-speech \| pt-BR-Macerio:DragonHDLatestNeural \| 2\.000 caracteres \| 0,06 \|/);
+  assert.match(comment, /\| \*\*Total\*\* \| \| \| \*\*0,068\*\* \|/);
+  assert.ok(!comment.includes("1.000 caracteres |"), "revision 1 usage stays out of the run table");
+  assert.match(comment, /Campanha até agora \(revisões 1 a 2\): US\$ 0,084; azure-speech \(pt-BR-FranciscaNeural\): 1\.500 caracteres, US\$ 0,024; azure-speech \(pt-BR-Macerio:DragonHDLatestNeural\): 2\.000 caracteres, US\$ 0,06/);
+  assert.match(comment, /sem tokens de IA, assinaturas ou infraestrutura/);
+  assert.match(costsComment(data, PRICES, { revision: 1 }), /Campanha até agora \(revisões 1 a 1\): US\$ 0,016;/);
+  const unpriced = costsComment(data, null);
+  assert.match(unpriced, /\| 500 caracteres \| preço não configurado \|/);
+  assert.match(unpriced, /\*\*0,00\*\* \(sem os itens sem preço\)/);
+  assert.throws(() => costsComment(data, { costs: { prices: { "azure-speech": {} } } }), /invalid costs in the profile/);
+});
+
+test("a run with no paid tool says so, and English batches get English labels", () => {
+  const free = pending([item()]);
+  const comment = costsComment(free, PRICES);
+  assert.match(comment, /Revisão 1 \(esta execução\):\n\nNenhuma ferramenta paga usada nesta execução\.\n\nCampanha até agora \(revisões 1 a 1\): nenhuma ferramenta paga/);
+  free.language = "en";
+  free.review.revision = 3;
+  free.usage = [speech("a", 1000, 1)];
+  const en = costsComment(free, PRICES);
+  assert.match(en, /### Generation costs\n\nRevision 3 \(this run\):\n\nNo paid tool used in this run\./);
+  assert.match(en, /Campaign so far \(revisions 1 to 3\): US\$ 0\.016; azure-speech \(pt-BR-FranciscaNeural\): 1,000 characters, US\$ 0\.016/);
+});
+
+test("upload merges the ledger once, tags it with the revision, and the README shows the campaign cost", async () => {
+  const dir = tempDir({ "media/card.png": png(10, 10) });
+  const drive = memoryDrive();
+  const data = pending([item()]);
+  await upload(data, { manifestDir: dir, drive, root: "P", config: PRICES, usage: [{ ...speech("a", 1000, null), revision: undefined }] });
+  assert.deepEqual(data.usage.map((entry) => [entry.id, entry.revision]), [["a", 1]]);
+  bump(data, [data.items[0].id]);
+  await upload(data, { manifestDir: dir, drive, root: "P", config: PRICES, usage: [{ ...speech("a", 1000, null), revision: undefined }, { ...speech("b", 1000, null), revision: undefined }] });
+  assert.deepEqual(data.usage.map((entry) => [entry.id, entry.revision]), [["a", 1], ["b", 2]]);
+  assert.equal(mergeUsage(data, [speech("b", 1000, 2)]), 0);
+  const readme = drive.files.get(`${data.review.drive_run_folder.id}/README.md`).content;
+  assert.match(readme, /- Custo de geração \(campanha\): US\$ 0,032; azure-speech \(pt-BR-FranciscaNeural\): 2\.000 caracteres, US\$ 0,032/);
+  assert.match(runReadme(pending([item()])), /- Custo de geração \(campanha\): nenhuma ferramenta paga/);
+  await assert.rejects(upload(pending([item()]), { manifestDir: dir, drive, root: "P", config: { costs: { prices: { x: 1 } } } }), /invalid costs in the profile/);
+});
+
+test("costs command reads <batch-dir>/usage.jsonl, records it in the manifest, and prints the comment", async () => {
+  const { main } = await import("../../.rulesync/skills/social-review/scripts/review-batch.mjs");
+  const { appendUsage } = await import("../../.rulesync/skills/social-review/scripts/social-manifest.mjs");
+  const dir = tempDir({ "p.md": `## Parameters\n\n\`\`\`json\n${JSON.stringify(PRICES)}\n\`\`\`\n` });
+  const path = writeManifest(dir, pending([item()]));
+  appendUsage(join(dir, "usage.jsonl"), { service: "azure-speech", unit: "characters", quantity: 250, voice: "pt-BR-FranciscaNeural" }, { id: "u1" });
+  const lines = [];
+  await main(["costs", path, "--profile", join(dir, "p.md")], { out: { write: (text) => lines.push(text) } });
+  assert.match(lines.join(""), /\| 250 caracteres \| 0,004 \|/);
+  assert.deepEqual(JSON.parse(readFileSync(path, "utf8")).usage.map((entry) => [entry.id, entry.revision]), [["u1", 1]]);
+  await assert.rejects(main(["costs", path, "--revision", "x"], { out: { write: () => {} } }), /--revision must be an integer/);
 });
