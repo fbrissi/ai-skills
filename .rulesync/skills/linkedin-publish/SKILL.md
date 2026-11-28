@@ -52,7 +52,7 @@ The read-back only accepts a recent post with the same commentary, created after
 
 ## AI disclosure
 
-LinkedIn has no API flag for AI content and shows its C2PA label only for media with Content Credentials. When an item has `ai_audio` or `synthetic_media`, the text gets a plain disclosure (default "Narração com voz sintética (Piper TTS)." in Portuguese; override with `options.ai_disclosure`).
+LinkedIn has no API flag for AI content and shows its C2PA label only for media with Content Credentials. When an item has `ai_audio` or `synthetic_media`, the text gets a plain disclosure (default "Narração com voz sintética (Piper TTS)." in Portuguese, or "(Azure AI Speech)" when `ai_audio_engine` is `azure`; override with `options.ai_disclosure`).
 
 ## Rules
 

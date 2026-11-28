@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 // Credits text for a video description: the Piper voice's license chain and the music track.
 // Usage: credits.mjs [--profile <profile.md>] [--voice <id>] [--music <file or title>] [--lang pt-BR|en]
-// Voices other than the built-in ones need their credit in the profile (video.voice_credits[<voice>][<lang>]).
+// Piper voices other than the built-in ones need their credit in the profile (video.voice_credits[<voice>][<lang>]).
+// Azure AI Speech voices (video.tts.engine azure) get a credit line only when the profile has one for the voice.
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { basename } from "node:path";
-import { isMain, readProfileConfig } from "./social-manifest.mjs";
+import { isMain, readProfileConfig, ttsConfig } from "./social-manifest.mjs";
 
 export const DEFAULT_VOICE = "pt_BR-faber-medium";
 
@@ -60,14 +61,19 @@ export function musicEntry(config, musicPath) {
 
 export function credits({ config = null, voice = null, music = null, lang = null } = {}) {
   const language = langOf(lang ?? config?.language);
-  const voiceId = voice ?? config?.video?.voice ?? DEFAULT_VOICE;
-  const voiceText = config?.video?.voice_credits?.[voiceId]?.[language] ?? VOICE_CREDITS[voiceId]?.[language];
-  if (voice !== false && !voiceText) throw new CreditsError(`no credit text for voice ${voiceId} in ${language}; add video.voice_credits.${voiceId}.${language} to the profile`);
+  const { engine, voices } = ttsConfig(config);
+  if (voice == null && voices?.length > 1) throw new CreditsError(`the profile lists several voices in video.tts.voices; pass --voice with the voice the video used`);
+  if (voice && voices && !voices.includes(voice)) throw new CreditsError(`voice ${voice} is not in video.tts.voices of the profile (${voices.join(", ")})`);
+  const voiceId = voice || (voices?.length === 1 ? voices[0] : null) || config?.video?.voice || (engine === "piper" ? DEFAULT_VOICE : null);
+  const profileText = voiceId ? config?.video?.voice_credits?.[voiceId]?.[language] : null;
+  // Azure prebuilt voices are a paid service that needs no attribution; Piper voices carry their license chain.
+  const voiceText = engine === "azure" ? profileText ?? null : profileText ?? VOICE_CREDITS[voiceId]?.[language];
+  if (voice !== false && engine === "piper" && !voiceText) throw new CreditsError(`no credit text for voice ${voiceId} in ${language}; add video.voice_credits.${voiceId}.${language} to the profile`);
   const lines = [HEADINGS[language].title];
-  if (voice !== false) lines.push(voiceText);
+  if (voice !== false && voiceText) lines.push(voiceText);
   const musicLine = musicCredit(findTrack(config, music), language);
   if (musicLine) lines.push(musicLine);
-  return lines.join("\n");
+  return lines.length > 1 ? lines.join("\n") : "";
 }
 
 export function main(argv, { out = process.stdout } = {}) {
@@ -77,7 +83,8 @@ export function main(argv, { out = process.stdout } = {}) {
   };
   try {
     const config = value("profile") ? readProfileConfig(value("profile")) : null;
-    out.write(`${credits({ config, voice: argv.includes("--no-voice") ? false : value("voice") ?? null, music: value("music") ?? null, lang: value("lang") ?? null })}\n`);
+    const text = credits({ config, voice: argv.includes("--no-voice") ? false : value("voice") ?? null, music: value("music") ?? null, lang: value("lang") ?? null });
+    if (text) out.write(`${text}\n`);
     return 0;
   } catch (error) {
     process.stderr.write(`${error.message}\n`);

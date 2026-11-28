@@ -7,7 +7,7 @@
 //        [--studio <dir with node_modules>] [--no-music] [--allow-cut-edges]
 // Screen focus/pan_to frames whose edges slice UI text or controls are refused (luminance scan of the screenshot);
 // --allow-cut-edges skips that scan for a frame you checked by eye.
-// Prints {path, width, height, duration, synthetic_media, ai_audio, music} (music: the manifest entry with license
+// Prints {path, width, height, duration, synthetic_media, ai_audio, ai_audio_engine, voice, music} (music: the manifest entry with license
 // evidence, checked against its sha256). Paths in the spec are relative to the current
 // directory (the repository root).
 import { execFileSync, spawnSync } from "node:child_process";
@@ -227,6 +227,13 @@ export function disclaimerErrors(props, config) {
   return props.scenes.filter((scene) => showsProductScreen(scene) && scene.disclaimer !== required).map((scene) => `scene ${scene.id}: shows a product screen without the profile's video.screen_disclaimer`);
 }
 
+/** ai_audio, the TTS engine and the voice of the rendered narration (voice.json entries from voice.mjs). */
+export function narrationInfo(scenes, voice) {
+  const voiced = scenes.filter((scene) => scene.voiceFile).map((scene) => voice[scene.id]).filter(Boolean);
+  if (!voiced.length) return { ai_audio: false, ai_audio_engine: null, voice: null };
+  return { ai_audio: true, ai_audio_engine: voiced[0].engine ?? "piper", voice: voiced[0].voice ?? null };
+}
+
 export function buildProps(spec, { config, root, jobDir, jobPublic, voice, music }) {
   const brand = config?.brand ?? {};
   const disclaimer = screenDisclaimer(config);
@@ -324,7 +331,7 @@ export function main(argv) {
     height: info.height ?? 1920,
     duration: Math.round((info.duration ?? totalSeconds(props.scenes)) * 100) / 100,
     synthetic_media: spec.scenes.some((scene) => scene.synthetic === true),
-    ai_audio: props.scenes.some((scene) => scene.voiceFile),
+    ...narrationInfo(props.scenes, voice),
     music: musicInfo,
   };
   process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);

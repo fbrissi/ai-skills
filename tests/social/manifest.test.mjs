@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
-import { approveManifest, composeText, imageSize, localIso, main, readProfileConfig, validateManifest, zoneOffset } from "../../shared/scripts/social-manifest.mjs";
+import { aiDisclosure, approveManifest, assignVoices, composeText, imageSize, isAiGenerated, lastVoice, localIso, main, nextVoice, readProfileConfig, ttsConfig, validateManifest, zoneOffset } from "../../shared/scripts/social-manifest.mjs";
 import { item, jpeg, manifest, NOW, png, sink, tempDir, writeManifest } from "./helpers.mjs";
 
 const files = () => tempDir({ "media/card.png": png(1080, 1350), "media/card.jpg": jpeg(1080, 1350), "media/wide.jpg": jpeg(2000, 1000), "media/reel.mp4": "mp4" });
@@ -158,4 +158,47 @@ test("music Shorts over 60 s are refused; Facebook Reels schedule at most 29 day
 test("Instagram allows at most 5 hashtags", () => {
   const data = manifest("instagram", [item({ publish_at: null, scheduled: false, media: [{ path: "media/card.jpg", kind: "image", width: 1080, height: 1350 }], hashtags: ["#a", "#b", "#c", "#d", "#e", "#f"] })]);
   assert.ok(validate(data, files()).some((e) => e.includes("more than 5 hashtags")));
+});
+
+test("the narration disclosure names the TTS engine; the AI label does not depend on it", () => {
+  assert.equal(aiDisclosure({ ai_audio: true }), "Narração com voz sintética (Piper TTS).");
+  assert.equal(aiDisclosure({ ai_audio: true, ai_audio_engine: "piper" }, "en"), "Narrated with a synthetic voice (Piper TTS).");
+  assert.equal(aiDisclosure({ ai_audio: true, ai_audio_engine: "azure" }), "Narração com voz sintética (Azure AI Speech).");
+  assert.equal(aiDisclosure({ ai_audio: true, ai_audio_engine: "azure", synthetic_media: true }, "en"), "Narrated with a synthetic voice (Azure AI Speech). Contains AI-generated footage.");
+  assert.equal(aiDisclosure({ ai_audio: false, ai_audio_engine: "azure" }), null);
+  assert.equal(isAiGenerated({ ai_audio: true, ai_audio_engine: "azure" }), true);
+  assert.equal(composeText({ caption: "Texto", ai_audio: true, ai_audio_engine: "azure", type: "video" }, "linkedin"), "Texto\n\nNarração com voz sintética (Azure AI Speech).");
+});
+
+test("manifest items record the narration voice and engine", () => {
+  const dir = files();
+  assert.deepEqual(validate(manifest("facebook", [item({ voice: "pt-BR-FranciscaNeural", ai_audio: true, ai_audio_engine: "azure" })]), dir), []);
+  assert.match(validate(manifest("facebook", [item({ ai_audio_engine: "polly" })]), dir).join("\n"), /ai_audio_engine: must be one of/);
+});
+
+test("voices alternate from the one the previous batch ended with", () => {
+  const voices = ["a", "b"];
+  assert.equal(nextVoice(voices, null), "a");
+  assert.equal(nextVoice(voices, "a"), "b");
+  assert.equal(nextVoice(voices, "b"), "a");
+  assert.equal(nextVoice(voices, "gone"), "a");
+  assert.equal(nextVoice(["a", "b", "c"], "c"), "a");
+  assert.equal(nextVoice([], "a"), null);
+  assert.deepEqual(assignVoices([{ id: 1 }, { id: 2 }, { id: 3 }], voices, "a").map((entry) => entry.voice), ["b", "a", "b"]);
+  assert.deepEqual(assignVoices([{ id: 1 }], voices, null).map((entry) => entry.voice), ["a"]);
+  const previous = { items: [
+    { id: "late", date: "2026-11-27", publish_at: "2026-11-27T18:00:00-03:00", voice: "b" },
+    { id: "early", date: "2026-11-26", publish_at: "2026-11-26T18:00:00-03:00", voice: "a" },
+    { id: "card", date: "2026-11-28", publish_at: "2026-11-28T18:00:00-03:00" },
+  ] };
+  assert.equal(lastVoice(previous), "b");
+  assert.equal(lastVoice({ items: [{ id: "x", date: "2026-11-26", publish_at: null, voice: "a" }, { id: "y", date: "2026-11-27", publish_at: null, voice: "b" }] }), "b");
+  assert.equal(lastVoice({ items: [] }), null);
+  assert.deepEqual(ttsConfig(null), { engine: "piper", voices: null, rotation: null });
+  assert.deepEqual(ttsConfig({ video: { tts: { engine: "azure", voices: voices, rotation: "alternate" } } }), { engine: "azure", voices, rotation: "alternate" });
+  assert.throws(() => ttsConfig({ video: { tts: { voices: "a" } } }), /list of voice ids/);
+  assert.throws(() => ttsConfig({ video: { tts: { voices, rotation: "random" } } }), /video\.tts\.rotation must be alternate or omitted \(got random\)/);
+  assert.throws(() => ttsConfig({ video: { tts: { engine: "polly" } } }), /video\.tts\.engine must be one of piper, azure/);
+  assert.equal(ttsConfig({ video: { tts: { voices: ["a"], rotation: null } } }).rotation, null);
+  assert.throws(() => ttsConfig({ video: { tts: { voices } } }), /several voices, so video\.tts\.rotation must be "alternate"/);
 });

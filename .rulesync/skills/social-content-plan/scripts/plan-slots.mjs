@@ -2,13 +2,18 @@
 // Turns a platform's Parameters (days, times, time zone, frequency, blackout dates, calendar hooks) into the dated
 // publication slots of the next batch, and optionally writes a skeleton manifest for the agent to fill.
 // Usage: plan-slots.mjs --profile <profile.md> --platform <facebook|instagram|youtube|linkedin> [--start YYYY-MM-DD]
-//        [--days N] [--now ISO] [--init <batch-dir>]
+//        [--days N] [--now ISO] [--init <batch-dir>] [--previous <previous batch manifest.json>]
 // Default start: the Monday after --now in the profile's time zone; default window: 7 days.
+// With video.tts voices, video items of the skeleton get a narration voice in publish order; when rotation is
+// "alternate" the first one differs from the voice of the previous batch's last narrated item (--previous).
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { isMain, localIso, readProfileConfig, UNSCHEDULED_PLATFORMS, zoneOffset } from "./social-manifest.mjs";
+import { assignVoices, isMain, lastVoice, loadManifest, localIso, readProfileConfig, ttsConfig, UNSCHEDULED_PLATFORMS, zoneOffset } from "./social-manifest.mjs";
 
 const WEEKDAYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
+
+/** Item types rendered by video-shorts with narration. */
+export const VIDEO_TYPES = ["reel", "short", "video"];
 
 export class PlanError extends Error {}
 
@@ -52,7 +57,7 @@ export function platformSettings(config, platform) {
   };
 }
 
-export function planSlots(config, platform, { now = new Date(), start = null, days = 7 } = {}) {
+export function planSlots(config, platform, { now = new Date(), start = null, days = 7, previousVoice = null } = {}) {
   const settings = platformSettings(config, platform);
   if (!/^\d{2}:\d{2}$/.test(settings.times[0] ?? "")) throw new PlanError("times must be HH:MM");
   const first = start ?? nextMonday(now, settings.timezone);
@@ -86,7 +91,7 @@ export function planSlots(config, platform, { now = new Date(), start = null, da
     language: settings.language,
     publication_date: limited[0]?.date ?? first,
     window: { start: first, end },
-    defaults: { scheduled: settings.scheduled, visibility: settings.visibility, formats: settings.formats, images: settings.images, video: settings.video },
+    defaults: { scheduled: settings.scheduled, visibility: settings.visibility, formats: settings.formats, images: settings.images, video: settings.video, tts: { ...ttsConfig(config), previous_voice: previousVoice } },
     slots: limited,
     skipped,
     hooks,
@@ -94,7 +99,35 @@ export function planSlots(config, platform, { now = new Date(), start = null, da
   };
 }
 
+/** Narration voices for the video items, in publish order, or the items unchanged when the profile lists none. */
+export function withVoices(items, tts) {
+  const voices = tts?.voices;
+  if (!voices?.length || (voices.length > 1 && tts.rotation !== "alternate")) return items;
+  const videos = items.filter((item) => VIDEO_TYPES.includes(item.type));
+  const voiced = new Map(assignVoices(videos, voices, voices.length > 1 ? tts.previous_voice ?? null : null).map((item) => [item.id, item.voice]));
+  return items.map((item) => (voiced.has(item.id) ? { ...item, voice: voiced.get(item.id) } : item));
+}
+
 export function skeletonManifest(plan, { profile = null, generator = null, now = new Date() } = {}) {
+  const items = plan.slots.map((slot, index) => ({
+    id: `${slot.date}-${plan.platform}-${index + 1}`,
+    type: plan.defaults.formats[index % plan.defaults.formats.length],
+    date: slot.date,
+    publish_at: slot.publish_at,
+    scheduled: plan.defaults.scheduled,
+    visibility: plan.defaults.visibility,
+    title: null,
+    caption: plan.platform === "youtube" ? null : "",
+    description: plan.platform === "youtube" ? "" : null,
+    hashtags: [],
+    tags: [],
+    link: null,
+    media: [],
+    thumbnail: null,
+    credits: null,
+    synthetic_media: false,
+    sources: [],
+  }));
   return {
     schema_version: 1,
     platform: plan.platform,
@@ -105,25 +138,7 @@ export function skeletonManifest(plan, { profile = null, generator = null, now =
     profile,
     created_at: now.toISOString(),
     generator,
-    items: plan.slots.map((slot, index) => ({
-      id: `${slot.date}-${plan.platform}-${index + 1}`,
-      type: plan.defaults.formats[index % plan.defaults.formats.length],
-      date: slot.date,
-      publish_at: slot.publish_at,
-      scheduled: plan.defaults.scheduled,
-      visibility: plan.defaults.visibility,
-      title: null,
-      caption: plan.platform === "youtube" ? null : "",
-      description: plan.platform === "youtube" ? "" : null,
-      hashtags: [],
-      tags: [],
-      link: null,
-      media: [],
-      thumbnail: null,
-      credits: null,
-      synthetic_media: false,
-      sources: [],
-    })),
+    items: withVoices(items, plan.defaults.tts),
     approval: { status: "pending", by: null, at: null, revision: null },
     review: { issue_number: null, issue_url: null, revision: 1, drive_root_id: null, history: [] },
     state: {},
@@ -136,13 +151,14 @@ export function main(argv, { out = process.stdout } = {}) {
     return index >= 0 ? argv[index + 1] : undefined;
   };
   if (!value("profile") || !value("platform")) {
-    process.stderr.write("usage: plan-slots.mjs --profile <profile.md> --platform <name> [--start YYYY-MM-DD] [--days N] [--now ISO] [--init <batch-dir>]\n");
+    process.stderr.write("usage: plan-slots.mjs --profile <profile.md> --platform <name> [--start YYYY-MM-DD] [--days N] [--now ISO] [--init <batch-dir>] [--previous <manifest.json>]\n");
     return 2;
   }
   try {
     const config = readProfileConfig(value("profile"));
     const now = value("now") ? new Date(value("now")) : new Date();
-    const plan = planSlots(config, value("platform"), { now, start: value("start") ?? null, days: Number(value("days") ?? 7) });
+    const previousVoice = value("previous") ? lastVoice(loadManifest(value("previous"))) : null;
+    const plan = planSlots(config, value("platform"), { now, start: value("start") ?? null, days: Number(value("days") ?? 7), previousVoice });
     if (value("init")) {
       const dir = value("init");
       const path = join(dir, "manifest.json");

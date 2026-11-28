@@ -208,6 +208,25 @@
           "type": "boolean",
           "description": "true when the narration is AI-generated (TTS). Meta posts get is_ai_generated; LinkedIn gets a text disclosure. YouTube's containsSyntheticMedia stays tied to synthetic_media."
         },
+        "ai_audio_engine": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "piper",
+            "azure",
+            null
+          ],
+          "description": "TTS engine of the narration; picks the disclosure text (default piper)."
+        },
+        "voice": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Narration voice id: assigned at planning in publish order when video.tts alternates voices, then the voice actually used. The next batch of the platform starts from a different voice."
+        },
         "music": {
           "type": [
             "object",

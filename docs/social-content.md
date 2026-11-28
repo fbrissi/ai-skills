@@ -20,7 +20,7 @@ flowchart LR
 | [`social-content-plan`](skills/social-content-plan.md) | Skill + script | Dated slots and sourced briefs; skeleton manifest |
 | [`copy-guard`](skills/copy-guard.md) | Skill + script | Mandatory gate against AI tells, bait, unsupported claims |
 | [`image-cards`](skills/image-cards.md) | Skill + script | Cards and thumbnails, Playwright in Docker, offline |
-| [`video-shorts`](skills/video-shorts.md) | Skill + scripts + Remotion studio | 9:16 Shorts and Reels with Piper narration, music, credits |
+| [`video-shorts`](skills/video-shorts.md) | Skill + scripts + Remotion studio | 9:16 Shorts and Reels with Piper or Azure AI Speech narration, music, credits |
 | [`social-review`](skills/social-review.md) | Skill + script | Drive upload, review issue with the manifest marker, `/adjust` requests |
 | [`facebook-publish`](skills/facebook-publish.md), [`instagram-publish`](skills/instagram-publish.md), [`youtube-publish`](skills/youtube-publish.md), [`linkedin-publish`](skills/linkedin-publish.md) | Deterministic publishers | Validate, publish or schedule, record idempotent state |
 

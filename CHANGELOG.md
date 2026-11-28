@@ -3,6 +3,17 @@
 All notable changes to this project are documented here. Release versions follow
 [Semantic Versioning](https://semver.org/).
 
+## v0.16.0
+
+### Added
+
+- Azure AI Speech as a second TTS engine in `video-shorts`. The optional profile setting `video.tts` (`engine`: `piper` or `azure`, `voices`, `rotation`) picks the engine and the allowed voices; without it narration is Piper with `video.voice`, as before, and Piper stays the default. `voice.mjs` calls the Speech REST API with `AZURE_SPEECH_KEY` and `AZURE_SPEECH_REGION` (the key never appears in logs or errors), applies the same silence trim, EQ, and −16 LUFS loudness as Piper, and re-synthesizes a line when the engine or voice changes. Upgrading re-synthesizes every cached Piper line once, because the cache key now includes the engine. `voice.json` is saved after each line, so a failure midway (an Azure 429 or a network error) keeps the lines already synthesized.
+- Voice alternation. With several voices and `rotation: "alternate"`, `plan-slots.mjs --previous <manifest>` assigns a `voice` to the video items in publish order, starting from a voice the previous batch's last narrated item did not use; `voice.mjs` refuses a spec without a voice, or with one outside `video.tts.voices`. Manifest items record `voice` and `ai_audio_engine`. `video.tts.engine` and `video.tts.rotation` are validated, and several voices require `rotation: "alternate"`.
+
+### Changed
+
+- The AI narration disclosure names the engine: "Narração com voz sintética (Azure AI Speech)." for Azure, "(Piper TTS)" as before for Piper. `credits.mjs` adds no voice line for Azure prebuilt voices unless the profile sets `video.voice_credits.<voice>`, and prints nothing when there is no credit at all; Piper voices still need their credit.
+
 ## v0.15.0
 
 ### Added

@@ -47,6 +47,8 @@ Every path in the manifest is relative to its directory and must stay inside it.
 | `thumbnail` | YouTube custom thumbnail (JPEG or PNG) |
 | `credits` | credit lines appended to the text (voice and music licenses) |
 | `ai_audio` | `true` when the narration is AI-generated (TTS); Meta posts get `is_ai_generated`, LinkedIn a text disclosure |
+| `ai_audio_engine` | TTS engine of the narration, `piper` (default) or `azure`; picks the disclosure text ("Piper TTS" or "Azure AI Speech") |
+| `voice` | narration voice id: assigned at planning when `video.tts` alternates voices, then the voice used (from the render output); the next batch of the platform starts from a different one |
 | `music` | the track used, with `title`, `author`, `source`, `license`, `license_url`, `evidence` (Drive file id of the license evidence), `sha256`; shown in the review issue |
 | `synthetic_media` | `true` when realistic AI-generated footage is used; YouTube gets `containsSyntheticMedia` |
 | `sources` | where each claim came from (profile sources only) |
