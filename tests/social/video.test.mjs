@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { credits, findTrack } from "../../.rulesync/skills/video-shorts/scripts/credits.mjs";
-import { buildProps, disclaimerErrors, edgeCuts, footageFitError, specErrors, undisclaimedScreens, visibleRect } from "../../.rulesync/skills/video-shorts/scripts/render.mjs";
+import { buildProps, disclaimerErrors, edgeCuts, footageFitError, narrationInfo, specErrors, undisclaimedScreens, visibleRect } from "../../.rulesync/skills/video-shorts/scripts/render.mjs";
 import { sceneFrames } from "../../.rulesync/skills/video-shorts/scripts/frames.mjs";
 import { sceneTiming } from "../../.rulesync/skills/video-shorts/scripts/timing.mjs";
-import { sceneKey, voiceSettings } from "../../.rulesync/skills/video-shorts/scripts/voice.mjs";
+import { azureRequest, escapeXml, sceneKey, synthesizeAzure, voiceSettings } from "../../.rulesync/skills/video-shorts/scripts/voice.mjs";
 import { join } from "node:path";
 import { png, tempDir } from "./helpers.mjs";
 
@@ -44,9 +44,80 @@ test("specs need real screens: no image, no recording, or generated UI is refuse
 });
 
 test("voice settings come from spec, profile, then defaults; the cache key changes with them", () => {
-  assert.deepEqual(voiceSettings({}, null, {}), { voice: "pt_BR-faber-medium", lengthScale: "0.92" });
-  assert.deepEqual(voiceSettings({ length_scale: 1 }, { video: { voice: "en_US-x" } }, {}), { voice: "en_US-x", lengthScale: "1" });
+  assert.deepEqual(voiceSettings({}, null, {}), { engine: "piper", voice: "pt_BR-faber-medium", lengthScale: "0.92" });
+  assert.deepEqual(voiceSettings({ length_scale: 1 }, { video: { voice: "en_US-x" } }, {}), { engine: "piper", voice: "en_US-x", lengthScale: "1" });
   assert.notEqual(sceneKey("a", { voice: "v", lengthScale: "1" }), sceneKey("a", { voice: "v", lengthScale: "0.9" }));
+});
+
+const AZURE = { video: { tts: { engine: "azure", voices: ["pt-BR-Macerio:DragonHDLatestNeural", "pt-BR-FranciscaNeural"], rotation: "alternate" } } };
+const KEY = "secret-key-123";
+const ENV = { AZURE_SPEECH_KEY: KEY, AZURE_SPEECH_REGION: "brazilsouth" };
+
+test("video.tts voices: the spec's voice must be listed, and several voices need one in the spec", () => {
+  assert.deepEqual(voiceSettings({ voice: "pt-BR-FranciscaNeural" }, AZURE, {}), { engine: "azure", voice: "pt-BR-FranciscaNeural", lengthScale: null });
+  assert.throws(() => voiceSettings({ voice: "pt-BR-AntonioNeural" }, AZURE, {}), /voice pt-BR-AntonioNeural is not in video\.tts\.voices/);
+  assert.throws(() => voiceSettings({ id: "v1" }, AZURE, {}), /several voices in video\.tts\.voices.*set "voice" in the spec v1/);
+  assert.equal(voiceSettings({}, { video: { tts: { engine: "azure", voices: ["pt-BR-FranciscaNeural"] } } }, {}).voice, "pt-BR-FranciscaNeural");
+  assert.deepEqual(voiceSettings({}, { video: { voice: "pt_BR-x", tts: { engine: "piper", voices: ["pt_BR-faber-medium"] } } }, {}), { engine: "piper", voice: "pt_BR-faber-medium", lengthScale: "0.92" });
+  assert.throws(() => voiceSettings({}, { video: { tts: { engine: "azure" } } }, {}), /needs a voice/);
+  assert.throws(() => voiceSettings({}, { video: { tts: { engine: "polly" } } }, {}), /video\.tts\.engine must be one of piper, azure/);
+});
+
+test("the cache key changes with the engine and the voice", () => {
+  const piper = { engine: "piper", voice: "v", lengthScale: "1" };
+  assert.notEqual(sceneKey("a", piper), sceneKey("a", { ...piper, engine: "azure" }));
+  assert.notEqual(sceneKey("a", { engine: "azure", voice: "pt-BR-A-Neural", lengthScale: null }), sceneKey("a", { engine: "azure", voice: "pt-BR-B-Neural", lengthScale: null }));
+});
+
+test("azure requests: region URL, headers, and escaped SSML in the voice's language", () => {
+  const { url, init } = azureRequest(`Notas & "recorrências" <já> d'água`, "pt-BR-Macerio:DragonHDLatestNeural", { region: "brazilsouth", key: KEY });
+  assert.equal(url, "https://brazilsouth.tts.speech.microsoft.com/cognitiveservices/v1");
+  assert.equal(init.method, "POST");
+  assert.equal(init.headers["Ocp-Apim-Subscription-Key"], KEY);
+  assert.equal(init.headers["Content-Type"], "application/ssml+xml");
+  assert.equal(init.headers["X-Microsoft-OutputFormat"], "riff-48khz-16bit-mono-pcm");
+  assert.ok(init.headers["User-Agent"]);
+  assert.equal(init.body, '<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="pt-BR"><voice name="pt-BR-Macerio:DragonHDLatestNeural">Notas &amp; &quot;recorrências&quot; &lt;já&gt; d&apos;água</voice></speak>');
+  assert.equal(escapeXml("a<b"), "a&lt;b");
+  assert.throws(() => azureRequest("x", "Francisca", { region: "r", key: KEY }), /no locale prefix/);
+});
+
+test("azure synthesis returns the WAV bytes and never puts the key in errors", async () => {
+  const calls = [];
+  const ok = async (url, init) => { calls.push({ url, init }); return new Response(new Uint8Array([82, 73, 70, 70]), { status: 200 }); };
+  const wav = await synthesizeAzure("Olá", "pt-BR-FranciscaNeural", { env: ENV, fetch: ok });
+  assert.deepEqual([...wav], [82, 73, 70, 70]);
+  assert.equal(calls.length, 1);
+  assert.match(calls[0].init.body, /<voice name="pt-BR-FranciscaNeural">Olá<\/voice>/);
+  const denied = async () => new Response(`invalid subscription key ${KEY} ${"x".repeat(500)}`, { status: 401, statusText: "Unauthorized" });
+  const error = await synthesizeAzure("Olá", "pt-BR-FranciscaNeural", { env: ENV, fetch: denied }).catch((caught) => caught);
+  assert.match(error.message, /^Azure Speech returned 401 Unauthorized for voice pt-BR-FranciscaNeural: invalid subscription key \*\*\*/);
+  assert.ok(!error.message.includes(KEY));
+  assert.ok(error.message.length < 320);
+  const offline = async () => { throw new Error(`connect failed with ${KEY}`); };
+  const network = await synthesizeAzure("Olá", "pt-BR-FranciscaNeural", { env: ENV, fetch: offline }).catch((caught) => caught);
+  assert.ok(!network.message.includes(KEY));
+  await assert.rejects(synthesizeAzure("Olá", "pt-BR-FranciscaNeural", { env: {}, fetch: ok }), /needs AZURE_SPEECH_KEY and AZURE_SPEECH_REGION/);
+  await assert.rejects(synthesizeAzure("Olá", "pt-BR-FranciscaNeural", { env: { AZURE_SPEECH_KEY: KEY }, fetch: ok }), (caught) => /needs AZURE_SPEECH_REGION/.test(caught.message) && !caught.message.includes(KEY));
+  assert.equal(calls.length, 1);
+});
+
+test("credits: azure voices get no voice line unless the profile has one; piper is unchanged", () => {
+  const voice = "pt-BR-FranciscaNeural";
+  assert.equal(credits({ config: AZURE, voice }), "");
+  assert.equal(credits({ config: { ...AZURE, video: { ...AZURE.video, music: config.video.music } }, voice, music: "city-sunshine.mp3" }), 'Créditos\nMúsica: "City Sunshine", Kevin MacLeod (FreePD, CC0).');
+  assert.equal(credits({ config: { video: { ...AZURE.video, voice_credits: { [voice]: { pt: "Voz: Azure AI Speech." } } } }, voice }), "Créditos\nVoz: Azure AI Speech.");
+  assert.throws(() => credits({ config: AZURE }), /pass --voice/);
+  assert.throws(() => credits({ config: AZURE, voice: "pt-BR-AntonioNeural" }), /not in video\.tts\.voices/);
+  assert.match(credits({ config: { video: { tts: { engine: "piper", voices: ["pt_BR-faber-medium"] } } } }), /Piper TTS/);
+  assert.throws(() => credits({ config: { video: { tts: { engine: "piper", voices: ["en_US-other-medium"] } } } }), /no credit text for voice en_US-other-medium/);
+});
+
+test("the render output carries the narration engine and voice from voice.json", () => {
+  const scenes = [{ id: "a", voiceFile: null }, { id: "b", voiceFile: "job/v/b.wav" }];
+  assert.deepEqual(narrationInfo(scenes, { b: { engine: "azure", voice: "pt-BR-FranciscaNeural" } }), { ai_audio: true, ai_audio_engine: "azure", voice: "pt-BR-FranciscaNeural" });
+  assert.deepEqual(narrationInfo(scenes, { b: { duration: 1 } }), { ai_audio: true, ai_audio_engine: "piper", voice: null });
+  assert.deepEqual(narrationInfo([{ id: "a", voiceFile: null }], {}), { ai_audio: false, ai_audio_engine: null, voice: null });
 });
 
 test("music needs license evidence and must match its recorded sha256", async () => {

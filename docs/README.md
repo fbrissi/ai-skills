@@ -33,7 +33,7 @@
 | Social | [`social-content-plan`](skills/social-content-plan.md) | Dated slots and sourced briefs for the next Facebook, Instagram, or YouTube batch; skeleton manifest | Writes the batch directory |
 | Social | [`copy-guard`](skills/copy-guard.md) | Mandatory check for AI writing tells, engagement bait, unsupported claims (pt-BR and English) | None |
 | Social | [`image-cards`](skills/image-cards.md) | Social cards and thumbnails rendered offline with Playwright in Docker | Writes images |
-| Social | [`video-shorts`](skills/video-shorts.md) | 9:16 Shorts and Reels with Remotion, Piper narration, music, and credits | Writes videos |
+| Social | [`video-shorts`](skills/video-shorts.md) | 9:16 Shorts and Reels with Remotion, Piper or Azure AI Speech narration, music, and credits | Writes videos |
 | Social | [`social-review`](skills/social-review.md) | Drive upload and GitHub review issue with a manifest marker; `/adjust` revisions | Drive files, issue, comments |
 | Social | [`facebook-publish`](skills/facebook-publish.md) | Deterministic Graph API scheduler for approved posts, photos, and Reels | Scheduled Page posts |
 | Social | [`instagram-publish`](skills/instagram-publish.md) | Deterministic Instagram publisher, one due item per run, media in a public bucket | Instagram posts, bucket objects |

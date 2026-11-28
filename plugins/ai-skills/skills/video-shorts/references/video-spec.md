@@ -22,7 +22,7 @@ A JSON file per video. Paths are relative to the repository root (the directory 
 |---|---|---|
 | `id`, `kind` | all | unique id; `hook`, `screen`, `footage`, `statement`, `cta` |
 | `voice` | all | the spoken line and its captions (hook and CTA show no captions) |
-| `say` | all | pronunciation spelling read by Piper instead of `voice` |
+| `say` | all | pronunciation spelling read by the TTS engine instead of `voice` |
 | `title`, `highlight` | hook, statement, cta | large text; `highlight` colors its last occurrence (hook) |
 | `body` | statement, cta | second line |
 | `headline` | screen, footage | line above the screen |
