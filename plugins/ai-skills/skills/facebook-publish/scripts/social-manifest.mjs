@@ -38,11 +38,56 @@ export const AI_DISCLOSURE = {
   en: { audio: "Narrated with a synthetic voice (Piper TTS).", visual: "Contains AI-generated footage." },
 };
 
+/** Narration disclosure per TTS engine (item.ai_audio_engine; items without it were narrated with Piper). */
+export const AI_AUDIO_DISCLOSURE = {
+  piper: { pt: AI_DISCLOSURE.pt.audio, en: AI_DISCLOSURE.en.audio },
+  azure: { pt: "Narração com voz sintética (Azure AI Speech).", en: "Narrated with a synthetic voice (Azure AI Speech)." },
+};
+
 export function aiDisclosure(item, language = "pt-BR") {
   if (!item.ai_audio && !item.synthetic_media) return null;
   if (item.options?.ai_disclosure) return item.options.ai_disclosure;
-  const texts = AI_DISCLOSURE[String(language).toLowerCase().startsWith("pt") ? "pt" : "en"];
-  return [item.ai_audio ? texts.audio : null, item.synthetic_media ? texts.visual : null].filter(Boolean).join(" ");
+  const lang = String(language).toLowerCase().startsWith("pt") ? "pt" : "en";
+  const audio = (AI_AUDIO_DISCLOSURE[item.ai_audio_engine] ?? AI_AUDIO_DISCLOSURE.piper)[lang];
+  return [item.ai_audio ? audio : null, item.synthetic_media ? AI_DISCLOSURE[lang].visual : null].filter(Boolean).join(" ");
+}
+
+// ---------- narration voices ----------
+
+export const TTS_ENGINES = ["piper", "azure"];
+
+/** The profile's TTS settings: video.tts when set, else Piper with video.voice (no voice list). */
+export function ttsConfig(config) {
+  const tts = config?.video?.tts;
+  if (!tts) return { engine: "piper", voices: null, rotation: null };
+  const engine = tts.engine ?? "piper";
+  if (!TTS_ENGINES.includes(engine)) throw new ManifestError(`video.tts.engine must be one of ${TTS_ENGINES.join(", ")} (got ${engine})`);
+  if (tts.voices !== undefined && (!Array.isArray(tts.voices) || tts.voices.some((voice) => typeof voice !== "string" || !voice))) throw new ManifestError("video.tts.voices must be a list of voice ids");
+  return { engine, voices: tts.voices?.length ? [...tts.voices] : null, rotation: tts.rotation ?? null };
+}
+
+/** The voice after previousVoice in the list; the first voice when there is no previous one or it left the list. */
+export function nextVoice(voices, previousVoice = null) {
+  if (!voices?.length) return null;
+  const index = voices.indexOf(previousVoice);
+  return voices[index < 0 ? 0 : (index + 1) % voices.length];
+}
+
+/** Assigns voices in order (items already in publish order), continuing the rotation after previousVoice. */
+export function assignVoices(items, voices, previousVoice = null) {
+  let voice = previousVoice;
+  return items.map((item) => {
+    voice = nextVoice(voices, voice);
+    return { ...item, voice };
+  });
+}
+
+/** The voice of a batch's last narrated item in publish order (publish_at, then date, then list order). */
+export function lastVoice(manifest) {
+  const voiced = (manifest?.items ?? []).map((item, index) => ({ item, index })).filter(({ item }) => item.voice);
+  const when = ({ item }) => item.publish_at ? Date.parse(item.publish_at) : Date.parse(`${item.date}T00:00:00Z`) || 0;
+  voiced.sort((a, b) => when(a) - when(b) || a.index - b.index);
+  return voiced.at(-1)?.item.voice ?? null;
 }
 
 /** Meta's AI label (is_ai_generated) applies to realistic AI visuals and to AI-generated narration. */

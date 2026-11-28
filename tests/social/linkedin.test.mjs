@@ -82,6 +82,14 @@ test("AI narration adds a plain-text disclosure to the post", async () => {
   assert.match(body.commentary, /Narração com voz sintética \\\(Piper TTS\\\)\./);
 });
 
+test("Azure narration names Azure AI Speech in the disclosure", async () => {
+  const s = setup([li("a", "2026-11-27", { ai_audio: true, ai_audio_engine: "azure" })]);
+  const fetchImpl = api();
+  await run(s, fetchImpl);
+  const body = JSON.parse(fetchImpl.calls.find((call) => call.url.endsWith("/rest/posts") && call.method === "POST").body);
+  assert.match(body.commentary, /Narração com voz sintética \\\(Azure AI Speech\\\)\./);
+});
+
 test("one item per run, in date order; future items wait", async () => {
   const s = setup([li("a", "2026-11-26"), li("b", "2026-11-27"), li("c", "2026-12-01")]);
   assert.deepEqual(dueItems(s.data, NOW).map((entry) => entry.id), ["a", "b"]);
