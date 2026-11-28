@@ -4,7 +4,8 @@ import { credits, findTrack } from "../../.rulesync/skills/video-shorts/scripts/
 import { buildProps, disclaimerErrors, edgeCuts, footageFitError, narrationInfo, specErrors, undisclaimedScreens, visibleRect } from "../../.rulesync/skills/video-shorts/scripts/render.mjs";
 import { sceneFrames } from "../../.rulesync/skills/video-shorts/scripts/frames.mjs";
 import { sceneTiming } from "../../.rulesync/skills/video-shorts/scripts/timing.mjs";
-import { azureRequest, escapeXml, sceneKey, synthesizeAzure, voiceSettings } from "../../.rulesync/skills/video-shorts/scripts/voice.mjs";
+import { azureRequest, escapeXml, main as voiceMain, sceneKey, synthesizeAzure, voiceSettings } from "../../.rulesync/skills/video-shorts/scripts/voice.mjs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { png, tempDir } from "./helpers.mjs";
 
@@ -211,4 +212,25 @@ test("frame edges that slice UI text are refused; flat dividers and full-width b
 test("frames: first settled and last frame of each screen and footage scene", () => {
   const props = { scenes: [{ id: "hook", kind: "hook", durationInFrames: 72 }, { id: "tela", kind: "screen", durationInFrames: 120 }, { id: "rec", kind: "footage", durationInFrames: 105 }, { id: "cta", kind: "cta", durationInFrames: 183 }] };
   assert.deepEqual(sceneFrames(props), [{ id: "tela", kind: "screen", first: 3, last: 6.333 }, { id: "rec", kind: "footage", first: 7, last: 9.833 }]);
+});
+
+test("voice.json is saved after each line, so an Azure failure midway keeps the lines already synthesized", async () => {
+  const dir = tempDir({ "p.md": `## Parameters\n\n\`\`\`json\n${JSON.stringify({ video: { tts: { engine: "azure", voices: ["pt-BR-FranciscaNeural"] } } })}\n\`\`\`\n` });
+  const spec = join(dir, "spec.json");
+  writeFileSync(spec, JSON.stringify({ id: "v", scenes: [{ id: "a", kind: "hook", voice: "Primeira." }, { id: "b", kind: "cta", voice: "Segunda." }] }));
+  let calls = 0;
+  const fetch = async () => (++calls === 1 ? new Response(new Uint8Array([1]), { status: 200 }) : new Response("Too many requests", { status: 429 }));
+  const exec = (command, args) => { if (command === "ffmpeg") writeFileSync(args.at(-1), "wav"); return command === "ffprobe" ? "1.5\n" : ""; };
+  const stderr = process.stderr.write;
+  process.stderr.write = () => true;
+  try {
+    await assert.rejects(voiceMain(["--spec", spec, "--profile", join(dir, "p.md"), "--work", join(dir, "work")], { env: ENV, fetch, exec }), /Azure Speech returned 429/);
+  } finally {
+    process.stderr.write = stderr;
+  }
+  const saved = JSON.parse(readFileSync(join(dir, "work", "voice", "v", "voice.json"), "utf8"));
+  assert.deepEqual(Object.keys(saved), ["a"]);
+  assert.equal(saved.a.engine, "azure");
+  assert.equal(saved.a.voice, "pt-BR-FranciscaNeural");
+  assert.ok(existsSync(join(dir, "work", "voice", "v", "a.wav")));
 });

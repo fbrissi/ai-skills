@@ -113,7 +113,7 @@ function ensureModel(python, modelDir, voice) {
   return model;
 }
 
-export async function main(argv, { env = process.env, fetch = globalThis.fetch } = {}) {
+export async function main(argv, { env = process.env, fetch = globalThis.fetch, exec = execFileSync } = {}) {
   const value = (name) => {
     const index = argv.indexOf(`--${name}`);
     return index >= 0 ? argv[index + 1] : undefined;
@@ -138,11 +138,13 @@ export async function main(argv, { env = process.env, fetch = globalThis.fetch }
     if (manifest[scene.id]?.key === key && existsSync(output)) { process.stderr.write(`voice ${scene.id}: unchanged\n`); continue; }
     const raw = join(dir, `${scene.id}.raw.wav`);
     if (settings.engine === "azure") writeFileSync(raw, await synthesizeAzure(spoken, settings.voice, { env, fetch }));
-    else execFileSync(python, ["-I", "-m", "piper", "-m", model, "--length-scale", settings.lengthScale, "--sentence-silence", "0.18", "-f", raw], { input: spoken, stdio: ["pipe", "ignore", "inherit"] });
-    execFileSync("ffmpeg", ["-v", "error", "-y", "-i", raw, "-af", VOICE_FILTER, "-ar", "48000", "-ac", "2", output]);
+    else exec(python, ["-I", "-m", "piper", "-m", model, "--length-scale", settings.lengthScale, "--sentence-silence", "0.18", "-f", raw], { input: spoken, stdio: ["pipe", "ignore", "inherit"] });
+    exec("ffmpeg", ["-v", "error", "-y", "-i", raw, "-af", VOICE_FILTER, "-ar", "48000", "-ac", "2", output]);
     rmSync(raw, { force: true });
-    const duration = Number(execFileSync("ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", output], { encoding: "utf8" }).trim());
+    const duration = Number(exec("ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", output], { encoding: "utf8" }).trim());
     manifest[scene.id] = { duration, text: scene.voice, key, engine: settings.engine, voice: settings.voice };
+    // Saved after every line so a failure later (an Azure 429, the network) keeps the lines already synthesized.
+    writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
     process.stderr.write(`voice ${scene.id}: ${duration.toFixed(2)} s\n`);
   }
   writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);

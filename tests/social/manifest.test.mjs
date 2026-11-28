@@ -197,4 +197,7 @@ test("voices alternate from the one the previous batch ended with", () => {
   assert.deepEqual(ttsConfig(null), { engine: "piper", voices: null, rotation: null });
   assert.deepEqual(ttsConfig({ video: { tts: { engine: "azure", voices: voices, rotation: "alternate" } } }), { engine: "azure", voices, rotation: "alternate" });
   assert.throws(() => ttsConfig({ video: { tts: { voices: "a" } } }), /list of voice ids/);
+  assert.throws(() => ttsConfig({ video: { tts: { voices, rotation: "random" } } }), /video\.tts\.rotation must be alternate or omitted \(got random\)/);
+  assert.throws(() => ttsConfig({ video: { tts: { engine: "polly" } } }), /video\.tts\.engine must be one of piper, azure/);
+  assert.equal(ttsConfig({ video: { tts: { voices, rotation: null } } }).rotation, null);
 });

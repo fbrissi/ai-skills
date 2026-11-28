@@ -55,6 +55,7 @@ export function aiDisclosure(item, language = "pt-BR") {
 // ---------- narration voices ----------
 
 export const TTS_ENGINES = ["piper", "azure"];
+export const TTS_ROTATIONS = ["alternate"];
 
 /** The profile's TTS settings: video.tts when set, else Piper with video.voice (no voice list). */
 export function ttsConfig(config) {
@@ -62,6 +63,7 @@ export function ttsConfig(config) {
   if (!tts) return { engine: "piper", voices: null, rotation: null };
   const engine = tts.engine ?? "piper";
   if (!TTS_ENGINES.includes(engine)) throw new ManifestError(`video.tts.engine must be one of ${TTS_ENGINES.join(", ")} (got ${engine})`);
+  if (tts.rotation != null && !TTS_ROTATIONS.includes(tts.rotation)) throw new ManifestError(`video.tts.rotation must be ${TTS_ROTATIONS.join(" or ")} or omitted (got ${tts.rotation})`);
   if (tts.voices !== undefined && (!Array.isArray(tts.voices) || tts.voices.some((voice) => typeof voice !== "string" || !voice))) throw new ManifestError("video.tts.voices must be a list of voice ids");
   return { engine, voices: tts.voices?.length ? [...tts.voices] : null, rotation: tts.rotation ?? null };
 }
