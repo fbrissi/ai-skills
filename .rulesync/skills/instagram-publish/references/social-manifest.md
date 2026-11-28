@@ -25,8 +25,9 @@ Every path in the manifest is relative to its directory and must stay inside it.
 | `timezone`, `language` | IANA zone and `pt-BR`/`en`-style language of the copy |
 | `items` | the content, in publication order |
 | `approval` | `{status: pending|approved|rejected, by, at, revision}`; only the approval step sets `approved` |
-| `review` | `{issue_number, issue_url, revision, drive_root_id, drive_run_folder, history[]}`; `drive_run_folder` is `{id, name, url}` of the batch's Drive run folder (`<root>/<Platform>/<YYYY-MM-DD HH-mm>`, the `created_at` time in `timezone`), written by the first `social-review` upload and reused by every later one |
+| `review` | `{issue_number, issue_url, revision, drive_root_id, drive_run_folder, history[]}`; `drive_run_folder` is `{id, name, url}` of the batch's Drive run folder (`<root>/<Platform>/<YYYY-MM-DD HH-mm>`, the `created_at` time in `timezone`), written by the first `social-review` upload and reused by every later one (a same-minute folder of another batch gets a ` (2)` suffix) |
 | `usage` | ledger of paid generation calls (`{id, at, service, unit, quantity, revision, voice, spec, scene, item, detail}`), merged by `social-review` from `<batch-dir>/usage.jsonl` and tagged with the revision that spent it; feeds the generation-cost comment and the run README. Never AI harness tokens, subscriptions, or infrastructure |
+| `cost_prices` | snapshot of the profile's `costs.prices`, recorded by `social-review` when it runs with `--profile`, so README and costs rendered without the profile keep the prices |
 | `state` | `{<item id>: {status: scheduled|published|failed|unknown|skipped, remote_id, url, publish_at, at, attempts, error, media_urls, extra}}`, written only by publishers. `failed`: the platform refused it (safe to retry). `unknown`: the final publish call got no response, so it may be live; never retried automatically (Instagram resolves it from the saved container) |
 
 ## Item

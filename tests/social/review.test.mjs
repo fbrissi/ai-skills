@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { Drive } from "../../.rulesync/skills/social-review/scripts/drive.mjs";
 import { composeText } from "../../.rulesync/skills/social-review/scripts/social-manifest.mjs";
-import { adjustRequests, bump, costsComment, decodeMarker, encodeMarker, fetchMedia, issueBody, localStamp, mergeUsage, revisionComment, runFolderName, runReadme, upload } from "../../.rulesync/skills/social-review/scripts/review-batch.mjs";
+import { adjustRequests, bump, compactUsage, costsComment, decodeMarker, encodeMarker, fetchMedia, issueBody, localStamp, mergeUsage, revisionComment, runFolderName, runReadme, upload } from "../../.rulesync/skills/social-review/scripts/review-batch.mjs";
 import { fakeFetch, item, json, manifest, png, tempDir, writeManifest } from "./helpers.mjs";
 
 const pending = (items) => manifest("facebook", items, { approval: { status: "pending", by: null, at: null, revision: null } });
@@ -254,6 +254,23 @@ function memoryDrive() {
       }
       return { id: parent };
     },
+    async findFolder(name, parentId) {
+      const id = folders.get(`${parentId}/${name}`);
+      return id ? { id, name } : null;
+    },
+    async createFolder(name, parentId) {
+      const id = `F${++ids}`;
+      folders.set(`${parentId}/${name}`, id);
+      return { id, name };
+    },
+    async children(folderId) {
+      return [...files.entries()].filter(([key]) => key.startsWith(`${folderId}/`)).map(([key, file]) => ({ id: file.id, name: key.slice(folderId.length + 1) }));
+    },
+    async download(fileId, outPath) {
+      const file = [...files.values()].find((entry) => entry.id === fileId);
+      writeFileSync(outPath, file.content);
+      return outPath;
+    },
     async share(id) { shared.push(id); },
     async upload(localPath, folderId, { name }) {
       const key = `${folderId}/${name}`;
@@ -378,10 +395,11 @@ test("generation price resolution: voice override, service default, missing pric
   assert.deepEqual(priceErrors({ costs: { prices: { tts: { unit: "characters" } } } }), ["costs.prices.tts needs per_million_usd or voices"]);
 });
 
-test("billable characters count the text sent, not SSML markup or escaping", async () => {
+test("billable characters count every code point sent inside <voice>, escapes included, CJK twice", async () => {
   const { billableCharacters } = await import("../../.rulesync/skills/social-review/scripts/social-manifest.mjs");
   assert.equal(billableCharacters("Olá, até já!"), 12);
-  assert.equal(billableCharacters("A & B <c>"), 9);
+  assert.equal(billableCharacters("A &amp; B &lt;c&gt;"), 19, "escapes sent inside <voice> count");
+  assert.equal(billableCharacters("你好, ok"), 8, "CJK characters count twice");
   assert.equal(billableCharacters(""), 0);
 });
 
@@ -401,7 +419,8 @@ test("the costs comment shows only this revision, the campaign total, missing pr
   assert.match(costsComment(data, PRICES, { revision: 1 }), /Campanha até agora \(revisões 1 a 1\): US\$ 0,016;/);
   const unpriced = costsComment(data, null);
   assert.match(unpriced, /\| 500 caracteres \| preço não configurado \|/);
-  assert.match(unpriced, /\*\*0,00\*\* \(sem os itens sem preço\)/);
+  assert.match(unpriced, /\| \*\*Total\*\* \| \| \| - \|/);
+  assert.match(unpriced, /Campanha até agora \(revisões 1 a 2\): -; azure-speech \(pt-BR-FranciscaNeural\): 1\.500 caracteres, preço não configurado/);
   assert.throws(() => costsComment(data, { costs: { prices: { "azure-speech": {} } } }), /invalid costs in the profile/);
 });
 
@@ -444,4 +463,65 @@ test("costs command reads <batch-dir>/usage.jsonl, records it in the manifest, a
   assert.match(lines.join(""), /\| 250 caracteres \| 0,004 \|/);
   assert.deepEqual(JSON.parse(readFileSync(path, "utf8")).usage.map((entry) => [entry.id, entry.revision]), [["u1", 1]]);
   await assert.rejects(main(["costs", path, "--revision", "x"], { out: { write: () => {} } }), /--revision must be an integer/);
+});
+
+test("README and costs keep the upload's prices when later rendered without --profile", async () => {
+  const { main } = await import("../../.rulesync/skills/social-review/scripts/review-batch.mjs");
+  const dir = tempDir({ "media/card.png": png(10, 10) });
+  const drive = memoryDrive();
+  const data = pending([item()]);
+  await upload(data, { manifestDir: dir, drive, root: "P", config: PRICES, usage: [speech("a", 1000, 1)] });
+  assert.deepEqual(data.cost_prices, PRICES.costs.prices);
+  const path = writeManifest(dir, data);
+  const out = { write: () => {} };
+  await main(["set-issue", path, "--issue", "12", "--url", "https://github.com/o/r/issues/12"], { out, driveFactory: async () => drive });
+  const readme = () => drive.files.get(`${data.review.drive_run_folder.id}/README.md`).content;
+  assert.match(readme(), /- Custo de geração \(campanha\): US\$ 0,016; azure-speech \(pt-BR-FranciscaNeural\): 1\.000 caracteres, US\$ 0,016/);
+  await main(["readme", path], { out, driveFactory: async () => drive });
+  assert.match(readme(), /US\$ 0,016/);
+  assert.ok(!readme().includes("preço não configurado"));
+  const lines = [];
+  await main(["costs", path, "--usage", join(dir, "none.jsonl")], { out: { write: (text) => lines.push(text) } });
+  assert.match(lines.join(""), /\| 1\.000 caracteres \| 0,016 \|/);
+  const bad = { ...data, cost_prices: { x: 1 } };
+  assert.throws(() => runReadme(bad), /invalid costs in the manifest's cost_prices/);
+});
+
+test("a run folder of the same minute that belongs to another batch gets a numbered name", async () => {
+  const dir = tempDir({ "media/card.png": png(10, 10) });
+  const drive = memoryDrive();
+  const first = pending([item()]);
+  await upload(first, { manifestDir: dir, drive, root: "P" });
+  assert.equal(first.review.drive_run_folder.name, "2026-11-27 09-00");
+  assert.match(drive.files.get(`${first.review.drive_run_folder.id}/README.md`).content, /- Lote: `2026-11-30-facebook`/);
+  const other = pending([item()], {});
+  other.batch_id = "2026-12-07-facebook";
+  await upload(other, { manifestDir: dir, drive, root: "P" });
+  assert.equal(other.review.drive_run_folder.name, "2026-11-27 09-00 (2)");
+  assert.notEqual(other.review.drive_run_folder.id, first.review.drive_run_folder.id);
+  const third = pending([item()]);
+  third.batch_id = "2026-12-14-facebook";
+  await upload(third, { manifestDir: dir, drive, root: "P" });
+  assert.equal(third.review.drive_run_folder.name, "2026-11-27 09-00 (3)");
+  const retry = pending([item()]);
+  await upload(retry, { manifestDir: dir, drive, root: "P" });
+  assert.equal(retry.review.drive_run_folder.id, first.review.drive_run_folder.id, "the same batch without a recorded folder finds its own");
+});
+
+test("the marker folds earlier revisions' usage per revision and keeps the totals", () => {
+  const data = pending([item()]);
+  data.review.revision = 3;
+  data.usage = [speech("a", 100, 1), speech("b", 200, 1), speech("c", 50, 1, "pt-BR-Macerio:DragonHDLatestNeural"), speech("d", 300, 2), speech("e", 10, 3), speech("f", 20, 3)];
+  const decoded = decodeMarker(encodeMarker(data));
+  assert.deepEqual(decoded.usage, [
+    { id: "r1:azure-speech:pt-BR-FranciscaNeural:characters", service: "azure-speech", unit: "characters", quantity: 300, revision: 1, voice: "pt-BR-FranciscaNeural" },
+    { id: "r1:azure-speech:pt-BR-Macerio:DragonHDLatestNeural:characters", service: "azure-speech", unit: "characters", quantity: 50, revision: 1, voice: "pt-BR-Macerio:DragonHDLatestNeural" },
+    { id: "r2:azure-speech:pt-BR-FranciscaNeural:characters", service: "azure-speech", unit: "characters", quantity: 300, revision: 2, voice: "pt-BR-FranciscaNeural" },
+    speech("e", 10, 3),
+    speech("f", 20, 3),
+  ]);
+  assert.deepEqual(compactUsage(decoded.usage, 3), decoded.usage, "folding again changes nothing");
+  for (const revision of [1, 2, 3]) assert.equal(costsComment(decoded, PRICES, { revision }), costsComment(data, PRICES, { revision }));
+  assert.equal(runReadme(decoded, { config: PRICES }), runReadme(data, { config: PRICES }));
+  assert.equal(data.usage.length, 6, "the manifest itself keeps every entry");
 });
