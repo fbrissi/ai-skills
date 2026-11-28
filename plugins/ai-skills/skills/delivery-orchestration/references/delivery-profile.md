@@ -42,6 +42,7 @@ For every value: the run's input (from the request, a calling agent, or a workfl
 | `version-files` | Version files | none (`path: what to set` lines, for example `package.json: version`) |
 | `release-notes-branch-template` | Release notes branch template | `feature/{release-slug}-release-notes` |
 | `no-release-paths` | No-release paths | none: every release gets notes (comma-separated globs, for example `docs/**, *.md`) |
+| `largest-issue-size` | Largest size per issue | `S` (one Size option; issues above it are split) |
 | `qa-ci-setup` | QA in CI setup | none (targeted validation in CI: focused tests, the app or API headless, smoke checks) |
 | `qa-browser` | QA browser | `playwright` (`playwright` or `selenium`) |
 
@@ -148,6 +149,7 @@ Copy to `docs/ai/delivery.md` and remove the lines you do not need.
 - Size field: <name>; options: <XS, S, M, L, XL>
 - Estimate field: <name>
 - Size to Estimate scale: <XS=3, S=5, M=8, L=13, XL=21>
+- Largest size per issue: <S: the largest Size one implement run delivers; refinement splits issues above it>
 - Estimate source: <history | plan>
 - Owner: <login | none>
 

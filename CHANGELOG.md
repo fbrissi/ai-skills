@@ -3,6 +3,13 @@
 All notable changes to this project are documented here. Release versions follow
 [Semantic Versioning](https://semver.org/).
 
+## v0.15.0
+
+### Added
+
+- Separate quality mode for the `task-implementer` agent. When the caller runs the code review and QA in their own workflows (`quality-mode: separate` of `fbrissi/github-actions` `ai-task.yml` v1.20.0), the agent only develops: it runs the narrow checks of the change, pushes, opens the pull request, and stops, and the review and QA findings come back to a PR fix pass. The default `cycle` mode keeps the quality cycle in the run.
+- Size for one implement run. `triage.md` sizes each issue for one implement run (the content to write, the areas, and the scenarios count, not only the code), and the delivery profile gains `Largest size per issue` (default `S`). `business-refinement` makes deliverables as small as they can be while each stays acceptable on its own, and `technical-refinement` splits an issue above that size unless it cannot be split, and says why. A content-heavy issue sized S had run out of time in one implement run.
+
 ## v0.14.1
 
 ### Fixed

@@ -26,7 +26,7 @@ Stop with `Unable to refine: missing source` if there is no `source`.
 
 ## 2. Decide
 
-Split the request into deliverables: each one a user-visible outcome that can be accepted on its own and worked on independently of the others. For each, decide:
+Split the request into deliverables: each one a user-visible outcome that can be accepted on its own and worked on independently of the others. Make them as small as they can be while each stays acceptable on its own: one implement run delivers each one, so size each against the profile's `Largest size per issue` as [references/triage.md](references/triage.md) (Size for one implement run) says, and split a deliverable above it. For each, decide:
 
 | Verdict | When |
 | --- | --- |
