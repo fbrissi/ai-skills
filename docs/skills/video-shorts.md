@@ -11,6 +11,7 @@ Makes vertical 9:16 Shorts and Reels with Remotion: Piper or Azure AI Speech nar
 | Brief | theme, claims, call to action | from the plan |
 | Voice | Piper voice id (`video.voice`), or `video.tts` with the engine (`piper` or `azure`) and the allowed voices, alternated between consecutive videos | `pt_BR-faber-medium` |
 | Music | track from the profile's Drive folder | none |
+| Music volume | `video.music.bed_volume` and `ducked_volume` (spec `music_volume: {bed, ducked}` overrides) | `0.18` and `0.07` |
 | Profile | path | `docs/ai/social-content.md` |
 
 ## Examples

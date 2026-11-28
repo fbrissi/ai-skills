@@ -17,13 +17,11 @@ const L = {
     footnote: { y: 1490, fontSize: 26 },
 };
 
-const BED_VOLUME = 0.18;
-const DUCKED_VOLUME = 0.07;
 const DUCK_RAMP_FRAMES = 8;
 const MAX_WORDS = 7;
 
-/** Music bed at ~18% between lines, ducked to ~7% under the voice, with short ramps and a fade in and out. */
-const Music = ({ src, scenes }: { src: string; scenes: SceneProps[] }) => {
+/** Music bed at volume.bed between lines (default 0.18), ducked to volume.ducked under the voice (default 0.07), with short ramps and a fade in and out. */
+const Music = ({ src, scenes, volume }: { src: string; scenes: SceneProps[]; volume: ShortProps["musicVolume"] }) => {
     const { durationInFrames, fps } = useVideoConfig();
     const voice: Array<[number, number]> = [];
     let offset = 0;
@@ -33,7 +31,7 @@ const Music = ({ src, scenes }: { src: string; scenes: SceneProps[] }) => {
     }
     const level = (frame: number) => {
         const distance = Math.min(...voice.map(([start, end]) => (frame < start ? start - frame : frame > end ? frame - end : 0)), DUCK_RAMP_FRAMES);
-        return interpolate(distance, [0, DUCK_RAMP_FRAMES], [DUCKED_VOLUME, BED_VOLUME]);
+        return interpolate(distance, [0, DUCK_RAMP_FRAMES], [volume.ducked, volume.bed]);
     };
     const fade = (frame: number) => interpolate(frame, [0, fps * 0.6, durationInFrames - fps * 1.5, durationInFrames - 1], [0, 1, 1, 0], clamp);
     return <Audio src={staticFile(src)} volume={(frame) => level(frame) * fade(frame)} />;
@@ -219,14 +217,14 @@ const SceneView = ({ scene, brand }: { scene: SceneProps; brand: Brand }) => {
 
 const loadedFonts = new Set<string>();
 
-export const Short = ({ brand, music, footnote, scenes }: ShortProps) => {
+export const Short = ({ brand, music, musicVolume, footnote, scenes }: ShortProps) => {
     if (brand.fontFile && !loadedFonts.has(brand.fontFile)) {
         loadedFonts.add(brand.fontFile);
         loadFont({ family: brand.fontFamily, url: staticFile(brand.fontFile), weight: "100 900" }).catch(() => undefined);
     }
     return (
         <AbsoluteFill style={{ backgroundColor: brand.colors.background, fontFamily: `"${brand.fontFamily}", system-ui, sans-serif`, color: brand.colors.ink }}>
-            {music && <Music src={music} scenes={scenes} />}
+            {music && <Music src={music} scenes={scenes} volume={musicVolume} />}
             <Series>
                 {scenes.map((scene) => (
                     <Series.Sequence key={scene.id} name={scene.id} durationInFrames={scene.durationInFrames}>

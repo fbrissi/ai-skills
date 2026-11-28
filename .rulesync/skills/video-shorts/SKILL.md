@@ -36,6 +36,8 @@ node <skill-dir>/scripts/drive.mjs download-folder --folder <video.music.drive_f
 
 Pick a track listed in `video.music.tracks` and set `music` in the spec. Every track needs `license_url`, `evidence` (the Drive file id of the license evidence, such as the download page saved as PDF), and `sha256` of the file in the profile: `render.mjs` refuses music without them or whose file hash differs. A YouTube Short with music must stay at most 60 s. Without music, omit it.
 
+The bed plays at `video.music.bed_volume` between narration lines (default `0.18`) and ducks to `video.music.ducked_volume` under the voice (default `0.07`). Both are gains greater than 0 and at most 1, and the ducked level must not be louder than the bed. A spec may override either for one video with `"music_volume": {"bed": 0.22, "ducked": 0.08}` (a missing key falls back to the profile, then the default). `render.mjs` refuses invalid levels before rendering, naming the key.
+
 ## 3. Narration and render
 
 ```bash

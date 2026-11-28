@@ -25,6 +25,32 @@ const DEFAULT_COLORS = { background: "#f5f7fa", ink: "#14213d", primary: "#2d5ba
 
 export class RenderError extends Error {}
 
+/** Music bed level between narration lines and under the voice (ducked), as gain in (0, 1]. */
+export const DEFAULT_MUSIC_VOLUME = { bed: 0.18, ducked: 0.07 };
+
+/**
+ * Music levels and their errors: the spec's music_volume {bed, ducked} over the profile's video.music.bed_volume
+ * and ducked_volume, over the defaults. Each must be a number in (0, 1], and ducked at most bed.
+ */
+export function musicVolume(spec, config) {
+  const music = config?.video?.music ?? {};
+  const override = spec?.music_volume;
+  const errors = [];
+  if (override !== undefined && (override === null || typeof override !== "object" || Array.isArray(override))) errors.push("music_volume must be an object {bed, ducked}");
+  const pick = (key, profileKey) => {
+    if (override && typeof override === "object" && override[key] !== undefined) return [override[key], `music_volume.${key}`];
+    if (music[profileKey] !== undefined) return [music[profileKey], `video.music.${profileKey}`];
+    return [DEFAULT_MUSIC_VOLUME[key], null];
+  };
+  const [bed, bedFrom] = pick("bed", "bed_volume");
+  const [ducked, duckedFrom] = pick("ducked", "ducked_volume");
+  for (const [value, from] of [[bed, bedFrom], [ducked, duckedFrom]]) {
+    if (from && (typeof value !== "number" || !Number.isFinite(value) || value <= 0 || value > 1)) errors.push(`${from} must be a number greater than 0 and at most 1 (got ${JSON.stringify(value)})`);
+  }
+  if (!errors.length && ducked > bed) errors.push(`${duckedFrom ?? "the default ducked volume"} (${ducked}) must not be louder than ${bedFrom ?? "the default bed volume"} (${bed}): the music ducks under the voice`);
+  return { volume: { bed, ducked }, errors };
+}
+
 /** The window that shows screens and footage in Short.tsx (L.screen): 1000x720 on the 1080x1920 canvas. */
 export const SCREEN_FRAME = { width: 1000, height: 720 };
 /** Longest screen disclaimer that fits one line under the screen frame. */
@@ -178,6 +204,7 @@ export function specErrors(spec, root = process.cwd(), config = null, { pixels =
     }
   }
   if (spec.music && !existsSync(resolve(root, spec.music))) errors.push(`music not found: ${spec.music} (download it with drive.mjs download-folder)`);
+  errors.push(...musicVolume(spec, config).errors);
   return errors;
 }
 
@@ -266,9 +293,12 @@ export function buildProps(spec, { config, root, jobDir, jobPublic, voice, music
     return entry;
   });
   const logo = brand.logo ? copy(brand.logo, `logo${extname(brand.logo)}`) : null;
+  const { volume, errors } = musicVolume(spec, config);
+  if (errors.length) throw new RenderError(`invalid music volume:\n- ${errors.join("\n- ")}`);
   return {
     brand: { colors: { ...DEFAULT_COLORS, ...(brand.colors ?? {}) }, fontFamily: brand.font?.family ?? "system-ui", fontFile, logo },
     music: music ? copy(music, `music${extname(music)}`) : null,
+    musicVolume: volume,
     footnote: spec.footnote ?? config?.video?.footnote ?? null,
     scenes,
   };

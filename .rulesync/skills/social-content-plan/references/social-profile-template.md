@@ -101,6 +101,8 @@ Bad (never write like this):
     "length_scale": 0.92,
     "music": {
       "drive_folder_id": "<Drive folder id with the tracks>",
+      "bed_volume": 0.18,
+      "ducked_volume": 0.07,
       "tracks": [{ "file": "city-sunshine.mp3", "title": "City Sunshine", "author": "Kevin MacLeod", "source": "FreePD", "license": "CC0", "license_url": "<URL of the license or the track page>", "evidence": "<Drive file id of the saved license page or receipt>", "sha256": "<sha256 of the mp3: shasum -a 256 city-sunshine.mp3>" }]
     },
     "footnote": "<for example: Telas reais com dados fictícios>",
@@ -118,6 +120,7 @@ Bad (never write like this):
 - `platforms.instagram` and `platforms.linkedin`: always published by the consumer's cron (no scheduling APIs). Keep `linkedin.enabled` false until LinkedIn approves the Community Management API for your app. `media_prefix` is the bucket key prefix (`{date}`, `{id}`).
 - `review.drive_root`: the Drive folder of the batches. Each generate run gets `<drive_root>/<Platform>/<YYYY-MM-DD HH-mm>/` (the run's creation time in `timezone`) with a `README.md` and one subfolder per publish date; adjust revisions reuse the batch's run folder.
 - `video.music.drive_folder_id`: a Drive folder whose tracks the app can see (uploaded with `drive.mjs upload`, since the `drive.file` scope only sees app-created files), or a public folder read with `GOOGLE_API_KEY`. Every track used must be listed in `tracks` with its license, `license_url`, `evidence` (Drive file id of the license evidence) and `sha256`; `video-shorts` refuses a track without them or whose file hash differs, and the review issue links the evidence.
+- `video.music.bed_volume` and `video.music.ducked_volume`: optional music levels (gain in (0, 1]) between narration lines and under the voice; defaults 0.18 and 0.07, and `ducked_volume` must not exceed `bed_volume`. A video spec can override them with `music_volume: {bed, ducked}`.
 - `copy_guard.allowed_numbers`: numeric claims allowed besides those in Offer, Allowed claims, and Calendar hooks, written with the word that follows the number (`"50 números"`); a bare `"30"` allows the number in any context. `copy-guard` flags every other number in digits.
 - `video.screen_disclaimer`: a line `video-shorts` draws under every product screen (screenshots and real recordings), at most 80 characters; when set, the render stops when a product screen lacks it. Optional: without it product screens render bare with a warning. `video.footnote` is the small line near the bottom of screen scenes when the spec has none.
 - `video.tts`: optional; without it narration uses Piper with `video.voice`. `engine` is `piper` (default) or `azure` (Azure AI Speech, needs `AZURE_SPEECH_KEY` and `AZURE_SPEECH_REGION`); `voices` lists the allowed voice ids (a spec's `voice` must be one of them); more than one voice requires `rotation: "alternate"` (anything else is rejected), and then the plan assigns voices in publish order so consecutive videos of a platform never share one. Azure example: `{ "engine": "azure", "voices": ["pt-BR-Macerio:DragonHDLatestNeural", "pt-BR-FranciscaNeural"], "rotation": "alternate" }`. `video.length_scale` applies to Piper only.
