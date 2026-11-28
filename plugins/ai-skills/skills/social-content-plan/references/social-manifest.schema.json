@@ -620,6 +620,13 @@
             "string",
             "null"
           ]
+        },
+        "sources": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Ledger ids folded into this per-revision aggregate by the issue marker; merging the same ledger again skips them."
         }
       }
     },

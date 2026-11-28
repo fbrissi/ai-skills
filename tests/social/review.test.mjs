@@ -514,9 +514,9 @@ test("the marker folds earlier revisions' usage per revision and keeps the total
   data.usage = [speech("a", 100, 1), speech("b", 200, 1), speech("c", 50, 1, "pt-BR-Macerio:DragonHDLatestNeural"), speech("d", 300, 2), speech("e", 10, 3), speech("f", 20, 3)];
   const decoded = decodeMarker(encodeMarker(data));
   assert.deepEqual(decoded.usage, [
-    { id: "r1:azure-speech:pt-BR-FranciscaNeural:characters", service: "azure-speech", unit: "characters", quantity: 300, revision: 1, voice: "pt-BR-FranciscaNeural" },
-    { id: "r1:azure-speech:pt-BR-Macerio:DragonHDLatestNeural:characters", service: "azure-speech", unit: "characters", quantity: 50, revision: 1, voice: "pt-BR-Macerio:DragonHDLatestNeural" },
-    { id: "r2:azure-speech:pt-BR-FranciscaNeural:characters", service: "azure-speech", unit: "characters", quantity: 300, revision: 2, voice: "pt-BR-FranciscaNeural" },
+    { id: "r1:azure-speech:pt-BR-FranciscaNeural:characters", service: "azure-speech", unit: "characters", quantity: 300, revision: 1, voice: "pt-BR-FranciscaNeural", sources: ["a", "b"] },
+    { id: "r1:azure-speech:pt-BR-Macerio:DragonHDLatestNeural:characters", service: "azure-speech", unit: "characters", quantity: 50, revision: 1, voice: "pt-BR-Macerio:DragonHDLatestNeural", sources: ["c"] },
+    { id: "r2:azure-speech:pt-BR-FranciscaNeural:characters", service: "azure-speech", unit: "characters", quantity: 300, revision: 2, voice: "pt-BR-FranciscaNeural", sources: ["d"] },
     speech("e", 10, 3),
     speech("f", 20, 3),
   ]);
@@ -524,4 +524,29 @@ test("the marker folds earlier revisions' usage per revision and keeps the total
   for (const revision of [1, 2, 3]) assert.equal(costsComment(decoded, PRICES, { revision }), costsComment(data, PRICES, { revision }));
   assert.equal(runReadme(decoded, { config: PRICES }), runReadme(data, { config: PRICES }));
   assert.equal(data.usage.length, 6, "the manifest itself keeps every entry");
+});
+
+test("re-merging the original ledger after a marker restore adds nothing and re-tags nothing", async () => {
+  const { appendUsage, readUsage } = await import("../../.rulesync/skills/social-review/scripts/social-manifest.mjs");
+  const dir = tempDir({ "media/card.png": png(10, 10) });
+  const ledger = join(dir, "usage.jsonl");
+  appendUsage(ledger, { service: "azure-speech", unit: "characters", quantity: 1000, voice: "pt-BR-FranciscaNeural" }, { id: "u1" });
+  appendUsage(ledger, { service: "azure-speech", unit: "characters", quantity: 500, voice: "pt-BR-FranciscaNeural" }, { id: "u2" });
+  const drive = memoryDrive();
+  const data = pending([item()]);
+  await upload(data, { manifestDir: dir, drive, root: "P", config: PRICES, usage: readUsage(ledger) });
+  bump(data, [data.items[0].id]);
+  appendUsage(ledger, { service: "azure-speech", unit: "characters", quantity: 200, voice: "pt-BR-FranciscaNeural" }, { id: "u3" });
+  await upload(data, { manifestDir: dir, drive, root: "P", config: PRICES, usage: readUsage(ledger) });
+  bump(data, [data.items[0].id]);
+  const before = { comment: costsComment(data, PRICES, { revision: 3 }), readme: runReadme(data, { config: PRICES }) };
+  const restored = decodeMarker(encodeMarker(data));
+  assert.deepEqual(restored.usage.map((entry) => [entry.id, entry.revision, entry.quantity]), [["r1:azure-speech:pt-BR-FranciscaNeural:characters", 1, 1500], ["r2:azure-speech:pt-BR-FranciscaNeural:characters", 2, 200]]);
+  assert.equal(mergeUsage(restored, readUsage(ledger)), 0);
+  await upload(restored, { manifestDir: dir, drive, root: "P", config: PRICES, usage: readUsage(ledger) });
+  assert.deepEqual(restored.usage.map((entry) => [entry.revision, entry.quantity]), [[1, 1500], [2, 200]]);
+  assert.equal(costsComment(restored, PRICES, { revision: 3 }), before.comment);
+  assert.equal(runReadme(restored, { config: PRICES }), before.readme);
+  const again = decodeMarker(encodeMarker(restored));
+  assert.equal(mergeUsage(again, readUsage(ledger)), 0, "a second round trip still skips the folded ids");
 });

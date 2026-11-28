@@ -527,7 +527,7 @@ export function billableCharacters(text) {
   return [...String(text ?? "")].reduce((sum, char) => sum + (DOUBLE_WIDTH.test(char) ? 2 : 1), 0);
 }
 
-const USAGE_KEYS = ["id", "at", "service", "unit", "quantity", "revision", "detail", "voice", "spec", "scene", "item"];
+const USAGE_KEYS = ["id", "at", "service", "unit", "quantity", "revision", "detail", "voice", "spec", "scene", "item", "sources"];
 
 /** Errors of one usage ledger entry (a paid generation call). */
 export function usageErrors(entry, where = "usage") {

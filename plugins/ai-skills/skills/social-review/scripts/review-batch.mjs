@@ -41,7 +41,8 @@ const commands = (review) => ({ adjust: review.commands?.adjust ?? "/adjust", ap
 /**
  * Usage with the entries of revisions before `revision` folded into one aggregate per revision, service, voice,
  * detail, and unit (same quantities, so totals and costs stay identical); the current revision stays detailed.
- * Aggregates have deterministic ids, so folding again changes nothing.
+ * Aggregates have deterministic ids and list the ledger ids they replace in `sources`, so folding again changes
+ * nothing and mergeUsage never adds a folded entry twice.
  */
 export function compactUsage(usage, revision) {
   const kept = [];
@@ -50,10 +51,12 @@ export function compactUsage(usage, revision) {
     const entryRevision = entry.revision ?? 1;
     if (entryRevision >= revision) { kept.push(entry); continue; }
     const key = JSON.stringify([entryRevision, entry.service, entry.voice ?? null, entry.detail ?? null, entry.unit]);
-    const aggregate = folded.get(key) ?? { id: `r${entryRevision}:${entry.service}:${entry.voice ?? entry.detail ?? "-"}:${entry.unit}`, service: entry.service, unit: entry.unit, quantity: 0, revision: entryRevision, ...(entry.voice ? { voice: entry.voice } : {}), ...(entry.detail ? { detail: entry.detail } : {}) };
+    const aggregate = folded.get(key) ?? { id: `r${entryRevision}:${entry.service}:${entry.voice ?? entry.detail ?? "-"}:${entry.unit}`, service: entry.service, unit: entry.unit, quantity: 0, revision: entryRevision, ...(entry.voice ? { voice: entry.voice } : {}), ...(entry.detail ? { detail: entry.detail } : {}), sources: [] };
     aggregate.quantity += entry.quantity;
+    aggregate.sources.push(...(entry.sources ?? [entry.id]));
     folded.set(key, aggregate);
   }
+  for (const aggregate of folded.values()) aggregate.sources = [...new Set(aggregate.sources)].sort();
   return [...folded.values(), ...kept];
 }
 
@@ -193,9 +196,12 @@ export function bump(manifest, changed, { note = null, now = new Date() } = {}) 
   return manifest;
 }
 
-/** Adds ledger entries not yet in manifest.usage (by id), tagging untagged ones with the current revision. */
+/**
+ * Adds ledger entries not yet in manifest.usage, tagging untagged ones with the current revision. An entry already
+ * merged, directly (its id) or folded into an aggregate of the marker (its sources), is never added or tagged again.
+ */
 export function mergeUsage(manifest, entries) {
-  const known = new Set((manifest.usage ?? []).map((entry) => entry.id));
+  const known = new Set((manifest.usage ?? []).flatMap((entry) => [entry.id, ...(entry.sources ?? [])]));
   const revision = manifest.review?.revision ?? 1;
   const added = entries.filter((entry) => !known.has(entry.id)).map((entry) => ({ ...entry, revision: entry.revision ?? revision }));
   if (added.length || manifest.usage) manifest.usage = [...(manifest.usage ?? []), ...added];
